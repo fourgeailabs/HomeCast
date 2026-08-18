@@ -1,6 +1,6 @@
 {
-  "name": "GlassCast",
-  "description": "Audiobook and Plex music client with a glassmorphism iOS feel.",
+  "name": "HomeCast",
+  "description": "Audiobook and Plex music client with a sleek glassmorphism aesthetic, AI-powered discovery, and smart media player.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
