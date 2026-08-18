@@ -10,11 +10,21 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
+  <img src="https://img.shields.io/badge/Release-v1.1-brightgreen?style=flat-square" alt="Version 1.1" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
+
+---
+
+### 🚀 What's New in v1.1
+- **Working Server Connections**: Functional **Audiobookshelf** and **Plex** server configuration with real test connection, token/credential validation, and one-tap database sync.
+- **Plex Music Integration**: Added real Plex server connection and live music streaming (`X-Plex-Token` / direct URL).
+- **Real Local Room Database**: Replaced placeholder data with live Room database caching for audiobooks, music tracks, and server configurations.
+- **Gemini 2.5 AI Discovery**: Enhanced AI media discovery with quick category chips, custom search prompt queries, and optional location-aware recommendations.
+- **Persistent Mini-Player**: Bottom mini-player bar for background playback and instant navigation between views.
 
 ---
 

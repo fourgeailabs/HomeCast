@@ -1,115 +1,419 @@
 package com.example.ui.screens
 
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.ServerConfig
+import com.example.ui.MainViewModel
+import com.example.ui.ServerOperationState
+import com.example.ui.theme.AccentIndigo
+import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.LocalThemeMode
+import com.example.ui.theme.SurfaceGlass
+import com.example.ui.theme.SurfaceGlassBorder
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
-fun SettingsScreen(onThemeToggle: (Boolean) -> Unit) {
+fun SettingsScreen(
+    viewModel: MainViewModel,
+    onThemeToggle: (Boolean) -> Unit
+) {
     val isDarkTheme = LocalThemeMode.current
+    val servers by viewModel.servers.collectAsState()
+    val serverOpState by viewModel.serverOpState.collectAsState()
+    val context = LocalContext.current
 
-    Column(
+    LaunchedEffect(serverOpState) {
+        when (serverOpState) {
+            is ServerOperationState.Success -> {
+                Toast.makeText(context, (serverOpState as ServerOperationState.Success).message, Toast.LENGTH_LONG).show()
+                viewModel.resetServerOpState()
+            }
+            is ServerOperationState.Error -> {
+                Toast.makeText(context, (serverOpState as ServerOperationState.Error).message, Toast.LENGTH_LONG).show()
+                viewModel.resetServerOpState()
+            }
+            else -> {}
+        }
+    }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        item {
+            Text("Settings & Connections", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        }
 
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+        item {
+            // Theme Setting
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = SurfaceGlass
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Dark Mode", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Switch(checked = isDarkTheme, onCheckedChange = { onThemeToggle(it) })
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                            contentDescription = "Theme",
+                            tint = AccentTeal
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Dark Mode", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Switch(checked = isDarkTheme, onCheckedChange = { onThemeToggle(it) })
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Servers", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        // Active Connected Servers
+        if (servers.isNotEmpty()) {
+            item {
+                Text("Connected Servers", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+            items(servers) { server ->
+                ServerItemCard(
+                    server = server,
+                    onSync = { viewModel.syncServer(server) },
+                    onDelete = { viewModel.removeServer(server.id) },
+                    isLoading = serverOpState is ServerOperationState.Loading
+                )
+            }
+        }
 
-        ServerConfigCard(title = "Audiobookshelf", type = "Audiobooks")
-        ServerConfigCard(title = "Plex", type = "Music")
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Add New Server", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+
+        // Audiobookshelf Config Card
+        item {
+            AudiobookshelfConfigCard(
+                isLoading = serverOpState is ServerOperationState.Loading,
+                onConnect = { name, url, token, username, password ->
+                    viewModel.saveAndConnectAudiobookshelf(name, url, token, username, password)
+                }
+            )
+        }
+
+        // Plex Config Card
+        item {
+            PlexConfigCard(
+                isLoading = serverOpState is ServerOperationState.Loading,
+                onConnect = { name, url, token ->
+                    viewModel.saveAndConnectPlexDirect(name, url, token)
+                }
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 }
 
 @Composable
-fun ServerConfigCard(title: String, type: String) {
+fun ServerItemCard(
+    server: ServerConfig,
+    onSync: () -> Unit,
+    onDelete: () -> Unit,
+    isLoading: Boolean
+) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text("Type: $type", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (server.type == "audiobookshelf") Icons.Default.Book else Icons.Default.MusicNote,
+                        contentDescription = server.type,
+                        tint = if (server.type == "audiobookshelf") AccentTeal else AccentIndigo
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(server.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(server.hostUrl, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
 
-            var serverName by remember { mutableStateOf("") }
-            var localIp by remember { mutableStateOf("") }
-            var externalIp by remember { mutableStateOf("") }
-            var username by remember { mutableStateOf("") }
-            var password by remember { mutableStateOf("") }
+                AssistChip(
+                    onClick = {},
+                    label = { Text(if (server.isConnected) "Connected" else "Offline", fontSize = 11.sp) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Status",
+                            tint = if (server.isConnected) Color.Green else Color.Gray,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                )
+            }
+
+            if (server.lastSyncTime > 0) {
+                val formattedTime = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(server.lastSyncTime))
+                Text(
+                    "Last synced: $formattedTime",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDelete, enabled = !isLoading) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                FilledTonalButton(onClick = onSync, enabled = !isLoading) {
+                    Icon(Icons.Default.Sync, contentDescription = "Sync", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Sync Library")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AudiobookshelfConfigCard(
+    isLoading: Boolean,
+    onConnect: (String, String, String, String, String) -> Unit
+) {
+    var serverName by remember { mutableStateOf("My Audiobookshelf") }
+    var hostUrl by remember { mutableStateOf("http://192.168.1.") }
+    var token by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var useTokenAuth by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Book, contentDescription = "Audiobookshelf", tint = AccentTeal)
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("Audiobookshelf Server", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Audiobooks, Podcasts & E-books", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = serverName,
                 onValueChange = { serverName = it },
-                label = { Text("Custom Server Name") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Display Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
             Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedTextField(
-                value = localIp,
-                onValueChange = { localIp = it },
-                label = { Text("Local IP / URL") },
-                modifier = Modifier.fillMaxWidth()
+                value = hostUrl,
+                onValueChange = { hostUrl = it },
+                label = { Text("Server URL (e.g. http://192.168.1.100:13378)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
+
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = externalIp,
-                onValueChange = { externalIp = it },
-                label = { Text("External IP / URL") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                modifier = Modifier.fillMaxWidth()
-            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = useTokenAuth, onCheckedChange = { useTokenAuth = it })
+                Text("Use API Token instead of Username/Password", fontSize = 13.sp)
+            }
+
+            if (useTokenAuth) {
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    label = { Text("API Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            } else {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
+
             Button(
-                onClick = { /* TODO: Save config */ },
-                modifier = Modifier.fillMaxWidth()
+                onClick = {
+                    onConnect(serverName, hostUrl, token, username, password)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading && hostUrl.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
             ) {
-                Text("Save & Connect")
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Connecting & Syncing...")
+                } else {
+                    Icon(Icons.Default.Link, contentDescription = "Connect")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Save & Connect Audiobookshelf")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlexConfigCard(
+    isLoading: Boolean,
+    onConnect: (String, String, String) -> Unit
+) {
+    var serverName by remember { mutableStateOf("My Plex Server") }
+    var hostUrl by remember { mutableStateOf("http://192.168.1.") }
+    var plexToken by remember { mutableStateOf("") }
+    var showTokenHelp by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MusicNote, contentDescription = "Plex", tint = AccentIndigo)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Plex Server", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Music & Audio Streaming", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                IconButton(onClick = { showTokenHelp = !showTokenHelp }) {
+                    Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            AnimatedVisibility(visible = showTokenHelp) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                ) {
+                    Text(
+                        "To find your Plex Token:\n1. Open Plex Web and inspect XML on any media item\n2. Or check your Plex account settings for X-Plex-Token\n3. Enter the token along with your Plex local/remote URL.",
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = serverName,
+                onValueChange = { serverName = it },
+                label = { Text("Display Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = hostUrl,
+                onValueChange = { hostUrl = it },
+                label = { Text("Plex URL (e.g. http://192.168.1.100:32400)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = plexToken,
+                onValueChange = { plexToken = it },
+                label = { Text("X-Plex-Token") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    onConnect(serverName, hostUrl, plexToken)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading && hostUrl.isNotBlank() && plexToken.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Connecting & Syncing...")
+                } else {
+                    Icon(Icons.Default.Link, contentDescription = "Connect")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Save & Connect Plex")
+                }
             }
         }
     }

@@ -9,21 +9,40 @@ data class Audiobook(
     val title: String,
     val author: String,
     val coverUrl: String,
-    val duration: Long,
-    val progress: Long,
+    val duration: Long, // in seconds or milliseconds
+    val progress: Long = 0L,
     val isFavorite: Boolean = false,
     val lastPlayed: Long = 0L,
     val serverId: String,
-    val isDownloaded: Boolean = false
+    val isDownloaded: Boolean = false,
+    val streamUrl: String = "",
+    val seriesName: String = "",
+    val narrator: String = ""
+)
+
+@Entity(tableName = "music_tracks")
+data class MusicTrack(
+    @PrimaryKey val id: String,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val coverUrl: String,
+    val duration: Long, // in milliseconds
+    val serverId: String,
+    val streamUrl: String,
+    val ratingKey: String = "",
+    val lastPlayed: Long = 0L
 )
 
 @Entity(tableName = "servers")
 data class ServerConfig(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey val id: String, // e.g. "abs_server" or "plex_server" or uuid
     val name: String,
     val type: String, // "audiobookshelf" or "plex"
-    val localIp: String,
-    val externalIp: String,
-    val apiKey: String,
-    val username: String = ""
+    val hostUrl: String,
+    val apiKey: String = "",
+    val username: String = "",
+    val password: String = "",
+    val isConnected: Boolean = false,
+    val lastSyncTime: Long = 0L
 )
