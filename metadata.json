@@ -1,0 +1,6 @@
+{
+  "name": "GlassCast",
+  "description": "Audiobook and Plex music client with a glassmorphism iOS feel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
