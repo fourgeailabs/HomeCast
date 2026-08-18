@@ -31,7 +31,9 @@ data class MusicTrack(
     val serverId: String,
     val streamUrl: String,
     val ratingKey: String = "",
-    val lastPlayed: Long = 0L
+    val lastPlayed: Long = 0L,
+    val genre: String = "Various",
+    val trackNumber: Int = 1
 )
 
 @Entity(tableName = "servers")

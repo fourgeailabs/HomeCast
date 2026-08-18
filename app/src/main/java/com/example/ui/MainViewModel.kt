@@ -213,16 +213,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Gemini Discovery ---
-    fun fetchDiscoveryRecommendations(prompt: String, location: Location? = null) {
+    fun fetchDiscoveryRecommendations(prompt: String, location: Location? = null, mediaType: String? = null) {
         viewModelScope.launch {
             _isDiscoveryLoading.value = true
             _discoveryError.value = null
             try {
-                val fullPrompt = if (location != null) {
-                    "$prompt (User Location: Lat ${location.latitude}, Lng ${location.longitude}). Return 4-5 diverse audiobook and music recommendations with title, creator/author, and a short 1-line reason why."
-                } else {
-                    "$prompt. Return 4-5 diverse audiobook and music recommendations with title, creator/author, and a short 1-line reason why."
+                val typeHint = when (mediaType?.lowercase()) {
+                    "audiobooks" -> "audiobooks with narrators"
+                    "music" -> "music albums and tracks with artists"
+                    "books" -> "e-books and literature with authors"
+                    else -> "audiobooks, music albums, and e-books"
                 }
+                val locationHint = if (location != null) " (User Location: Lat ${location.latitude}, Lng ${location.longitude})" else ""
+                val fullPrompt = "$prompt$locationHint. Recommend outstanding $typeHint. Return 4-6 distinct recommendations with format 'Title - Creator: Brief reason'."
 
                 val request = GenerateContentRequest(
                     contents = listOf(Content(parts = listOf(Part(text = fullPrompt))))
@@ -231,7 +234,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
                 val lines = text.split("\n")
                     .map { it.trim().removePrefix("*").removePrefix("-").trim() }
-                    .filter { it.isNotBlank() }
+                    .filter { it.isNotBlank() && it.length > 3 }
                 _recommendations.value = lines
             } catch (e: Exception) {
                 _discoveryError.value = "Unable to fetch AI recommendations: ${e.message}"

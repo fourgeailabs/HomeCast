@@ -120,7 +120,15 @@ data class PlexTrackMetadata(
     val parentThumb: String? = null,
     val grandparentThumb: String? = null,
     val duration: Long? = null,
+    val index: Int? = null,
+    val parentYear: Int? = null,
+    @Json(name = "Genre") val genreList: List<PlexTagItem>? = null,
     @Json(name = "Media") val media: List<PlexMediaItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PlexTagItem(
+    val tag: String? = null
 )
 
 @JsonClass(generateAdapter = true)

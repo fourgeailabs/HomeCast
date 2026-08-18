@@ -158,6 +158,9 @@ object PlexClient {
                             ""
                         }
 
+                        val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() } ?: "Various"
+                        val trackIndex = item.index ?: (tracksList.size + 1)
+
                         tracksList.add(
                             MusicTrack(
                                 id = "plex_${item.ratingKey}",
@@ -168,7 +171,9 @@ object PlexClient {
                                 duration = item.duration ?: 0L,
                                 serverId = serverId,
                                 streamUrl = streamUrl,
-                                ratingKey = item.ratingKey
+                                ratingKey = item.ratingKey,
+                                genre = genreTag,
+                                trackNumber = trackIndex
                             )
                         )
                     }

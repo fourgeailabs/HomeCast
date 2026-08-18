@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v1.3-brightgreen?style=flat-square" alt="Version 1.3" />
+  <img src="https://img.shields.io/badge/Release-v1.5-brightgreen?style=flat-square" alt="Version 1.5" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -18,6 +18,37 @@
 </p>
 
 ---
+
+### 🚀 What's New in v1.5
+- **Unified Discovery Shelf-Like Architecture**:
+  - **Multi-Media Horizontal Carousels**: Refactored the entire Discovery experience into fluid horizontal sliding shelves matching the Library and Music interfaces.
+  - **Complete Media Triad**: Full discovery support across **Audiobooks**, **Music**, and **Books (E-Reader)**.
+  - **Vertical Categorized Shelves**:
+    - **Audiobooks**: "Trending Audiobooks" (bestsellers, top narrators), "Sci-Fi & Cyberpunk Sagas" (epic worldbuilding, space operas), "Mindset & Growth", and "Psychological Thrillers".
+    - **Music**: "Featured Music Albums", "Acoustic & Lo-Fi Chill" (focus loops, rainy vibes, coffee shop melodies), "High-Voltage Rock & Synthwaves", and "Cinematic Orchestras & Scores".
+    - **Books (E-Reader Ready)**: "Bestselling E-Books & Novels", "Classic Literature", and "Speculative Fiction".
+- **Interactive E-Reader Engine & Preview**:
+  - Prepared the app for the upcoming full E-Reader aspect with an interactive **E-Reader Reading Canvas**.
+  - Includes typography customization (font size adjustments A- / A+), multiple reading themes (**Sepia**, **Night Dark**, **Clean Light**), formatted chapter excerpts, page counters, EPUB/PDF format badges, and one-tap "Bookmark to Library".
+- **Real-Time Gemini AI Generative Discovery**:
+  - Filter chips for fast context switching (`All Media`, `Audiobooks`, `Music`, `Books (E-Reader)`, `Nearby Culture`).
+  - Generative AI prompt bar for requesting customized recommendations across narrators, soundscapes, or book authors with direct playback and excerpt preview actions.
+- **Fluid Playback Integration**:
+  - Selecting any discovered audiobook or music track immediately launches audio playback and slides the full media player up into view.
+
+### 🚀 What's New in v1.4
+- **Intuitive Shelf-Like UI Architecture**:
+  - **Horizontal Sliding Shelves**: Audiobooks and music are now organized into horizontal sliding carousels ("slide to the side") for quick visual discovery.
+  - **Vertical Section Hierarchy**: Scroll up and down through curated categories including **"Continue Listening" / "Recent Grooves"**, **"New Releases & Additions"**, **"Popular & Regional Hits"**, **"Noteworthy Masterpieces"**, **"Series & Sagas"**, **"Curated Mixes"**, and **"Favorites"**.
+- **Hierarchical Music File Structure (Genre -> Artist -> Album -> Songs)**:
+  - Keep the persistent top search bar while unlocking a structured media file hierarchy.
+  - **Genre Exploration**: Interactive visual grid featuring dedicated artwork, vibrant gradient cards, and genre metadata (Rock & Alternative, Electronic, Pop, Hip Hop, Jazz, Classical, Acoustic, Ambient).
+  - **Artist Discographies**: Artist avatar hubs with album counts and direct drilldowns.
+  - **Album Song Hub with Centered Artwork**: Clicking any album reveals the dedicated song list featuring a **large square album cover with rounded corners at the top center**, full artist credits, track durations, and one-tap "Play Album" / "Shuffle" actions.
+- **Fluid Slide-Up Media Player**:
+  - Tapping any audiobook or song immediately starts audio playback and smoothly slides the full media player up into view.
+  - Includes a top collapse bar/chevron to slide the player down without interrupting audio, keeping a persistent mini-player pinned above the navigation bar for continuous browsing.
+- **Database & Model Upgrade**: Bumped Room database to version 3 with indexed genre and track sequence mappings for Plex music collections.
 
 ### 🚀 What's New in v1.3
 - **Audiobookshelf 401 & Authentication Fixes**:
