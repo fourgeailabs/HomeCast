@@ -24,7 +24,9 @@ object AudiobookshelfClient {
     private fun normalizeUrl(url: String): String {
         var clean = url.trim()
         if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
-            clean = "http://$clean"
+            // If domain contains common remote domain patterns (e.g. .com, .net, .org, .dev, cloudflare) or port 443, default to https
+            val isRemoteDomain = clean.contains(".") && !clean.matches(Regex("^[0-9.]+(?::[0-9]+)?$"))
+            clean = if (isRemoteDomain) "https://$clean" else "http://$clean"
         }
         return clean.trimEnd('/')
     }
@@ -37,8 +39,13 @@ object AudiobookshelfClient {
         val jsonPayload = requestAdapter.toJson(AbsLoginRequest(cleanUsername, password))
         val body = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaType())
 
-        // Try standard /login endpoint first, with fallback to /api/login if /login returns 404
-        val endpoints = listOf("$root/login", "$root/api/login")
+        // Build list of candidate endpoints (standard /login, /api/login, and HTTPS fallback if HTTP was tried)
+        val candidateRoots = mutableListOf(root)
+        if (root.startsWith("http://")) {
+            candidateRoots.add("https://" + root.removePrefix("http://"))
+        }
+
+        val endpoints = candidateRoots.flatMap { r -> listOf("$r/login", "$r/api/login") }
         var lastError: Exception? = null
 
         for (loginUrl in endpoints) {
@@ -60,18 +67,18 @@ object AudiobookshelfClient {
                         }
                     } catch (_: Exception) {}
                     return@withContext Result.failure(
-                        Exception("HTTP 401 Unauthorized: $detailedMsg. Please verify your credentials or use an API Token from Audiobookshelf (Settings > Users > API Keys).")
+                        Exception("HTTP 401 Unauthorized: $detailedMsg. If using remote reverse proxy or SSO, please check 'Use API Token' instead.")
                     )
                 }
 
-                if (response.code == 404 && loginUrl == endpoints.first()) {
-                    // Try next endpoint
+                if (response.code == 404 && loginUrl != endpoints.last()) {
                     continue
                 }
 
                 if (!response.isSuccessful) {
+                    if (loginUrl != endpoints.last()) continue
                     return@withContext Result.failure(
-                        Exception("HTTP ${response.code}: ${responseBody.ifBlank { response.message }}")
+                        Exception("HTTP ${response.code}: ${responseBody.ifBlank { response.message }} (Tested: $loginUrl)")
                     )
                 }
 
@@ -82,36 +89,44 @@ object AudiobookshelfClient {
                 if (!token.isNullOrBlank()) {
                     return@withContext Result.success(token)
                 } else {
-                    return@withContext Result.failure(Exception("No token returned by server in login response."))
+                    return@withContext Result.failure(Exception("No token returned by server in login response from $loginUrl."))
                 }
             } catch (e: Exception) {
                 lastError = e
             }
         }
 
-        Result.failure(lastError ?: Exception("Failed to reach Audiobookshelf login endpoint at $root"))
+        val errorMsg = lastError?.localizedMessage ?: "Unable to connect to remote server"
+        Result.failure(Exception("Remote connection error: $errorMsg. Check your remote URL (HTTPS/HTTP), network/VPN access, or connect using your Audiobookshelf API Token directly."))
     }
 
     suspend fun testConnection(baseUrl: String, token: String): Result<Boolean> = withContext(Dispatchers.IO) {
         val root = normalizeUrl(baseUrl)
-        val testUrl = "$root/api/libraries"
-
-        val request = Request.Builder()
-            .url(testUrl)
-            .addHeader("Authorization", "Bearer $token")
-            .get()
-            .build()
-
-        try {
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                Result.success(true)
-            } else {
-                Result.failure(Exception("Server returned status ${response.code}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+        val candidateUrls = mutableListOf("$root/api/libraries")
+        if (root.startsWith("http://")) {
+            candidateUrls.add("https://${root.removePrefix("http://")}/api/libraries")
         }
+
+        var lastError: Exception? = null
+        for (testUrl in candidateUrls) {
+            val request = Request.Builder()
+                .url(testUrl)
+                .addHeader("Authorization", "Bearer $token")
+                .get()
+                .build()
+
+            try {
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    return@withContext Result.success(true)
+                } else if (response.code == 401) {
+                    return@withContext Result.failure(Exception("HTTP 401 Unauthorized: API Token is invalid or expired."))
+                }
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+        Result.failure(lastError ?: Exception("Could not reach Audiobookshelf API at $root"))
     }
 
     suspend fun fetchAudiobooks(baseUrl: String, token: String, serverId: String): Result<List<Audiobook>> = withContext(Dispatchers.IO) {

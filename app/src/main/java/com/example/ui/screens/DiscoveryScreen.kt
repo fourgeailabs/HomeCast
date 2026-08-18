@@ -955,194 +955,152 @@ fun DiscoveryScreen(
     }
 
     // -------------------------------------------------------------------------
-    // E-READER PREVIEW DIALOG / SHEET (Supports font sizes, themes, and excerpts)
+    // KINDLE E-READER & COMIC FRAME-BY-FRAME VIEWER
     // -------------------------------------------------------------------------
     if (selectedBookForReading != null) {
         val book = selectedBookForReading!!
-        var readerFontSize by remember { mutableStateOf(16.sp) }
-        var readerTheme by remember { mutableStateOf("Sepia") } // Sepia, Dark, Light
-
-        val readerBgColor = when (readerTheme) {
-            "Sepia" -> Color(0xFFFBF0D9)
-            "Dark" -> Color(0xFF18181B)
-            else -> Color(0xFFFFFFFF)
+        var isViewingAsComic by remember {
+            mutableStateOf(
+                book.genre.contains("Comic", ignoreCase = true) ||
+                book.genre.contains("Cyberpunk", ignoreCase = true) ||
+                book.genre.contains("Tech", ignoreCase = true)
+            )
         }
 
-        val readerTextColor = when (readerTheme) {
-            "Sepia" -> Color(0xFF2D241E)
-            "Dark" -> Color(0xFFF4F4F5)
-            else -> Color(0xFF111827)
+        val eBookData = remember(book) {
+            EBookData(
+                id = book.id,
+                title = book.title,
+                author = book.creator,
+                totalChapters = 4,
+                chapters = listOf(
+                    BookChapter(
+                        title = "Chapter 1: The Beginning",
+                        startPage = 1,
+                        paragraphs = listOf(
+                            book.excerpt.ifBlank { "It was a bright cold day in April, and the clocks were striking thirteen. The air smelled of vintage paper and quiet serenity." },
+                            "Every passage was rendered with crystalline clarity upon the display. The gentle curve of the pages responded to each gesture, turning with fluid grace.",
+                            "In that quiet sanctuary, the reader flicked a thumb against the right edge of the screen, advancing effortlessly into the next scene.",
+                            "With personalized typography, custom margins, and warm sepia tones, the digital words felt as intimate as a bound heirloom volume."
+                        )
+                    ),
+                    BookChapter(
+                        title = "Chapter 2: The Archive",
+                        startPage = 2,
+                        paragraphs = listOf(
+                            "The library had stood for ages, guarding stories from every era.",
+                            "Audiobooks, music albums, and literature rested in complete harmony within the home server vault, accessible anywhere without restriction.",
+                            "As darkness fell, the true black OLED canvas offered deep contrast and comfort for long nocturnal reading sessions."
+                        )
+                    ),
+                    BookChapter(
+                        title = "Chapter 3: Odyssey",
+                        startPage = 3,
+                        paragraphs = listOf(
+                            "Every story is an expedition across stars and minds.",
+                            "With interactive bookmarks, reading speed estimates, and chapter navigation, the entire catalog came alive at the touch of a finger."
+                        )
+                    )
+                )
+            )
+        }
+
+        val sampleComic = remember(book) {
+            ComicData(
+                id = "comic_${book.id}",
+                title = book.title,
+                series = if (book.genre.contains("Cyberpunk", ignoreCase = true)) "Cyberpunk: Neon Horizon" else "Chronicles of the Cosmos",
+                issueNumber = "01",
+                writer = book.creator,
+                artist = "Master Illustrator",
+                coverUrl = book.coverUrl,
+                pages = listOf(
+                    ComicPage(
+                        pageNumber = 1,
+                        pageTitle = "Prologue: High Orbit",
+                        frames = listOf(
+                            ComicFrame(
+                                id = "f1",
+                                frameNumber = 1,
+                                title = "Approach Vector",
+                                speaker = "Commander Vex",
+                                dialogue = "All telemetry streams are synchronized. Home server link established.",
+                                sfx = "HUMMMM...",
+                                gradientColors = listOf(Color(0xFF0F172A), Color(0xFF1E1B4B))
+                            ),
+                            ComicFrame(
+                                id = "f2",
+                                frameNumber = 2,
+                                title = "Atmospheric Entry",
+                                speaker = "AI Core",
+                                dialogue = "Warning: Approaching cloud ceiling. Engaging guided visual thrusters!",
+                                sfx = "BOOOM!",
+                                gradientColors = listOf(Color(0xFF311042), Color(0xFF831843))
+                            ),
+                            ComicFrame(
+                                id = "f3",
+                                frameNumber = 3,
+                                title = "City Lights Below",
+                                speaker = "Vex",
+                                dialogue = "Look down there... countless server hubs shining like galaxies.",
+                                sfx = "CRACKLE",
+                                gradientColors = listOf(Color(0xFF064E3B), Color(0xFF065F46))
+                            ),
+                            ComicFrame(
+                                id = "f4",
+                                frameNumber = 4,
+                                title = "Safe Landing",
+                                speaker = "Navigator",
+                                dialogue = "Touchdown confirmed. The HomeCast terminal is operational.",
+                                sfx = "CLICK-WHIRR",
+                                gradientColors = listOf(Color(0xFF1E293B), Color(0xFF0284C7))
+                            )
+                        )
+                    ),
+                    ComicPage(
+                        pageNumber = 2,
+                        pageTitle = "Chapter 1: The Secret Vault",
+                        frames = listOf(
+                            ComicFrame(
+                                id = "f5",
+                                frameNumber = 1,
+                                title = "The Ancient Data Chamber",
+                                speaker = "Scholar",
+                                dialogue = "This archive holds the legendary audiobooks and graphic novels of our time.",
+                                sfx = "SHHHH",
+                                gradientColors = listOf(Color(0xFF451A03), Color(0xFF78350F))
+                            ),
+                            ComicFrame(
+                                id = "f6",
+                                frameNumber = 2,
+                                title = "Igniting the Playback Core",
+                                speaker = "Vex",
+                                dialogue = "Turn the page. Let the journey continue!",
+                                sfx = "FLASH!",
+                                gradientColors = listOf(Color(0xFF14532D), Color(0xFF166534))
+                            )
+                        )
+                    )
+                )
+            )
         }
 
         Dialog(
             onDismissRequest = { selectedBookForReading = null },
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-                    .shadow(24.dp, RoundedCornerShape(24.dp)),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Top App Bar for E-Reader
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { selectedBookForReading = null }) {
-                            Icon(Icons.Default.Close, contentDescription = "Close E-Reader")
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                book.title,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                "${book.creator} • ${book.format}",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // Theme Stepper / Font Controls
-                        Row {
-                            IconButton(onClick = {
-                                if (readerFontSize.value > 12f) readerFontSize = (readerFontSize.value - 2).sp
-                            }) {
-                                Text("A-", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                            IconButton(onClick = {
-                                if (readerFontSize.value < 26f) readerFontSize = (readerFontSize.value + 2).sp
-                            }) {
-                                Text("A+", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = SurfaceGlassBorder)
-
-                    // Theme selector pills (Sepia / Dark / Light)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        listOf("Sepia", "Dark", "Light").forEach { themeName ->
-                            val isSelected = readerTheme == themeName
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { readerTheme = themeName },
-                                label = { Text(themeName) },
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
-                                    selectedLabelColor = AccentTeal
-                                )
-                            )
-                        }
-                    }
-
-                    // Reading Canvas Area
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(readerBgColor)
-                            .padding(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            Text(
-                                "CHAPTER ONE",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = readerTextColor.copy(alpha = 0.6f),
-                                letterSpacing = 2.sp
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                book.title,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = readerTextColor,
-                                fontFamily = FontFamily.Serif
-                            )
-                            Text(
-                                "By ${book.creator} (${book.durationOrPages})",
-                                fontSize = 13.sp,
-                                color = readerTextColor.copy(alpha = 0.7f),
-                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                            )
-
-                            Spacer(modifier = Modifier.height(18.dp))
-                            HorizontalDivider(color = readerTextColor.copy(alpha = 0.15f))
-                            Spacer(modifier = Modifier.height(18.dp))
-
-                            Text(
-                                text = book.excerpt.ifBlank { book.description },
-                                fontSize = readerFontSize,
-                                color = readerTextColor,
-                                fontFamily = FontFamily.Serif,
-                                lineHeight = (readerFontSize.value * 1.6f).sp,
-                                textAlign = TextAlign.Justify
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-                        }
-                    }
-
-                    // Bottom Action Bar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = AccentTeal.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.BookmarkBorder, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Page 1 of ${book.durationOrPages}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AccentTeal)
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                bookmarkMessage = "Bookmarked '${book.title}' for E-Reader"
-                                selectedBookForReading = null
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Bookmark, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Bookmark to Library")
-                        }
-                    }
-                }
+            if (isViewingAsComic) {
+                ComicReaderScreen(
+                    comic = sampleComic,
+                    onClose = { selectedBookForReading = null },
+                    onSwitchToNovel = { isViewingAsComic = false }
+                )
+            } else {
+                EReaderScreen(
+                    eBook = eBookData,
+                    onClose = { selectedBookForReading = null },
+                    onSwitchToComic = { isViewingAsComic = true }
+                )
             }
         }
     }

@@ -1,8 +1,11 @@
 package com.example.ui.screens
 
 import android.graphics.Bitmap
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,11 +21,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -37,7 +42,9 @@ import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.PlayButtonColor
 import com.example.ui.theme.PlayButtonIcon
 import com.example.ui.theme.SurfaceGlass
+import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun PlayerScreen(
@@ -146,9 +153,40 @@ fun PlayerScreen(
 
     val progressFraction = sliderDraggingPosition ?: (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 
+    val coroutineScope = rememberCoroutineScope()
+    val dragOffsetY = remember { Animatable(0f) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .offset { IntOffset(0, dragOffsetY.value.roundToInt().coerceAtLeast(0)) }
+            .pointerInput(onCollapse) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        coroutineScope.launch {
+                            if (dragOffsetY.value > 140f) {
+                                onCollapse?.invoke()
+                                dragOffsetY.snapTo(0f)
+                            } else {
+                                dragOffsetY.animateTo(0f, spring(stiffness = 500f))
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        coroutineScope.launch {
+                            dragOffsetY.animateTo(0f, spring(stiffness = 500f))
+                        }
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        if (dragAmount > 0 || dragOffsetY.value > 0) {
+                            coroutineScope.launch {
+                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount).coerceAtLeast(0f))
+                            }
+                            change.consume()
+                        }
+                    }
+                )
+            }
             .background(MaterialTheme.colorScheme.background)
             .drawBehind {
                 drawCircle(

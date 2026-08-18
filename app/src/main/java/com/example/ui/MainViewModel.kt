@@ -212,20 +212,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Gemini Discovery ---
+    // --- Gemini Discovery (Grounding strictly on Active Server Media) ---
     fun fetchDiscoveryRecommendations(prompt: String, location: Location? = null, mediaType: String? = null) {
         viewModelScope.launch {
             _isDiscoveryLoading.value = true
             _discoveryError.value = null
             try {
-                val typeHint = when (mediaType?.lowercase()) {
-                    "audiobooks" -> "audiobooks with narrators"
-                    "music" -> "music albums and tracks with artists"
-                    "books" -> "e-books and literature with authors"
-                    else -> "audiobooks, music albums, and e-books"
+                val currentBooks = allBooks.value
+                val currentMusic = allMusic.value
+
+                val booksSummary = if (currentBooks.isNotEmpty()) {
+                    currentBooks.take(25).joinToString("; ") { "${it.title} by ${it.author}" }
+                } else {
+                    "No audiobooks synced yet"
                 }
-                val locationHint = if (location != null) " (User Location: Lat ${location.latitude}, Lng ${location.longitude})" else ""
-                val fullPrompt = "$prompt$locationHint. Recommend outstanding $typeHint. Return 4-6 distinct recommendations with format 'Title - Creator: Brief reason'."
+
+                val musicSummary = if (currentMusic.isNotEmpty()) {
+                    currentMusic.take(25).joinToString("; ") { "${it.title} by ${it.artist} (${it.album})" }
+                } else {
+                    "No music tracks synced yet"
+                }
+
+                val locationHint = if (location != null) " (Context: Near Lat ${location.latitude}, Lng ${location.longitude})" else ""
+
+                val fullPrompt = """
+                    You are the HomeCast Personal Media Assistant.
+                    The user has explicitly specified: ONLY generate recommendations and tailored queues BASED DIRECTLY ON THE MEDIA ACTIVELY PRESENT ON THEIR CONNECTED SERVERS.
+
+                    Active Connected Server Inventory:
+                    - Active Audiobooks: $booksSummary
+                    - Active Music Collection: $musicSummary
+
+                    User Request / Mood / Prompt: "$prompt"$locationHint
+                    Requested Media Focus: ${mediaType ?: "All active media"}
+
+                    Instructions:
+                    1. Select and recommend 4-6 items or combinations ONLY from the active server items listed above.
+                    2. Provide personalized reasons why each item fits the requested mood or listening session.
+                    3. Return each recommendation on its own line in the exact format: 'Title - Creator: Reason/Highlight' (e.g. 'Project Hail Mary - Andy Weir: Outstanding immersive sci-fi narration with gripping stakes').
+                    4. If the user's active inventory is currently empty, advise syncing Audiobookshelf or Plex in Settings and recommend setting up their server.
+                """.trimIndent()
 
                 val request = GenerateContentRequest(
                     contents = listOf(Content(parts = listOf(Part(text = fullPrompt))))

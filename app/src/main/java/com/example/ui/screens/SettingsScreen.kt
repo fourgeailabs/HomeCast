@@ -228,6 +228,7 @@ fun AudiobookshelfConfigCard(
     var useTokenAuth by remember { mutableStateOf(false) }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
+    var connectionMode by remember { mutableStateOf("local") }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -262,16 +263,16 @@ fun AudiobookshelfConfigCard(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            "Authentication & 401 Help:",
+                            "Remote Login & Authentication Guide:",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = AccentTeal
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "1. Check for typos or casing in your username and password.\n" +
-                            "2. If your server uses SSO, OIDC, or strict API policies, check 'Use API Token'.\n" +
-                            "3. To get an API Token: Open Audiobookshelf Web UI -> Settings -> Users -> Click your user or API Keys -> Copy Token/API Key.",
+                            "1. Remote Access: When connecting away from home, enter your HTTPS domain (e.g. https://abs.yourdomain.com) or Tailscale IP.\n" +
+                            "2. API Token (Recommended for Remote): If your reverse proxy, Cloudflare, or 2FA blocks login, select 'Use API Token'. To get it: Open ABS Web UI -> Settings -> Users -> Click your user -> Copy API Key / Token.\n" +
+                            "3. Reverse Proxy: Ensure WebSockets and Bearer headers are permitted.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
@@ -280,7 +281,49 @@ fun AudiobookshelfConfigCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick Connection Mode Selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = connectionMode == "local",
+                    onClick = {
+                        connectionMode = "local"
+                        if (hostUrl.startsWith("https://") || hostUrl.isBlank()) {
+                            hostUrl = "http://10.70.14.2:13378"
+                        }
+                    },
+                    label = { Text("Local LAN", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentTeal
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+
+                FilterChip(
+                    selected = connectionMode == "remote",
+                    onClick = {
+                        connectionMode = "remote"
+                        if (hostUrl.startsWith("http://10.") || hostUrl.startsWith("http://192.")) {
+                            hostUrl = "https://"
+                        }
+                    },
+                    label = { Text("Remote / HTTPS", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentIndigo
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = serverName,
@@ -294,7 +337,7 @@ fun AudiobookshelfConfigCard(
             OutlinedTextField(
                 value = hostUrl,
                 onValueChange = { hostUrl = it },
-                label = { Text("Server URL (e.g. http://10.70.14.2:13378)") },
+                label = { Text(if (connectionMode == "remote") "Remote Domain URL (e.g. https://abs.domain.com)" else "Server URL (e.g. http://10.70.14.2:13378)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
