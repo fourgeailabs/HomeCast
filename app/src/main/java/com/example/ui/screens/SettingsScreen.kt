@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ServerConfig
@@ -116,6 +117,7 @@ fun SettingsScreen(
         item {
             AudiobookshelfConfigCard(
                 isLoading = serverOpState is ServerOperationState.Loading,
+                serverOpState = serverOpState,
                 onConnect = { name, url, token, username, password ->
                     viewModel.saveAndConnectAudiobookshelf(name, url, token, username, password)
                 }
@@ -215,14 +217,17 @@ fun ServerItemCard(
 @Composable
 fun AudiobookshelfConfigCard(
     isLoading: Boolean,
+    serverOpState: ServerOperationState,
     onConnect: (String, String, String, String, String) -> Unit
 ) {
-    var serverName by remember { mutableStateOf("My Audiobookshelf") }
-    var hostUrl by remember { mutableStateOf("http://192.168.1.") }
+    var serverName by remember { mutableStateOf("AudioBookShelf") }
+    var hostUrl by remember { mutableStateOf("http://10.70.14.2:13378") }
     var token by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("ecollins") }
     var password by remember { mutableStateOf("") }
     var useTokenAuth by remember { mutableStateOf(false) }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -230,12 +235,48 @@ fun AudiobookshelfConfigCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Book, contentDescription = "Audiobookshelf", tint = AccentTeal)
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text("Audiobookshelf Server", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Audiobooks, Podcasts & E-books", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Book, contentDescription = "Audiobookshelf", tint = AccentTeal)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Audiobookshelf Server", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Audiobooks, Podcasts & E-books", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                IconButton(onClick = { showHelp = !showHelp }) {
+                    Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            AnimatedVisibility(visible = showHelp) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "Authentication & 401 Help:",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = AccentTeal
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "1. Check for typos or casing in your username and password.\n" +
+                            "2. If your server uses SSO, OIDC, or strict API policies, check 'Use API Token'.\n" +
+                            "3. To get an API Token: Open Audiobookshelf Web UI -> Settings -> Users -> Click your user or API Keys -> Copy Token/API Key.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
 
@@ -253,7 +294,7 @@ fun AudiobookshelfConfigCard(
             OutlinedTextField(
                 value = hostUrl,
                 onValueChange = { hostUrl = it },
-                label = { Text("Server URL (e.g. http://192.168.1.100:13378)") },
+                label = { Text("Server URL (e.g. http://10.70.14.2:13378)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -269,7 +310,8 @@ fun AudiobookshelfConfigCard(
                 OutlinedTextField(
                     value = token,
                     onValueChange = { token = it },
-                    label = { Text("API Token") },
+                    label = { Text("API Token / Key") },
+                    placeholder = { Text("Paste Bearer token or API key") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -286,7 +328,15 @@ fun AudiobookshelfConfigCard(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(
+                                if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (isPasswordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -296,7 +346,13 @@ fun AudiobookshelfConfigCard(
 
             Button(
                 onClick = {
-                    onConnect(serverName, hostUrl, token, username, password)
+                    onConnect(
+                        serverName.trim(),
+                        hostUrl.trim(),
+                        token.trim(),
+                        username.trim(),
+                        password
+                    )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isLoading && hostUrl.isNotBlank(),

@@ -13,6 +13,7 @@ data class AbsLoginRequest(
 @JsonClass(generateAdapter = true)
 data class AbsLoginResponse(
     val user: AbsUser? = null,
+    val token: String? = null,
     val error: String? = null
 )
 

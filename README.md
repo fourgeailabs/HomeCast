@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v1.2-brightgreen?style=flat-square" alt="Version 1.2" />
+  <img src="https://img.shields.io/badge/Release-v1.3-brightgreen?style=flat-square" alt="Version 1.3" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -18,6 +18,15 @@
 </p>
 
 ---
+
+### 🚀 What's New in v1.3
+- **Audiobookshelf 401 & Authentication Fixes**:
+  - Replaced manual JSON string construction with Moshi serialization so special characters in passwords (`"`, `\`, symbols) are never corrupted.
+  - Added dual endpoint fallback (`/login` and `/api/login`) to support reverse proxy and custom path setups.
+  - Automatic whitespace trimming on usernames, URLs, and tokens to prevent mobile keyboard input errors.
+  - Added password visibility toggle (show/hide eye icon) to verify password entries before connecting.
+  - Added an inline Help & Troubleshooting guide explaining how to retrieve and use an API Key/Token directly if username/password auth is disabled or uses SSO/OIDC.
+  - Improved error diagnostics with detailed server-reported reason messages.
 
 ### 🚀 What's New in v1.2
 - **Refreshed Custom Adaptive App Icon**: Brand-new custom vector adaptive launcher icon featuring a gradient badge (vibrant cyan, electric indigo, violet), headphones arch, open audiobook pages, cast waves, and glowing play beacon on a midnight gradient canvas with ambient lighting.

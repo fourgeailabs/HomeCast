@@ -31,33 +31,65 @@ object AudiobookshelfClient {
 
     suspend fun login(baseUrl: String, username: String, password: String): Result<String> = withContext(Dispatchers.IO) {
         val root = normalizeUrl(baseUrl)
-        val loginUrl = "$root/login"
-        val jsonPayload = """{"username":"$username","password":"$password"}"""
-        val body = jsonPayload.toRequestBody("application/json".toMediaType())
+        val cleanUsername = username.trim()
 
-        val request = Request.Builder()
-            .url(loginUrl)
-            .post(body)
-            .build()
+        val requestAdapter = moshi.adapter(AbsLoginRequest::class.java)
+        val jsonPayload = requestAdapter.toJson(AbsLoginRequest(cleanUsername, password))
+        val body = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaType())
 
-        try {
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string() ?: ""
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+        // Try standard /login endpoint first, with fallback to /api/login if /login returns 404
+        val endpoints = listOf("$root/login", "$root/api/login")
+        var lastError: Exception? = null
+
+        for (loginUrl in endpoints) {
+            val request = Request.Builder()
+                .url(loginUrl)
+                .post(body)
+                .build()
+
+            try {
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                if (response.code == 401) {
+                    var detailedMsg = "Invalid username or password"
+                    try {
+                        val parsed = moshi.adapter(AbsLoginResponse::class.java).fromJson(responseBody)
+                        if (!parsed?.error.isNullOrBlank()) {
+                            detailedMsg = parsed?.error ?: detailedMsg
+                        }
+                    } catch (_: Exception) {}
+                    return@withContext Result.failure(
+                        Exception("HTTP 401 Unauthorized: $detailedMsg. Please verify your credentials or use an API Token from Audiobookshelf (Settings > Users > API Keys).")
+                    )
+                }
+
+                if (response.code == 404 && loginUrl == endpoints.first()) {
+                    // Try next endpoint
+                    continue
+                }
+
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(
+                        Exception("HTTP ${response.code}: ${responseBody.ifBlank { response.message }}")
+                    )
+                }
+
+                val adapter = moshi.adapter(AbsLoginResponse::class.java)
+                val parsed = adapter.fromJson(responseBody)
+                val token = parsed?.user?.token ?: parsed?.token
+
+                if (!token.isNullOrBlank()) {
+                    return@withContext Result.success(token)
+                } else {
+                    return@withContext Result.failure(Exception("No token returned by server in login response."))
+                }
+            } catch (e: Exception) {
+                lastError = e
             }
-
-            val adapter = moshi.adapter(AbsLoginResponse::class.java)
-            val parsed = adapter.fromJson(responseBody)
-            val token = parsed?.user?.token
-            if (!token.isNullOrBlank()) {
-                Result.success(token)
-            } else {
-                Result.failure(Exception("No token returned by server"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
+
+        Result.failure(lastError ?: Exception("Failed to reach Audiobookshelf login endpoint at $root"))
     }
 
     suspend fun testConnection(baseUrl: String, token: String): Result<Boolean> = withContext(Dispatchers.IO) {
