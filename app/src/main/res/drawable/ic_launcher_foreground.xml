@@ -1,12 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Glowing soft shadow behind badge -->
     <path
+        android:pathData="M38,27 L70,27 C78,27 84,33 84,41 L84,69 C84,77 78,83 70,83 L38,83 C30,83 24,77 24,69 L24,41 C24,33 30,27 38,27 Z"
+        android:fillAlpha="0.35">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="24"
+                android:startY="27"
+                android:endX="84"
+                android:endY="83"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#4F46E5" />
+                <item android:offset="1.0" android:color="#0D9488" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Main Gradient Squircle Badge (Safe-zone centered 56dp x 56dp) -->
+    <path
+        android:pathData="M37,25 L71,25 C78.7,25 83,29.3 83,37 L83,71 C83,78.7 78.7,83 71,83 L37,83 C29.3,83 25,78.7 25,71 L25,37 C25,29.3 29.3,25 37,25 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="25"
+                android:startY="25"
+                android:endX="83"
+                android:endY="83"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#06B6D4" />
+                <item android:offset="0.4" android:color="#4F46E5" />
+                <item android:offset="0.8" android:color="#7C3AED" />
+                <item android:offset="1.0" android:color="#C026D3" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Top Glass Gloss Highlight Curve -->
+    <path
+        android:pathData="M37,25 L71,25 C77.5,25 81.5,28.5 82.5,34.5 C75,42.5 64.5,47 54,47 C43.5,47 33,42.5 25.5,34.5 C26.5,28.5 30.5,25 37,25 Z"
         android:fillColor="#FFFFFF"
-        android:pathData="M54.0,20.0 L16.0,50.0 L16.0,88.0 L92.0,88.0 L92.0,50.0 Z" />
+        android:fillAlpha="0.22" />
+
+    <!-- Headphone Arc over the top of the badge -->
     <path
-        android:fillColor="#14B8A6"
-        android:pathData="M44.0,46.0 L44.0,70.0 L66.0,58.0 Z" />
+        android:pathData="M35,53 C35,42.5 43.5,34 54,34 C64.5,34 73,42.5 73,53"
+        android:strokeWidth="3.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Left Ear Cushion -->
+    <path
+        android:pathData="M32.5,50 L36.5,50 C37.6,50 38.5,50.9 38.5,52 L38.5,60 C38.5,61.1 37.6,62 36.5,62 L32.5,62 C31.4,62 30.5,61.1 30.5,60 L30.5,52 C30.5,50.9 31.4,50 32.5,50 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Right Ear Cushion -->
+    <path
+        android:pathData="M71.5,50 L75.5,50 C76.6,50 77.5,50.9 77.5,52 L77.5,60 C77.5,61.1 76.6,62 75.5,62 L71.5,62 C70.4,62 69.5,61.1 69.5,60 L69.5,52 C69.5,50.9 70.4,50 71.5,50 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Open Audiobook Book Silhouette Base -->
+    <!-- Left Page -->
+    <path
+        android:pathData="M52,73.5 C46.5,71.5 41.5,71.8 37,73.5 L37,59.5 C41.5,57.8 46.5,57.5 52,59.5 Z"
+        android:fillColor="#F1F5F9"
+        android:fillAlpha="0.9" />
+
+    <!-- Right Page -->
+    <path
+        android:pathData="M56,73.5 C61.5,71.5 66.5,71.8 71,73.5 L71,59.5 C66.5,57.8 61.5,57.5 56,59.5 Z"
+        android:fillColor="#E2E8F0"
+        android:fillAlpha="0.9" />
+
+    <!-- Center Book Spine Line -->
+    <path
+        android:pathData="M54,58 L54,74"
+        android:strokeWidth="1.8"
+        android:strokeColor="#94A3B8"
+        android:strokeLineCap="round" />
+
+    <!-- Radiating Cast/Wi-Fi Arcs in vibrant Gold Amber (Top Right) -->
+    <path
+        android:pathData="M66,39 C68.8,36.5 72.5,36.5 75.2,39"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FDE047"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M69,43 C70.5,41.5 72.8,41.5 74.2,43"
+        android:strokeWidth="2"
+        android:strokeColor="#FDE047"
+        android:strokeLineCap="round" />
+
+    <!-- Center Glowing Play Arrow Beacon -->
+    <path
+        android:pathData="M49,47.5 L62.5,55 L49,62.5 Z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M49.5,48.5 L61,55 L49.5,61.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="49.5"
+                android:startY="48.5"
+                android:endX="61"
+                android:endY="61.5"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#22D3EE" />
+                <item android:offset="1.0" android:color="#818CF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Center Crisp White Play Triangle Core -->
+    <path
+        android:pathData="M51.5,51 L59,55 L51.5,59 Z"
+        android:fillColor="#FFFFFF" />
+
 </vector>
