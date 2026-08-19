@@ -465,52 +465,53 @@ fun EBooksScreen(
                     contentPadding = PaddingValues(bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(22.dp)
                 ) {
-                    // Shelf 1: Currently Reading & Favorites
-                    item {
-                        GlassBookshelfRow(
-                            shelfTitle = "Currently Reading",
-                            badge = "RECENT",
-                            badgeColor = AccentTeal,
-                            items = filteredItems.filter { it.progressPercent in 1..99 },
-                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
-                            onNavigateToCreator = onNavigateToCreator
-                        )
+                    // Shelf 1: Currently Reading
+                    val currentlyReading = filteredItems.filter { it.progressPercent in 1..99 }
+                    if (currentlyReading.isNotEmpty()) {
+                        item {
+                            GlassBookshelfRow(
+                                shelfTitle = "Currently Reading",
+                                badge = "RECENT",
+                                badgeColor = AccentTeal,
+                                items = currentlyReading,
+                                onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                                onNavigateToCreator = onNavigateToCreator
+                            )
+                        }
                     }
 
-                    // Shelf 2: Graphic Novels & Manga (Comic Reader with Gemini AI)
-                    item {
-                        GlassBookshelfRow(
-                            shelfTitle = "Graphic Novels & Manga",
-                            badge = "GEMINI SMART ZOOM",
-                            badgeColor = AccentIndigo,
-                            items = filteredItems.filter { it.isComic },
-                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
-                            onNavigateToCreator = onNavigateToCreator
-                        )
+                    // Shelf 2: Graphic Novels & Manga
+                    val comics = filteredItems.filter { it.isComic }
+                    if (comics.isNotEmpty()) {
+                        item {
+                            GlassBookshelfRow(
+                                shelfTitle = "Graphic Novels & Manga",
+                                badge = "GEMINI SMART ZOOM",
+                                badgeColor = AccentIndigo,
+                                items = comics,
+                                onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                                onNavigateToCreator = onNavigateToCreator
+                            )
+                        }
                     }
 
-                    // Shelf 3: Sci-Fi & Cyberpunk
-                    item {
-                        GlassBookshelfRow(
-                            shelfTitle = "Sci-Fi & Cyberpunk",
-                            badge = "NOVELS",
-                            badgeColor = Color(0xFFF59E0B),
-                            items = filteredItems.filter { it.genre in listOf("Sci-Fi", "Cyberpunk") },
-                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
-                            onNavigateToCreator = onNavigateToCreator
-                        )
-                    }
-
-                    // Shelf 4: Classics & Philosophy
-                    item {
-                        GlassBookshelfRow(
-                            shelfTitle = "Classics & Philosophy",
-                            badge = "PUBLIC DOMAIN",
-                            badgeColor = Color(0xFF10B981),
-                            items = filteredItems.filter { it.genre in listOf("Classic", "Philosophy") },
-                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
-                            onNavigateToCreator = onNavigateToCreator
-                        )
+                    // Dynamic Genres
+                    val specificGenres = listOf("Sci-Fi", "Cyberpunk", "Classic", "Philosophy")
+                    val otherBooks = filteredItems.filter { !it.isComic && it.progressPercent !in 1..99 }
+                    
+                    val groupedByGenre = otherBooks.groupBy { it.genre.takeIf { g -> g.isNotBlank() } ?: "Uncategorized" }
+                    
+                    groupedByGenre.forEach { (genre, books) ->
+                        item {
+                            GlassBookshelfRow(
+                                shelfTitle = genre,
+                                badge = "COLLECTION",
+                                badgeColor = Color(0xFFF59E0B),
+                                items = books,
+                                onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                                onNavigateToCreator = onNavigateToCreator
+                            )
+                        }
                     }
                 }
             }
