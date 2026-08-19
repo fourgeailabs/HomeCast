@@ -45,17 +45,4 @@ interface LibraryDao {
 
     @Query("UPDATE music_tracks SET lastPlayed = :timestamp WHERE id = :id")
     suspend fun updateMusicLastPlayed(id: String, timestamp: Long)
-
-    // Servers
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertServer(serverConfig: ServerConfig)
-
-    @Query("SELECT * FROM servers")
-    fun getServers(): Flow<List<ServerConfig>>
-
-    @Query("SELECT * FROM servers WHERE type = :type LIMIT 1")
-    suspend fun getServerByType(type: String): ServerConfig?
-
-    @Query("DELETE FROM servers WHERE id = :id")
-    suspend fun deleteServer(id: String)
 }

@@ -4,13 +4,13 @@ import com.example.data.network.AudiobookshelfClient
 import com.example.data.network.PlexClient
 import kotlinx.coroutines.flow.Flow
 
-class LibraryRepository(private val dao: LibraryDao) {
+class LibraryRepository(private val dao: LibraryDao, private val secureConfigManager: SecureConfigManager) {
     val allBooks: Flow<List<Audiobook>> = dao.getAllBooks()
     val favorites: Flow<List<Audiobook>> = dao.getFavorites()
     val recents: Flow<List<Audiobook>> = dao.getRecents()
     val allMusic: Flow<List<MusicTrack>> = dao.getAllMusic()
     val recentMusic: Flow<List<MusicTrack>> = dao.getRecentMusic()
-    val servers: Flow<List<ServerConfig>> = dao.getServers()
+    val servers: Flow<List<ServerConfig>> = secureConfigManager.serversFlow
 
     suspend fun insertBook(book: Audiobook) = dao.insertBook(book)
     suspend fun updateProgress(id: String, progress: Long) {
@@ -25,11 +25,11 @@ class LibraryRepository(private val dao: LibraryDao) {
     }
 
     suspend fun addOrUpdateServer(server: ServerConfig) {
-        dao.insertServer(server)
+        secureConfigManager.saveServer(server)
     }
 
     suspend fun removeServer(serverId: String) {
-        dao.deleteServer(serverId)
+        secureConfigManager.removeServer(serverId)
         dao.deleteBooksByServer(serverId)
         dao.deleteMusicByServer(serverId)
     }
@@ -42,7 +42,7 @@ class LibraryRepository(private val dao: LibraryDao) {
                 dao.deleteBooksByServer(server.id)
                 dao.insertBooks(books)
             }
-            dao.insertServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
+            secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
             Result.success(books.size)
         } else {
             Result.failure(result.exceptionOrNull() ?: Exception("Unknown error"))
@@ -57,7 +57,7 @@ class LibraryRepository(private val dao: LibraryDao) {
                 dao.deleteMusicByServer(server.id)
                 dao.insertMusicTracks(tracks)
             }
-            dao.insertServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
+            secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
             Result.success(tracks.size)
         } else {
             Result.failure(result.exceptionOrNull() ?: Exception("Unknown error"))

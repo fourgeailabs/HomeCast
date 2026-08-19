@@ -37,11 +37,10 @@ data class MusicTrack(
     val trackNumber: Int = 1
 )
 
-@Entity(tableName = "servers")
 data class ServerConfig(
-    @PrimaryKey val id: String, // e.g. "abs_server" or "plex_server" or uuid
+    val id: String, // e.g. "abs_server" or "plex_server" or uuid
     val name: String,
-    val type: String, // "audiobookshelf" or "plex"
+    val type: String, // "audiobookshelf", "plex", "booklore"
     val hostUrl: String,
     val apiKey: String = "",
     val username: String = "",

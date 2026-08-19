@@ -19,7 +19,8 @@ sealed class ServerOperationState {
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
-    private val repository = LibraryRepository(database.libraryDao())
+    private val secureConfigManager = SecureConfigManager(application)
+    private val repository = LibraryRepository(database.libraryDao(), secureConfigManager)
     val playbackManager = PlaybackManager(application)
 
     val allBooks = repository.allBooks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
