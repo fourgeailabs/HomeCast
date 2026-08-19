@@ -215,18 +215,15 @@ fun MusicScreen(
                 )
             }
 
-            if (servers.any { it.type == "plex" }) {
-                IconButton(
-                    onClick = {
-                        val server = servers.firstOrNull { it.type == "plex" }
-                        if (server != null) viewModel.syncServer(server)
-                    },
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                ) {
-                    Icon(Icons.Default.Sync, contentDescription = "Sync Plex Music", tint = AccentIndigo)
-                }
+            IconButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceGlass)
+                    .border(1.dp, SurfaceGlassBorder, CircleShape)
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentIndigo)
             }
         }
 

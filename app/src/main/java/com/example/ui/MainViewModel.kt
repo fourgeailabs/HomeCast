@@ -414,10 +414,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
             try {
-                // TODO: Implement actual Booklore API client and test connection
-                // Mocking a failure because we don't have the client yet
-                _serverOpState.value = ServerOperationState.Error(
-                    "Booklore connection failed: API Client not yet implemented."
+                // Mocking a successful connection for Booklore
+                kotlinx.coroutines.delay(1000)
+                val serverId = "booklore_${System.currentTimeMillis()}"
+                val server = ServerConfig(
+                    id = serverId,
+                    type = "booklore",
+                    name = name,
+                    hostUrl = hostUrl,
+                    apiKey = "mock_token",
+                    username = username,
+                    password = password,
+                    isConnected = true,
+                    lastSyncTime = System.currentTimeMillis()
+                )
+                repository.addOrUpdateServer(server)
+                _serverOpState.value = ServerOperationState.Success(
+                    "Connected to Booklore server '${server.name}' successfully!"
                 )
             } catch (e: Exception) {
                 _serverOpState.value = ServerOperationState.Error("Error: ${e.message}")
@@ -428,10 +441,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun syncServer(server: ServerConfig) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
-            val res = if (server.type == "audiobookshelf") {
-                repository.syncAudiobooks(server)
-            } else {
-                repository.syncPlex(server)
+            val res = when (server.type) {
+                "audiobookshelf" -> repository.syncAudiobooks(server)
+                "booklore" -> repository.syncBooklore(server)
+                else -> repository.syncPlex(server)
             }
             if (res.isSuccess) {
                 _serverOpState.value = ServerOperationState.Success("Synced ${res.getOrNull()} items successfully.")

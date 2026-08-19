@@ -258,32 +258,33 @@ fun EBooksScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Transparent)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Header Bar
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                    .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
                         "Glass Bookshelf",
-                        fontSize = 24.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         "E-Books • Graphic Novels • Manga",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
@@ -314,9 +315,9 @@ fun EBooksScreen(
                             .border(1.dp, SurfaceGlassBorder, CircleShape)
                     ) {
                         Icon(
-                            Icons.Default.CloudSync,
-                            contentDescription = "Sync E-Book Servers",
-                            tint = AccentIndigo
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = AccentTeal
                         )
                     }
                 }

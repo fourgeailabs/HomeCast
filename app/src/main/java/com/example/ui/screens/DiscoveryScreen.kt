@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +75,10 @@ data class DiscoveryItem(
     val gradient: List<Color> = listOf(AccentIndigo, AccentTeal)
 )
 
+enum class DiscoverySourceTab {
+    PERSONAL, PUBLIC_DOMAIN
+}
+
 @Composable
 fun DiscoveryScreen(
     viewModel: MainViewModel,
@@ -122,6 +127,7 @@ fun DiscoveryScreen(
 
     var customPrompt by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(DiscoveryCategoryTab.ALL) }
+    var selectedSource by remember { mutableStateOf(DiscoverySourceTab.PERSONAL) }
 
     // Selected E-Reader book preview state
     var selectedBookForReading by remember { mutableStateOf<DiscoveryItem?>(null) }
@@ -208,10 +214,46 @@ fun DiscoveryScreen(
         )
     }
 
-    val trendingAudiobooks = if (dynamicAudiobooks.isNotEmpty()) dynamicAudiobooks else publicDomainBooks
+    val publicDomainAudio = remember {
+        listOf(
+            DiscoveryItem(
+                id = "disc_ab_pd_1",
+                title = "The Art of War",
+                creator = "Sun Tzu",
+                mediaType = DiscoveryMediaType.AUDIOBOOK,
+                genre = "Philosophy",
+                coverUrl = "https://images.unsplash.com/photo-1545041793-272e50529d84?w=600&q=80",
+                description = "Classic ancient Chinese military treatise.",
+                tag = "🏛️ Public Domain",
+                durationOrPages = "1h 12m",
+                format = "AUDIOBOOK",
+                gradient = listOf(Color(0xFFB71C1C), Color(0xFFFF5252))
+            )
+        )
+    }
+
+    val publicDomainMusic = remember {
+        listOf(
+            DiscoveryItem(
+                id = "disc_m_pd_1",
+                title = "Acoustic & Chill Discovery",
+                creator = "Various Artists",
+                mediaType = DiscoveryMediaType.MUSIC,
+                genre = "Acoustic",
+                coverUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
+                description = "Public domain acoustic tracks for focus and relaxation.",
+                tag = "🏛️ Public Domain",
+                durationOrPages = "45m",
+                format = "MP3",
+                gradient = listOf(Color(0xFF004D40), Color(0xFF1DE9B6))
+            )
+        )
+    }
+
+    val trendingAudiobooks = if (selectedSource == DiscoverySourceTab.PERSONAL) dynamicAudiobooks else publicDomainAudio
     val sciFiSagas = publicDomainBooks
-    val featuredAlbums = if (dynamicMusic.isNotEmpty()) dynamicMusic else publicDomainBooks
-    val acousticChillMusic = publicDomainBooks
+    val featuredAlbums = if (selectedSource == DiscoverySourceTab.PERSONAL) dynamicMusic else publicDomainMusic
+    val acousticChillMusic = publicDomainMusic
     val bestsellingEBooks = publicDomainBooks
 
     // Initial load on first render if recommendations are empty
@@ -313,7 +355,39 @@ fun DiscoveryScreen(
             )
         }
 
-        // 2. Category Filter Chips: All, Audiobooks, Music, Books (E-Reader), Regional
+        // 2. Source Selection (Personal vs Public Domain)
+        item {
+            TabRow(
+                selectedTabIndex = selectedSource.ordinal,
+                containerColor = Color.Transparent,
+                indicator = { tabPositions ->
+                    if (selectedSource.ordinal < tabPositions.size) {
+                        TabRowDefaults.Indicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedSource.ordinal]),
+                            color = AccentTeal
+                        )
+                    }
+                },
+                divider = { Divider(color = SurfaceGlassBorder) }
+            ) {
+                Tab(
+                    selected = selectedSource == DiscoverySourceTab.PERSONAL,
+                    onClick = { selectedSource = DiscoverySourceTab.PERSONAL },
+                    text = { Text("Personal Collection", fontWeight = FontWeight.SemiBold) },
+                    selectedContentColor = AccentTeal,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Tab(
+                    selected = selectedSource == DiscoverySourceTab.PUBLIC_DOMAIN,
+                    onClick = { selectedSource = DiscoverySourceTab.PUBLIC_DOMAIN },
+                    text = { Text("Public Domain Library", fontWeight = FontWeight.SemiBold) },
+                    selectedContentColor = AccentTeal,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // 3. Category Filter Chips: All, Audiobooks, Music, Books (E-Reader), Regional
         item {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

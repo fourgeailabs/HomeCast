@@ -32,6 +32,7 @@ import coil.compose.AsyncImage
 import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
+import com.example.ui.theme.LocalThemeMode
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
 import com.example.ui.theme.TextSecondary
@@ -84,8 +85,34 @@ fun MainScreen(
         indicatorColor = Color.Transparent
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val isDarkTheme = LocalThemeMode.current
+    val globalBackgroundBrush = remember(isDarkTheme) {
+        if (isDarkTheme) {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF0F172A), // Deep Slate
+                    Color(0xFF1E1B4B), // Deep Indigo
+                    Color(0xFF090B10)  // Deep Black
+                )
+            )
+        } else {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFFF8FAFC),
+                    Color(0xFFE0E7FF),
+                    Color(0xFFF1F5F9)
+                )
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(globalBackgroundBrush)
+    ) {
         Scaffold(
+            containerColor = Color.Transparent,
             bottomBar = {
                 Column {
                     // Persistent Mini-Player when browsing shelves/hierarchy
@@ -185,7 +212,9 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.Library) {
-                                    popUpTo(Routes.Library) { inclusive = true }
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Audiobooks") },
@@ -197,7 +226,9 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.Music) {
-                                    popUpTo(Routes.Library)
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.MusicNote, contentDescription = "Music") },
@@ -209,7 +240,9 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.EBooks) {
-                                    popUpTo(Routes.Library)
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.MenuBook, contentDescription = "E-Books") },
@@ -217,36 +250,17 @@ fun MainScreen(
                             colors = navColors
                         )
                         NavigationBarItem(
-                            selected = isPlayerSlidUp || isSelected(Routes.Player),
-                            onClick = {
-                                isPlayerSlidUp = true
-                            },
-                            icon = { Icon(Icons.Default.PlayCircle, contentDescription = "Player") },
-                            label = { Text("Player", maxLines = 1) },
-                            colors = navColors
-                        )
-                        NavigationBarItem(
                             selected = isSelected(Routes.Discovery),
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.Discovery) {
-                                    popUpTo(Routes.Library)
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.TravelExplore, contentDescription = "Discovery") },
                             label = { Text("Discovery", maxLines = 1) },
-                            colors = navColors
-                        )
-                        NavigationBarItem(
-                            selected = isSelected(Routes.Settings),
-                            onClick = {
-                                isPlayerSlidUp = false
-                                navController.navigate(Routes.Settings) {
-                                    popUpTo(Routes.Library)
-                                }
-                            },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                            label = { Text("Settings", maxLines = 1) },
                             colors = navColors
                         )
                     }

@@ -32,10 +32,12 @@ class PlaybackManager(private val context: Context) {
     private var currentPlaylist: List<MusicTrack> = emptyList()
     private var currentAudiobookList: List<Audiobook> = emptyList()
 
+    private var isPrepared = false
+
     private val updateProgressRunnable = object : Runnable {
         override fun run() {
             mediaPlayer?.let { player ->
-                if (player.isPlaying) {
+                if (isPrepared && player.isPlaying) {
                     val pos = player.currentPosition.toLong()
                     val dur = if (player.duration > 0) player.duration.toLong() else _playbackState.value.duration
                     _playbackState.value = _playbackState.value.copy(
@@ -188,6 +190,7 @@ class PlaybackManager(private val context: Context) {
 
                 prepareAsync()
                 setOnPreparedListener { mp ->
+                    isPrepared = true
                     if (startPositionMs > 0 && startPositionMs < mp.duration) {
                         mp.seekTo(startPositionMs.toInt())
                     }
@@ -201,11 +204,12 @@ class PlaybackManager(private val context: Context) {
                     handler.post(updateProgressRunnable)
                 }
                 setOnCompletionListener { mp ->
-                    _playbackState.value = _playbackState.value.copy(isPlaying = false, currentPosition = mp.duration.toLong())
+                    _playbackState.value = _playbackState.value.copy(isPlaying = false, currentPosition = if(isPrepared) mp.duration.toLong() else 0L)
                     skipNextTrack()
                 }
                 setOnErrorListener { _, what, extra ->
                     Log.e("PlaybackManager", "MediaPlayer error: what=$what extra=$extra on url $url")
+                    isPrepared = false
                     
                     // If first attempt failed on audiobook, try fallback download endpoint
                     if (isAudiobook && fallbackCandidate != null && attempt == 1) {
@@ -241,13 +245,21 @@ class PlaybackManager(private val context: Context) {
     fun togglePlayPause() {
         val current = _playbackState.value
         mediaPlayer?.let { player ->
-            if (player.isPlaying) {
-                player.pause()
-                _playbackState.value = current.copy(isPlaying = false)
-            } else {
-                player.start()
-                _playbackState.value = current.copy(isPlaying = true)
-                handler.post(updateProgressRunnable)
+            try {
+                if (isPrepared) {
+                    if (player.isPlaying) {
+                        player.pause()
+                        _playbackState.value = current.copy(isPlaying = false)
+                    } else {
+                        player.start()
+                        _playbackState.value = current.copy(isPlaying = true)
+                        handler.post(updateProgressRunnable)
+                    }
+                } else {
+                     _playbackState.value = current.copy(isPlaying = !current.isPlaying)
+                }
+            } catch (e: Exception) {
+                Log.e("PlaybackManager", "Error toggling play/pause", e)
             }
         } ?: run {
             _playbackState.value = current.copy(isPlaying = !current.isPlaying)

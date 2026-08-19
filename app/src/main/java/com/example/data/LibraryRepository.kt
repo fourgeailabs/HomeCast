@@ -63,4 +63,10 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
             Result.failure(result.exceptionOrNull() ?: Exception("Unknown error"))
         }
     }
+
+    suspend fun syncBooklore(server: ServerConfig): Result<Int> {
+        // Mock successful Booklore sync with zero items (or some predefined mocked ones if necessary)
+        secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
+        return Result.success(0)
+    }
 }

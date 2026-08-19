@@ -16,8 +16,8 @@ val TextPrimary = Color(0xFFF1F5F9)
 val TextSecondary = Color(0xFF94A3B8)
 val AccentIndigo = Color(0xFF6366F1)
 val AccentTeal = Color(0xFF14B8A6)
-val SurfaceGlass = Color(0x0DFFFFFF) // white/5
-val SurfaceGlassBorder = Color(0x1AFFFFFF) // white/10
+val SurfaceGlass = Color(0x1AFFFFFF) // white/10 for better frosted visibility
+val SurfaceGlassBorder = Color(0x33FFFFFF) // white/20 for edge highlights
 val PlayButtonColor = Color(0xFFFFFFFF)
 val PlayButtonIcon = Color(0xFF020617) // slate-950
 

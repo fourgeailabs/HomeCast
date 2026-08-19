@@ -160,14 +160,16 @@ fun EReaderScreen(
     val pageTurnAnim = remember { Animatable(0f) }
     var isTurningForward by remember { mutableStateOf(true) }
 
-    fun triggerPageTurn(forward: Boolean) {
+    fun triggerPageTurn(forward: Boolean, animate: Boolean = true) {
         coroutineScope.launch {
             isTurningForward = forward
-            pageTurnAnim.snapTo(if (forward) 0f else 1f)
-            pageTurnAnim.animateTo(
-                targetValue = if (forward) 1f else 0f,
-                animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
-            )
+            if (animate) {
+                pageTurnAnim.snapTo(0f)
+                pageTurnAnim.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
+                )
+            }
             if (forward) {
                 if (safePage < totalPagesInChapter - 1) {
                     currentPageInChapter = safePage + 1
@@ -264,17 +266,38 @@ fun EReaderScreen(
                 }
                 .pointerInput(safePage, currentChapterIndex) {
                     var totalDragX = 0f
+                    val width = size.width.toFloat()
                     detectHorizontalDragGestures(
+                        onDragStart = {
+                            totalDragX = 0f
+                        },
                         onDragEnd = {
-                            if (totalDragX < -60f) {
-                                triggerPageTurn(forward = true)
-                            } else if (totalDragX > 60f) {
-                                triggerPageTurn(forward = false)
+                            coroutineScope.launch {
+                                if (totalDragX < -60f) {
+                                    isTurningForward = true
+                                    pageTurnAnim.animateTo(1f, tween(150, easing = LinearOutSlowInEasing))
+                                    triggerPageTurn(forward = true, animate = false)
+                                } else if (totalDragX > 60f) {
+                                    isTurningForward = false
+                                    pageTurnAnim.animateTo(1f, tween(150, easing = LinearOutSlowInEasing))
+                                    triggerPageTurn(forward = false, animate = false)
+                                } else {
+                                    pageTurnAnim.animateTo(0f, tween(200))
+                                }
+                                totalDragX = 0f
                             }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch { pageTurnAnim.animateTo(0f, tween(200)) }
                             totalDragX = 0f
                         },
                         onHorizontalDrag = { _, dragAmount ->
                             totalDragX += dragAmount
+                            isTurningForward = totalDragX < 0
+                            val progress = (kotlin.math.abs(totalDragX) / width).coerceIn(0f, 1f)
+                            coroutineScope.launch {
+                                pageTurnAnim.snapTo(progress)
+                            }
                         }
                     )
                 }

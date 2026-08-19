@@ -56,7 +56,7 @@ fun PlayerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Color.Transparent)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(24.dp),
             contentAlignment = Alignment.Center
@@ -191,8 +191,8 @@ fun PlayerScreen(
                     listOf(
                         dominantColor.copy(alpha = 0.45f),
                         vibrantColor.copy(alpha = 0.25f),
-                        MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-                        MaterialTheme.colorScheme.background
+                        Color.Transparent,
+                        Color.Transparent
                     )
                 )
             )
