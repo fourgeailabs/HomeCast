@@ -16,7 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -604,6 +606,7 @@ fun PlexConfigCard(
     onConnect: (String, String, String) -> Unit
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     var serverName by remember { mutableStateOf("My Plex Server") }
     var hostUrl by remember { mutableStateOf("http://192.168.1.100:32400") }
     var plexToken by remember { mutableStateOf("") }
@@ -613,6 +616,7 @@ fun PlexConfigCard(
     val plexDiagnosticResult by viewModel.plexDiagnosticResult.collectAsState()
     val isDiagnosingPlex by viewModel.isDiagnosingPlex.collectAsState()
     val plexPinCode by viewModel.plexPinCode.collectAsState()
+    val plexAuthToken by viewModel.plexAuthToken.collectAsState()
     val isRequestingPin by viewModel.isRequestingPin.collectAsState()
     val isPollingPin by viewModel.isPollingPin.collectAsState()
 
@@ -621,6 +625,15 @@ fun PlexConfigCard(
     LaunchedEffect(plexDiagnosticResult) {
         if (plexDiagnosticResult != null) {
             showDiagnosticDialog = true
+        }
+    }
+
+    LaunchedEffect(plexAuthToken) {
+        val token = plexAuthToken
+        if (!token.isNullOrBlank()) {
+            plexToken = token
+            Toast.makeText(context, "Plex token acquired! You can now Save & Connect.", Toast.LENGTH_LONG).show()
+            viewModel.clearPlexAuthToken()
         }
     }
 
@@ -828,6 +841,7 @@ fun PlexConfigCard(
 
     // Plex PIN Link Flow Dialog
     if (plexPinCode != null) {
+        val code = plexPinCode ?: ""
         AlertDialog(
             onDismissRequest = { viewModel.dismissPlexPin() },
             icon = {
@@ -843,37 +857,106 @@ fun PlexConfigCard(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        "1. Open plex.tv/link in your browser\n2. Enter this 4-letter authorization code:",
+                        "Enter this 4-character code at plex.tv/link to authorize:",
                         fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
 
-                    Surface(
-                        color = AccentIndigo.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentIndigo)
-                    ) {
-                        Text(
-                            text = plexPinCode ?: "",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 6.sp,
-                            color = AccentIndigo,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
-                        )
+                    // 4-Letter Digit Display
+                    if (code.length == 4) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            for (char in code) {
+                                Surface(
+                                    color = AccentIndigo.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.5.dp, AccentIndigo),
+                                    modifier = Modifier.size(width = 46.dp, height = 54.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = char.toString(),
+                                            fontSize = 26.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentIndigo
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Surface(
+                            color = AccentIndigo.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentIndigo)
+                        ) {
+                            Text(
+                                text = code,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentIndigo,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                            )
+                        }
                     }
 
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://plex.tv/link"))
-                            context.startActivity(intent)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                    // Quick Copy & Browser Links
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(code))
+                                Toast.makeText(context, "Code '$code' copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Copy Code", fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                val linkUrl = "https://plex.tv/link?code=$code"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(linkUrl))
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                            modifier = Modifier.weight(1.3f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Open plex.tv/link", fontSize = 12.sp)
+                        }
+                    }
+
+                    // Auto-sync helper message
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.OpenInBrowser, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open plex.tv/link in Browser")
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (isPollingPin) {
+                                CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = AccentTeal)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = "Auto-checking plex.tv approval in the background...",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             },
@@ -887,13 +970,7 @@ fun PlexConfigCard(
                     enabled = !isPollingPin,
                     colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
                 ) {
-                    if (isPollingPin) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Checking...")
-                    } else {
-                        Text("I Authorized - Complete Login")
-                    }
+                    Text("Check Manually")
                 }
             },
             dismissButton = {

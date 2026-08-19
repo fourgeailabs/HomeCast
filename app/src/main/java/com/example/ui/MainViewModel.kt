@@ -64,11 +64,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _plexPinId = MutableStateFlow<Long?>(null)
     val plexPinId = _plexPinId.asStateFlow()
 
+    private val _plexAuthToken = MutableStateFlow<String?>(null)
+    val plexAuthToken = _plexAuthToken.asStateFlow()
+
     private val _isRequestingPin = MutableStateFlow(false)
     val isRequestingPin = _isRequestingPin.asStateFlow()
 
     private val _isPollingPin = MutableStateFlow(false)
     val isPollingPin = _isPollingPin.asStateFlow()
+
+    private var pinPollJob: kotlinx.coroutines.Job? = null
 
     fun diagnoseAudiobookshelf(baseUrl: String, username: String = "", password: String = "", token: String = "") {
         viewModelScope.launch {
@@ -124,14 +129,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestPlexPin() {
+        pinPollJob?.cancel()
         viewModelScope.launch {
             _isRequestingPin.value = true
             try {
                 val result = PlexClient.createPin()
                 if (result.isSuccess) {
                     val pin = result.getOrNull()
-                    _plexPinCode.value = pin?.code
+                    val code = pin?.code?.uppercase()?.trim()
+                    _plexPinCode.value = code
                     _plexPinId.value = pin?.id
+
+                    // Launch automatic polling in the background while user enters code
+                    if (pin?.id != null) {
+                        startAutomaticPinPolling(pin.id)
+                    }
                 } else {
                     _serverOpState.value = ServerOperationState.Error("PIN creation failed: ${result.exceptionOrNull()?.message}")
                 }
@@ -140,6 +152,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 _isRequestingPin.value = false
             }
+        }
+    }
+
+    private fun startAutomaticPinPolling(pinId: Long) {
+        pinPollJob?.cancel()
+        pinPollJob = viewModelScope.launch {
+            _isPollingPin.value = true
+            val startTime = System.currentTimeMillis()
+            val timeout = 300_000L // 5 minutes
+
+            while (System.currentTimeMillis() - startTime < timeout) {
+                kotlinx.coroutines.delay(2000)
+                try {
+                    val result = PlexClient.checkPin(pinId)
+                    if (result.isSuccess) {
+                        val token = result.getOrNull()
+                        if (!token.isNullOrBlank()) {
+                            _plexAuthToken.value = token
+                            _plexPinCode.value = null
+                            _plexPinId.value = null
+                            _serverOpState.value = ServerOperationState.Success("Plex account linked successfully!")
+                            break
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Continue polling until timeout or dismiss
+                }
+            }
+            _isPollingPin.value = false
         }
     }
 
@@ -152,8 +193,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (result.isSuccess) {
                     val token = result.getOrNull()
                     if (!token.isNullOrBlank()) {
+                        pinPollJob?.cancel()
                         _plexPinCode.value = null
                         _plexPinId.value = null
+                        _plexAuthToken.value = token
                         onTokenReceived(token)
                         _serverOpState.value = ServerOperationState.Success("Plex account linked successfully!")
                     } else {
@@ -171,8 +214,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissPlexPin() {
+        pinPollJob?.cancel()
         _plexPinCode.value = null
         _plexPinId.value = null
+        _isPollingPin.value = false
+    }
+
+    fun clearPlexAuthToken() {
+        _plexAuthToken.value = null
     }
 
     // --- Audiobookshelf Connect & Sync ---

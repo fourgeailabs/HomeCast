@@ -119,10 +119,11 @@ object PlexClient {
 
     /**
      * Creates a Plex PIN for web authorization (plex.tv/link).
+     * Uses strong=false to generate a clean 4-character code for plex.tv/link.
      */
     suspend fun createPin(): Result<PlexPinResponse> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("https://plex.tv/api/v2/pins?strong=true")
+            .url("https://plex.tv/api/v2/pins?strong=false")
             .post("".toRequestBody())
             .apply { buildStandardHeaders(this, "") }
             .build()
@@ -137,7 +138,8 @@ object PlexClient {
             val adapter = moshi.adapter(PlexPinResponse::class.java)
             val pin = adapter.fromJson(body)
             if (pin?.code != null && pin.id != null) {
-                Result.success(pin)
+                // Ensure code is formatted cleanly (4 uppercase characters)
+                Result.success(pin.copy(code = pin.code.uppercase()))
             } else {
                 Result.failure(Exception("Invalid PIN response from Plex"))
             }
