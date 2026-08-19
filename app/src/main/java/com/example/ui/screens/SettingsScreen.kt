@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -22,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ServerConfig
 import com.example.data.network.AbsDiagnosticResult
+import com.example.data.network.PlexDiagnosticResult
 import com.example.ui.MainViewModel
 import com.example.ui.ServerOperationState
 import com.example.ui.theme.AccentIndigo
@@ -129,6 +132,7 @@ fun SettingsScreen(
         // Plex Config Card
         item {
             PlexConfigCard(
+                viewModel = viewModel,
                 isLoading = serverOpState is ServerOperationState.Loading,
                 onConnect = { name, url, token ->
                     viewModel.saveAndConnectPlexDirect(name, url, token)
@@ -595,13 +599,30 @@ fun AudiobookshelfConfigCard(
 
 @Composable
 fun PlexConfigCard(
+    viewModel: MainViewModel,
     isLoading: Boolean,
     onConnect: (String, String, String) -> Unit
 ) {
+    val context = LocalContext.current
     var serverName by remember { mutableStateOf("My Plex Server") }
-    var hostUrl by remember { mutableStateOf("http://192.168.1.") }
+    var hostUrl by remember { mutableStateOf("http://192.168.1.100:32400") }
     var plexToken by remember { mutableStateOf("") }
     var showTokenHelp by remember { mutableStateOf(false) }
+    var connectionMode by remember { mutableStateOf("local") }
+
+    val plexDiagnosticResult by viewModel.plexDiagnosticResult.collectAsState()
+    val isDiagnosingPlex by viewModel.isDiagnosingPlex.collectAsState()
+    val plexPinCode by viewModel.plexPinCode.collectAsState()
+    val isRequestingPin by viewModel.isRequestingPin.collectAsState()
+    val isPollingPin by viewModel.isPollingPin.collectAsState()
+
+    var showDiagnosticDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(plexDiagnosticResult) {
+        if (plexDiagnosticResult != null) {
+            showDiagnosticDialog = true
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -634,16 +655,100 @@ fun PlexConfigCard(
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.padding(vertical = 8.dp)
                 ) {
-                    Text(
-                        "To find your Plex Token:\n1. Open Plex Web and inspect XML on any media item\n2. Or check your Plex account settings for X-Plex-Token\n3. Enter the token along with your Plex local/remote URL.",
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Why Plex returns HTTP 401 Unauthorized:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentIndigo)
+                        Text(
+                            "1. Missing or Invalid X-Plex-Token: Plex requires an account auth token for all library endpoints.\n" +
+                            "2. Easy Fix -> 'Sign in with Plex PIN': Tap the button below to link your Plex account in 5 seconds without manual tokens.\n" +
+                            "3. Manual Token: Open Plex Web -> Play any track -> Click '...' -> View Info -> View XML -> Copy the token after 'X-Plex-Token=' at the end of the URL.\n" +
+                            "4. Default Port: Local Plex servers run on port :32400 (e.g. http://192.168.1.50:32400).",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick Connection Mode Selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = connectionMode == "local",
+                    onClick = {
+                        connectionMode = "local"
+                        if (hostUrl.startsWith("https://") || hostUrl.isBlank()) {
+                            hostUrl = "http://192.168.1.100:32400"
+                        }
+                    },
+                    label = { Text("Local LAN (:32400)", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentIndigo
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+
+                FilterChip(
+                    selected = connectionMode == "remote",
+                    onClick = {
+                        connectionMode = "remote"
+                        if (hostUrl.startsWith("http://192.") || hostUrl.startsWith("http://10.")) {
+                            hostUrl = "https://"
+                        }
+                    },
+                    label = { Text("Remote / HTTPS", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentTeal
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Fast 1-Tap Plex PIN Sign-In Banner
+            Surface(
+                color = AccentIndigo.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Instant Plex Authorization", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentIndigo)
+                        Text("Get valid token via official Plex PIN flow", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Button(
+                        onClick = { viewModel.requestPlexPin() },
+                        enabled = !isRequestingPin,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        if (isRequestingPin) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Sign In with PIN", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = serverName,
@@ -667,6 +772,7 @@ fun PlexConfigCard(
                 value = plexToken,
                 onValueChange = { plexToken = it },
                 label = { Text("X-Plex-Token") },
+                placeholder = { Text("Paste token or use PIN login above") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -674,24 +780,261 @@ fun PlexConfigCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = {
-                    onConnect(serverName, hostUrl, plexToken)
-                },
+            // Dual Action Buttons: Test & Diagnose / Save & Connect
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading && hostUrl.isNotBlank() && plexToken.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Connecting & Syncing...")
-                } else {
-                    Icon(Icons.Default.Link, contentDescription = "Connect")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save & Connect Plex")
+                OutlinedButton(
+                    onClick = {
+                        viewModel.diagnosePlex(
+                            serverUrl = hostUrl.trim(),
+                            token = plexToken.trim()
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !isDiagnosingPlex && !isLoading && hostUrl.isNotBlank()
+                ) {
+                    if (isDiagnosingPlex) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Test & Diagnose", fontSize = 12.sp)
+                }
+
+                Button(
+                    onClick = {
+                        onConnect(serverName.trim(), hostUrl.trim(), plexToken.trim())
+                    },
+                    modifier = Modifier.weight(1.3f),
+                    enabled = !isLoading && !isDiagnosingPlex && hostUrl.isNotBlank() && plexToken.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Connecting...", fontSize = 12.sp)
+                    } else {
+                        Icon(Icons.Default.Link, contentDescription = "Connect", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save & Connect", fontSize = 12.sp)
+                    }
                 }
             }
         }
+    }
+
+    // Plex PIN Link Flow Dialog
+    if (plexPinCode != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPlexPin() },
+            icon = {
+                Icon(Icons.Default.VpnKey, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(36.dp))
+            },
+            title = {
+                Text("Link Plex Account", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "1. Open plex.tv/link in your browser\n2. Enter this 4-letter authorization code:",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Surface(
+                        color = AccentIndigo.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentIndigo)
+                    ) {
+                        Text(
+                            text = plexPinCode ?: "",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 6.sp,
+                            color = AccentIndigo,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://plex.tv/link"))
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.OpenInBrowser, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Open plex.tv/link in Browser")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.checkPlexPinStatus { receivedToken ->
+                            plexToken = receivedToken
+                        }
+                    },
+                    enabled = !isPollingPin,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                ) {
+                    if (isPollingPin) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Checking...")
+                    } else {
+                        Text("I Authorized - Complete Login")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissPlexPin() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Plex Diagnostic Results Dialog
+    if (showDiagnosticDialog && plexDiagnosticResult != null) {
+        val result = plexDiagnosticResult!!
+        AlertDialog(
+            onDismissRequest = {
+                showDiagnosticDialog = false
+                viewModel.clearPlexDiagnosticResult()
+            },
+            icon = {
+                Icon(
+                    imageVector = when {
+                        result.success -> Icons.Default.CheckCircle
+                        result.isReachable -> Icons.Default.Warning
+                        else -> Icons.Default.Error
+                    },
+                    contentDescription = null,
+                    tint = when {
+                        result.success -> Color(0xFF4CAF50)
+                        result.isReachable -> Color(0xFFFF9800)
+                        else -> MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (result.success) "Plex Connection Verified" else "Plex Diagnostic Report",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = result.statusMessage,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = if (result.success) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Tested URL: ${result.testedUrl}", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Text("Latency: ${result.latencyMs} ms", fontSize = 12.sp)
+                            if (result.httpStatusCode != null) {
+                                Text("HTTP Status Code: ${result.httpStatusCode}", fontSize = 12.sp)
+                            }
+                            if (result.musicSectionsFound > 0) {
+                                Text("Music Libraries Found: ${result.musicSectionsFound}", fontSize = 12.sp, color = AccentTeal)
+                            }
+                            if (result.totalTracksFound > 0) {
+                                Text("Tracks Sampled: ${result.totalTracksFound}", fontSize = 12.sp, color = AccentIndigo)
+                            }
+                        }
+                    }
+
+                    if (result.diagnosticLog.isNotEmpty()) {
+                        Text("Diagnostic Logs:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.8f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                for (logLine in result.diagnosticLog) {
+                                    Text(
+                                        text = logLine,
+                                        fontSize = 11.sp,
+                                        color = if (logLine.contains("AUTHENTICATED") || logLine.contains("SUCCESS")) Color(0xFF81C784) else Color(0xFFE0E0E0),
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (result.recommendations.isNotEmpty()) {
+                        Text("How to Fix:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for (tip in result.recommendations) {
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text("• ", fontSize = 12.sp, color = AccentIndigo)
+                                    Text(tip, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (result.success) {
+                    Button(
+                        onClick = {
+                            showDiagnosticDialog = false
+                            viewModel.clearPlexDiagnosticResult()
+                            onConnect(serverName.trim(), result.testedUrl, plexToken.trim())
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                    ) {
+                        Text("Save & Connect Now")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            showDiagnosticDialog = false
+                            viewModel.clearPlexDiagnosticResult()
+                        }
+                    ) {
+                        Text("Close")
+                    }
+                }
+            },
+            dismissButton = {
+                if (result.success) {
+                    TextButton(onClick = {
+                        showDiagnosticDialog = false
+                        viewModel.clearPlexDiagnosticResult()
+                    }) {
+                        Text("Dismiss")
+                    }
+                }
+            }
+        )
     }
 }

@@ -161,3 +161,16 @@ data class PlexPartItem(
     val key: String? = null,
     val duration: Long? = null
 )
+
+data class PlexDiagnosticResult(
+    val isReachable: Boolean,
+    val testedUrl: String,
+    val httpStatusCode: Int?,
+    val success: Boolean,
+    val statusMessage: String,
+    val latencyMs: Long,
+    val musicSectionsFound: Int = 0,
+    val totalTracksFound: Int = 0,
+    val diagnosticLog: List<String> = emptyList(),
+    val recommendations: List<String> = emptyList()
+)

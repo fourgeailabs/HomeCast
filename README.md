@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v1.7-brightgreen?style=flat-square" alt="Version 1.7" />
+  <img src="https://img.shields.io/badge/Release-v1.8-brightgreen?style=flat-square" alt="Version 1.8" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -19,13 +19,15 @@
 
 ---
 
-### 🚀 What's New in v1.7
-- **🛡️ Bulletproof Audiobookshelf Connection & Diagnostic Engine**:
-  - **Permissive SSL/TLS Engine**: Gracefully handles self-signed SSL certificates, internal CA certificates, Let's Encrypt certificates, and custom HTTPS ports on self-hosted home servers (Unraid, TrueNAS, Synology, Docker, Proxmox).
-  - **Live Connection Diagnostics Modal**: Added a dedicated **"Test & Diagnose"** tool in Settings that runs real-time reachability, ping latency, SSL validation, authentication probes, and library discovery checks with monospaced execution logs and tailored remediation tips.
-  - **Deep URL Sanitizer**: Automatically cleanses pasted URLs, strips browser UI suffixes (`/login`, `/audiobooks`, query params, and anchors), handles port formatting, and auto-detects HTTPS vs HTTP.
-  - **Multi-Strategy Token & Credential Auth**: Automatically probes `/login`, `/api/login`, `/api/authorize`, API Bearer tokens, and custom headers.
-  - **1-Tap Save & Connect**: Seamlessly saves and syncs library media immediately once diagnostics confirm server reachability.
+### 🚀 What's New in v1.8
+- **🎵 Bulletproof Plex Connection & HTTP 401 Resolution**:
+  - **Official Plex PIN Sign-In (OAuth Link)**: Direct 1-tap browser linking via `plex.tv/link`. HomeCast generates a 4-letter authorization code and automatically fetches the official `authToken`, eliminating token errors.
+  - **Comprehensive Header & Query Authentication**: Automatically sends full standard Plex headers (`X-Plex-Product`, `X-Plex-Version`, `X-Plex-Client-Identifier`, `X-Plex-Platform`, `X-Plex-Device`) along with both header and query-parameter `X-Plex-Token` authentication for maximum server compatibility.
+  - **Plex Port & URL Sanitizer**: Auto-detects and appends the standard Plex port `:32400` when connecting to local IP addresses and automatically strips `/web` or `/manage` browser suffixes.
+  - **Plex Connection Diagnostics**: Real-time server ping, latency measurement, `/identity` probing, music library discovery, and sample track validation with actionable troubleshooting tips for 401/404/SSL errors.
+  - **Permissive SSL Fallback**: Smooth connections across custom HTTPS domains, remote reverse proxies, and self-hosted SSL setups.
+- **🛡️ Bulletproof Audiobookshelf Connection & Diagnostics (v1.7 Integration)**:
+  - Permissive SSL engine, deep URL sanitizing, multi-strategy token login, and live diagnostics dialog.
 - **📖 Kindle-Grade E-Reader (v1.6 Integration)**:
   - Physics-based realistic page turns with 3D curl simulation.
   - 4 Selectable Font Families (Literata, Bookerly, Inter, JetBrains Mono) with granular sizing and 5 color themes (Warm Sepia, OLED Black, Paper White, Midnight Slate, Solar Mint).

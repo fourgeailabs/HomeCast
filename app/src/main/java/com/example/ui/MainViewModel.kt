@@ -51,6 +51,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isDiagnosing = MutableStateFlow(false)
     val isDiagnosing = _isDiagnosing.asStateFlow()
 
+    private val _plexDiagnosticResult = MutableStateFlow<PlexDiagnosticResult?>(null)
+    val plexDiagnosticResult = _plexDiagnosticResult.asStateFlow()
+
+    private val _isDiagnosingPlex = MutableStateFlow(false)
+    val isDiagnosingPlex = _isDiagnosingPlex.asStateFlow()
+
+    // Plex PIN Link State
+    private val _plexPinCode = MutableStateFlow<String?>(null)
+    val plexPinCode = _plexPinCode.asStateFlow()
+
+    private val _plexPinId = MutableStateFlow<Long?>(null)
+    val plexPinId = _plexPinId.asStateFlow()
+
+    private val _isRequestingPin = MutableStateFlow(false)
+    val isRequestingPin = _isRequestingPin.asStateFlow()
+
+    private val _isPollingPin = MutableStateFlow(false)
+    val isPollingPin = _isPollingPin.asStateFlow()
+
     fun diagnoseAudiobookshelf(baseUrl: String, username: String = "", password: String = "", token: String = "") {
         viewModelScope.launch {
             _isDiagnosing.value = true
@@ -76,6 +95,84 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearDiagnosticResult() {
         _diagnosticResult.value = null
+    }
+
+    fun diagnosePlex(serverUrl: String, token: String = "") {
+        viewModelScope.launch {
+            _isDiagnosingPlex.value = true
+            try {
+                val report = PlexClient.diagnoseConnection(serverUrl, token)
+                _plexDiagnosticResult.value = report
+            } catch (e: Exception) {
+                _plexDiagnosticResult.value = PlexDiagnosticResult(
+                    isReachable = false,
+                    testedUrl = serverUrl,
+                    httpStatusCode = null,
+                    success = false,
+                    statusMessage = "Diagnostic error: ${e.message}",
+                    latencyMs = 0,
+                    diagnosticLog = listOf("Unexpected error: ${e.message}")
+                )
+            } finally {
+                _isDiagnosingPlex.value = false
+            }
+        }
+    }
+
+    fun clearPlexDiagnosticResult() {
+        _plexDiagnosticResult.value = null
+    }
+
+    fun requestPlexPin() {
+        viewModelScope.launch {
+            _isRequestingPin.value = true
+            try {
+                val result = PlexClient.createPin()
+                if (result.isSuccess) {
+                    val pin = result.getOrNull()
+                    _plexPinCode.value = pin?.code
+                    _plexPinId.value = pin?.id
+                } else {
+                    _serverOpState.value = ServerOperationState.Error("PIN creation failed: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                _serverOpState.value = ServerOperationState.Error("Error: ${e.message}")
+            } finally {
+                _isRequestingPin.value = false
+            }
+        }
+    }
+
+    fun checkPlexPinStatus(onTokenReceived: (String) -> Unit) {
+        val pinId = _plexPinId.value ?: return
+        viewModelScope.launch {
+            _isPollingPin.value = true
+            try {
+                val result = PlexClient.checkPin(pinId)
+                if (result.isSuccess) {
+                    val token = result.getOrNull()
+                    if (!token.isNullOrBlank()) {
+                        _plexPinCode.value = null
+                        _plexPinId.value = null
+                        onTokenReceived(token)
+                        _serverOpState.value = ServerOperationState.Success("Plex account linked successfully!")
+                    } else {
+                        _serverOpState.value = ServerOperationState.Error("PIN not claimed yet on plex.tv/link. Please verify in your browser.")
+                    }
+                } else {
+                    _serverOpState.value = ServerOperationState.Error("PIN check error: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                _serverOpState.value = ServerOperationState.Error("Error checking PIN: ${e.message}")
+            } finally {
+                _isPollingPin.value = false
+            }
+        }
+    }
+
+    fun dismissPlexPin() {
+        _plexPinCode.value = null
+        _plexPinId.value = null
     }
 
     // --- Audiobookshelf Connect & Sync ---
