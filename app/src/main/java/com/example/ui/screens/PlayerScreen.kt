@@ -397,7 +397,7 @@ fun PlayerScreen(
                     onValueChange = { sliderDraggingPosition = it },
                     onValueChangeFinished = {
                         sliderDraggingPosition?.let { fraction ->
-                            viewModel.seekTo((fraction * durationMs).toLong())
+                            viewModel.playbackManager.seekTo((fraction * durationMs).toLong())
                             sliderDraggingPosition = null
                         }
                     },
@@ -437,7 +437,7 @@ fun PlayerScreen(
                 ) {
                     // Previous Track Button
                     IconButton(
-                        onClick = { viewModel.skipPreviousTrack() },
+                        onClick = { viewModel.playbackManager.skipPreviousTrack() },
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
@@ -454,7 +454,7 @@ fun PlayerScreen(
 
                     // Rewind 10s Button
                     IconButton(
-                        onClick = { viewModel.skipBackward(10) },
+                        onClick = { viewModel.playbackManager.skipBackward(10) },
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
@@ -484,7 +484,7 @@ fun PlayerScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(
-                            onClick = { viewModel.togglePlayPause() },
+                            onClick = { viewModel.playbackManager.togglePlayPause() },
                             modifier = Modifier.fillMaxSize()
                         ) {
                             Icon(
@@ -498,7 +498,7 @@ fun PlayerScreen(
 
                     // Fast Forward 30s Button
                     IconButton(
-                        onClick = { viewModel.skipForward(30) },
+                        onClick = { viewModel.playbackManager.skipForward(30) },
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
@@ -515,7 +515,7 @@ fun PlayerScreen(
 
                     // Next / Skip Track Button
                     IconButton(
-                        onClick = { viewModel.skipNextTrack() },
+                        onClick = { viewModel.playbackManager.skipNextTrack() },
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
@@ -569,7 +569,7 @@ fun PlayerScreen(
                                 DropdownMenuItem(
                                     text = { Text("${speed}x") },
                                     onClick = {
-                                        viewModel.setSpeed(speed)
+                                        viewModel.playbackManager.setPlaybackSpeed(speed)
                                         showSpeedMenu = false
                                     }
                                 )

@@ -375,13 +375,13 @@ fun MusicScreen(
                 currentTrackId = playbackState.currentMusicTrack?.id,
                 onBack = { selectedAlbum = null },
                 onTrackSelected = { track ->
-                    viewModel.playMusicTrack(track)
+                    viewModel.playbackManager.playMusicTrack(track)
                     onTrackClick(track)
                 },
                 onPlayAll = {
                     val first = selectedAlbum!!.tracks.firstOrNull()
                     if (first != null) {
-                        viewModel.playMusicTrack(first)
+                        viewModel.playbackManager.playMusicTrack(first)
                         onTrackClick(first)
                     }
                 }
@@ -396,7 +396,7 @@ fun MusicScreen(
                 onBack = { selectedArtist = null },
                 onAlbumClick = { album -> selectedAlbum = album },
                 onTrackClick = { track ->
-                    viewModel.playMusicTrack(track)
+                    viewModel.playbackManager.playMusicTrack(track)
                     onTrackClick(track)
                 }
             )
@@ -458,7 +458,7 @@ fun MusicScreen(
                         track = track,
                         isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
                         onClick = {
-                            viewModel.playMusicTrack(track)
+                            viewModel.playbackManager.playMusicTrack(track)
                             onTrackClick(track)
                         }
                     )
@@ -527,7 +527,7 @@ fun MusicScreen(
                     playbackState = playbackState,
                     onAlbumClick = { selectedAlbum = it },
                     onTrackClick = { track ->
-                        viewModel.playMusicTrack(track)
+                        viewModel.playbackManager.playMusicTrack(track)
                         onTrackClick(track)
                     }
                 )
@@ -564,7 +564,7 @@ fun MusicScreen(
                             track = track,
                             isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
                             onClick = {
-                                viewModel.playMusicTrack(track)
+                                viewModel.playbackManager.playMusicTrack(track)
                                 onTrackClick(track)
                             }
                         )

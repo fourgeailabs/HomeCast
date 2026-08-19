@@ -181,7 +181,7 @@ fun MainScreen(
                                 Text(mediaSubtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
 
-                            IconButton(onClick = { viewModel.togglePlayPause() }) {
+                            IconButton(onClick = { viewModel.playbackManager.togglePlayPause() }) {
                                 Icon(
                                     if (playbackState.isPlaying) Icons.Default.PauseCircleFilled else Icons.Default.PlayCircleFilled,
                                     contentDescription = if (playbackState.isPlaying) "Pause" else "Play",

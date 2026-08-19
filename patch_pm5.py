@@ -1,4 +1,8 @@
-package com.example.data
+import re
+
+file_path = "app/src/main/java/com/example/data/PlaybackManager.kt"
+
+text = """package com.example.data
 
 import android.content.Context
 import android.net.Uri
@@ -276,3 +280,7 @@ class PlaybackManager(private val context: Context) {
         }
     }
 }
+"""
+
+with open(file_path, "w") as f:
+    f.write(text)

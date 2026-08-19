@@ -3,6 +3,14 @@ package com.example.ui
 import android.app.Application
 import android.location.Location
 import androidx.lifecycle.AndroidViewModel
+
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import android.content.ComponentName
+import com.example.PlaybackService
+
 import androidx.lifecycle.viewModelScope
 import com.example.*
 import com.example.data.*
@@ -20,7 +28,7 @@ sealed class ServerOperationState {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val secureConfigManager = SecureConfigManager(application)
-    private val repository = LibraryRepository(database.libraryDao(), secureConfigManager)
+    val repository = LibraryRepository(database.libraryDao(), secureConfigManager)
     val playbackManager = PlaybackManager(application)
 
     val allBooks = repository.allBooks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -37,13 +45,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val serverOpState = _serverOpState.asStateFlow()
 
     // Discovery State
-    private val _recommendations = MutableStateFlow<List<String>>(emptyList())
+    val _recommendations = MutableStateFlow<List<String>>(emptyList())
     val recommendations = _recommendations.asStateFlow()
 
-    private val _isDiscoveryLoading = MutableStateFlow(false)
+    val _isDiscoveryLoading = MutableStateFlow(false)
     val isDiscoveryLoading = _isDiscoveryLoading.asStateFlow()
 
-    private val _discoveryError = MutableStateFlow<String?>(null)
+    val _discoveryError = MutableStateFlow<String?>(null)
     private val _geminiCategoryItems = MutableStateFlow<List<com.example.ui.screens.DiscoveryItem>>(emptyList())
     val geminiCategoryItems: StateFlow<List<com.example.ui.screens.DiscoveryItem>> = _geminiCategoryItems.asStateFlow()
 
@@ -537,48 +545,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Playback Controls ---
     fun playAudiobook(book: Audiobook, playlist: List<Audiobook>? = null) {
+        playbackManager.playAudiobook(book, playlist ?: allBooks.value)
         viewModelScope.launch {
             repository.updateProgress(book.id, book.progress)
-            playbackManager.setAudiobookList(playlist ?: allBooks.value)
-            playbackManager.playAudiobook(book, playlist ?: allBooks.value)
         }
     }
 
     fun playMusicTrack(track: MusicTrack, playlist: List<MusicTrack>? = null) {
+        playbackManager.playMusicTrack(track, playlist ?: allMusic.value)
         viewModelScope.launch {
             repository.updateMusicLastPlayed(track.id)
-            playbackManager.setPlaylist(playlist ?: allMusic.value)
-            playbackManager.playMusicTrack(track, playlist ?: allMusic.value)
         }
     }
 
-    fun skipNextTrack() {
-        playbackManager.skipNextTrack()
-    }
 
-    fun skipPreviousTrack() {
-        playbackManager.skipPreviousTrack()
-    }
 
-    fun togglePlayPause() {
-        playbackManager.togglePlayPause()
-    }
 
-    fun seekTo(positionMs: Long) {
-        playbackManager.seekTo(positionMs)
-    }
 
-    fun setSpeed(speed: Float) {
-        playbackManager.setPlaybackSpeed(speed)
-    }
 
-    fun skipForward(seconds: Int = 30) {
-        playbackManager.skipForward(seconds)
-    }
 
-    fun skipBackward(seconds: Int = 10) {
-        playbackManager.skipBackward(seconds)
-    }
+
+
+
+
+
+
+
 
     fun toggleFavorite(book: Audiobook) {
         viewModelScope.launch {

@@ -139,3 +139,10 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+dependencies {
+    val media3_version = "1.2.1"
+    implementation("androidx.media3:media3-exoplayer:$media3_version")
+    implementation("androidx.media3:media3-session:$media3_version")
+    implementation("androidx.media3:media3-ui:$media3_version")
+}

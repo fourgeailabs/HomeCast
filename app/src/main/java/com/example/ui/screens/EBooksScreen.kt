@@ -45,6 +45,7 @@ data class BookshelfItem(
     val id: String,
     val title: String,
     val authorOrArtist: String,
+    val publicDomainUrl: String? = null,
     val coverUrl: String,
     val genre: String,
     val isComic: Boolean = false,
@@ -57,6 +58,7 @@ data class BookshelfItem(
 val sampleBookshelfItems = listOf(
     BookshelfItem(
         id = "ebook_1",
+        publicDomainUrl = "https://www.gutenberg.org/cache/epub/35/pg35.txt",
         title = "The Time Machine",
         authorOrArtist = "H.G. Wells",
         coverUrl = "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=60",
@@ -67,6 +69,7 @@ val sampleBookshelfItems = listOf(
     ),
     BookshelfItem(
         id = "ebook_2",
+        publicDomainUrl = "https://www.gutenberg.org/cache/epub/84/pg84.txt",
         title = "Frankenstein",
         authorOrArtist = "Mary Shelley",
         coverUrl = "https://images.unsplash.com/photo-1532012164546-f432f2e37b29?w=500&auto=format&fit=crop&q=60",
@@ -98,6 +101,7 @@ val sampleBookshelfItems = listOf(
     ),
     BookshelfItem(
         id = "ebook_4",
+        publicDomainUrl = "https://www.gutenberg.org/cache/epub/132/pg132.txt",
         title = "The Art of War",
         authorOrArtist = "Sun Tzu",
         coverUrl = "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=500&auto=format&fit=crop&q=60",
@@ -119,6 +123,7 @@ val sampleBookshelfItems = listOf(
     ),
     BookshelfItem(
         id = "ebook_5",
+        publicDomainUrl = "https://www.gutenberg.org/cache/epub/64317/pg64317.txt",
         title = "The Great Gatsby",
         authorOrArtist = "F. Scott Fitzgerald",
         coverUrl = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500&auto=format&fit=crop&q=60",
@@ -129,6 +134,7 @@ val sampleBookshelfItems = listOf(
     ),
     BookshelfItem(
         id = "ebook_6",
+        publicDomainUrl = "https://www.gutenberg.org/cache/epub/5200/pg5200.txt",
         title = "Metamorphosis",
         authorOrArtist = "Franz Kafka",
         coverUrl = "https://images.unsplash.com/photo-1495640388970-05e83744d18e?w=500&auto=format&fit=crop&q=60",
@@ -247,29 +253,13 @@ fun EBooksScreen(
             )
             onOpenComic(sampleComic)
         } else {
-            val generatedChapters = (1..20).map { chapterNum ->
-                BookChapter(
-                    title = "Chapter $chapterNum",
-                    startPage = chapterNum * 5,
-                    paragraphs = listOf(
-                        "The Time Traveller was expounding a recondite matter to us. His grey eyes shone and twinkled, and his usually pale face was flushed and animated.",
-                        "The fire burnt brightly, and the soft radiance of the incandescent lights in the lilies of silver caught the bubbles that flashed and passed in our glasses.",
-                        "Our chairs, being his patents, embraced and caressed us rather than submitted to be sat upon, and there was that luxurious after-dinner atmosphere when thought roams gracefully free of the trammels of precision.",
-                        "He put it to us in this way—marking the points with a lean forefinger—as we sat and lazily admired his earnestness over this new paradox.",
-                        "“You must follow me carefully. I shall have to controvert one or two ideas that are almost universally accepted. The geometry, for instance, they taught you at school is founded on a misconception.”",
-                        "“Is not that rather a large thing to expect us to begin upon?” said Filby, an argumentative person with red hair.",
-                        "“I do not mean to ask you to accept anything without reasonable ground for it. You will soon admit as much as I need from you. You know of course that a mathematical line, a line of thickness nil, has no real existence.”",
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet.",
-                        "Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos."
-                    )
-                )
-            }
             val sampleEBook = EBookData(
                 id = item.id,
                 title = item.title,
                 author = item.authorOrArtist,
-                totalChapters = generatedChapters.size,
-                chapters = generatedChapters
+                totalChapters = 0,
+                chapters = emptyList(),
+                publicDomainUrl = item.publicDomainUrl
             )
             onOpenEBook(sampleEBook)
         }

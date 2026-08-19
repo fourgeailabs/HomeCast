@@ -110,7 +110,8 @@ data class EBookData(
     val title: String,
     val author: String,
     val totalChapters: Int,
-    val chapters: List<BookChapter>
+    val chapters: List<BookChapter>,
+    val publicDomainUrl: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,6 +121,32 @@ fun EReaderScreen(
     onClose: () -> Unit,
     onSwitchToComic: (() -> Unit)? = null
 ) {
+    var chapters by remember { mutableStateOf(eBook.chapters) }
+    var isLoading by remember { mutableStateOf(eBook.publicDomainUrl != null) }
+
+    LaunchedEffect(eBook) {
+        if (eBook.publicDomainUrl != null) {
+            val fetched = PublicDomainContentFetcher.fetchTextContent(eBook.publicDomainUrl)
+            if (fetched.isNotEmpty()) {
+                chapters = fetched
+            } else {
+                chapters = listOf(BookChapter("Fetch Failed", 0, listOf("Failed to load content from ${eBook.publicDomainUrl}")))
+            }
+            isLoading = false
+        }
+    }
+
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFDFBF7)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = AccentTeal)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Downloading book from Public Domain archive...", color = Color.Black)
+            }
+        }
+        return
+    }
+
     val coroutineScope = rememberCoroutineScope()
 
     // Reader Settings State
@@ -141,7 +168,7 @@ fun EReaderScreen(
     val bookmarks = remember { mutableStateListOf<Pair<Int, Int>>() } // (chapter, page)
 
     // Compute active chapter and content
-    val activeChapter = eBook.chapters.getOrElse(currentChapterIndex) { eBook.chapters.first() }
+    val activeChapter = chapters.getOrElse(currentChapterIndex) { chapters.first() }
     val paragraphsPerPage = 3
     val totalPagesInChapter = (activeChapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage
     val safePage = currentPageInChapter.coerceIn(0, (totalPagesInChapter - 1).coerceAtLeast(0))
@@ -173,7 +200,7 @@ fun EReaderScreen(
             if (forward) {
                 if (safePage < totalPagesInChapter - 1) {
                     currentPageInChapter = safePage + 1
-                } else if (currentChapterIndex < eBook.chapters.size - 1) {
+                } else if (currentChapterIndex < chapters.size - 1) {
                     currentChapterIndex++
                     currentPageInChapter = 0
                 }
@@ -182,7 +209,7 @@ fun EReaderScreen(
                     currentPageInChapter = safePage - 1
                 } else if (currentChapterIndex > 0) {
                     currentChapterIndex--
-                    val prevChapter = eBook.chapters[currentChapterIndex]
+                    val prevChapter = chapters[currentChapterIndex]
                     val prevTotalPages = (prevChapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage
                     currentPageInChapter = (prevTotalPages - 1).coerceAtLeast(0)
                 }
@@ -412,8 +439,8 @@ fun EReaderScreen(
                         fontWeight = FontWeight.Medium
                     )
 
-                    val overallProgressPercent = (((currentChapterIndex.toFloat() / eBook.chapters.size.coerceAtLeast(1)) +
-                            ((safePage.toFloat() / totalPagesInChapter.coerceAtLeast(1)) / eBook.chapters.size.coerceAtLeast(1))) * 100).toInt()
+                    val overallProgressPercent = (((currentChapterIndex.toFloat() / chapters.size.coerceAtLeast(1)) +
+                            ((safePage.toFloat() / totalPagesInChapter.coerceAtLeast(1)) / chapters.size.coerceAtLeast(1))) * 100).toInt()
                     Text(
                         "$overallProgressPercent%",
                         fontSize = 11.sp,
@@ -568,7 +595,7 @@ fun EReaderScreen(
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                "Chapter ${currentChapterIndex + 1} of ${eBook.chapters.size}",
+                                "Chapter ${currentChapterIndex + 1} of ${chapters.size}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = currentTheme.text
@@ -582,12 +609,12 @@ fun EReaderScreen(
 
                         IconButton(
                             onClick = {
-                                if (currentChapterIndex < eBook.chapters.size - 1) {
+                                if (currentChapterIndex < chapters.size - 1) {
                                     currentChapterIndex++
                                     currentPageInChapter = 0
                                 }
                             },
-                            enabled = currentChapterIndex < eBook.chapters.size - 1
+                            enabled = currentChapterIndex < chapters.size - 1
                         ) {
                             Icon(Icons.Default.SkipNext, contentDescription = "Next Chapter", tint = currentTheme.text)
                         }
@@ -754,7 +781,7 @@ fun EReaderScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        itemsIndexed(eBook.chapters) { idx, chapter ->
+                        itemsIndexed(chapters) { idx, chapter ->
                             val isCurrent = idx == currentChapterIndex
                             Row(
                                 modifier = Modifier

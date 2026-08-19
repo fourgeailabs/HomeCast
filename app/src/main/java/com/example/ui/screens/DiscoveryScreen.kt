@@ -342,7 +342,7 @@ fun DiscoveryScreen(
                                 viewModel.playAudiobook(localBook)
                                 onMediaSelected()
                             } else if (localTrack != null) {
-                                viewModel.playMusicTrack(localTrack)
+                                viewModel.playbackManager.playMusicTrack(localTrack)
                                 onMediaSelected()
                             } else if (item.mediaType == DiscoveryMediaType.BOOK) {
                                 selectedBookForReading = item
@@ -678,7 +678,7 @@ fun DiscoveryScreen(
                                     viewModel.playAudiobook(matchingBook)
                                     onMediaSelected()
                                 } else if (matchingTrack != null) {
-                                    viewModel.playMusicTrack(matchingTrack)
+                                    viewModel.playbackManager.playMusicTrack(matchingTrack)
                                     onMediaSelected()
                                 } else {
                                     // Treat as recommended book or audio preview

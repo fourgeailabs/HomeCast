@@ -1,0 +1,59 @@
+package com.example.ui.screens
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import android.util.Log
+
+object PublicDomainContentFetcher {
+    private val client = OkHttpClient()
+
+    suspend fun fetchTextContent(url: String): List<BookChapter> = withContext(Dispatchers.IO) {
+        try {
+            if (url.isBlank()) return@withContext emptyList()
+            
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            val fullText = response.body?.string() ?: return@withContext emptyList()
+            
+            // Simple logic: split into chapters by "CHAPTER" or just chunk it
+            val chunks = fullText.split("CHAPTER").filter { it.isNotBlank() }
+            
+            val chapters = mutableListOf<BookChapter>()
+            if (chunks.size > 1) {
+                // Ignore the first chunk as it's usually preamble
+                for (i in 1 until chunks.size) {
+                    val chapterText = chunks[i].trim()
+                    val lines = chapterText.split("\n\n").map { it.trim().replace("\n", " ") }.filter { it.isNotBlank() }
+                    chapters.add(
+                        BookChapter(
+                            title = "Chapter $i",
+                            startPage = i * 10,
+                            paragraphs = lines.take(200) // Increase limits
+                        )
+                    )
+                }
+            } else {
+                // Just chunk it arbitrarily
+                val lines = fullText.split("\n\n").map { it.trim().replace("\n", " ") }.filter { it.isNotBlank() }
+                val chunkSize = 50
+                val chunkedLines = lines.chunked(chunkSize)
+                for (i in chunkedLines.indices) {
+                    chapters.add(
+                        BookChapter(
+                            title = "Part ${i+1}",
+                            startPage = i * 5,
+                            paragraphs = chunkedLines[i]
+                        )
+                    )
+                }
+            }
+            return@withContext chapters
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext emptyList()
+        }
+    }
+}
