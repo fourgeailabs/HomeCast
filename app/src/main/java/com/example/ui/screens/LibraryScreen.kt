@@ -9,6 +9,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +29,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -47,15 +54,23 @@ fun LibraryScreen(
     val playbackState by viewModel.playbackState.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedShelfFilter by remember { mutableStateOf("All") }
+    var selectedGenre by remember { mutableStateOf<String?>(null) }
+    var isGridView by remember { mutableStateOf(false) }
 
-    val filteredBooks = remember(allBooks, searchQuery) {
-        if (searchQuery.isBlank()) allBooks
-        else allBooks.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.author.contains(searchQuery, ignoreCase = true) ||
-            it.seriesName.contains(searchQuery, ignoreCase = true) ||
-            it.narrator.contains(searchQuery, ignoreCase = true)
+    val genreList = remember(allBooks) {
+        val extracted = allBooks.map { it.genre.trim() }.filter { it.isNotBlank() }.distinct()
+        if (extracted.isNotEmpty()) listOf("All") + extracted else listOf("All", "Sci-Fi", "Fantasy", "Mystery", "Non-Fiction", "Classics")
+    }
+
+    val filteredBooks = remember(allBooks, searchQuery, selectedGenre) {
+        allBooks.filter { book ->
+            val matchesGenre = selectedGenre == null || selectedGenre == "All" || book.genre.equals(selectedGenre, ignoreCase = true)
+            val matchesSearch = searchQuery.isBlank() ||
+                book.title.contains(searchQuery, ignoreCase = true) ||
+                book.author.contains(searchQuery, ignoreCase = true) ||
+                book.seriesName.contains(searchQuery, ignoreCase = true) ||
+                book.narrator.contains(searchQuery, ignoreCase = true)
+            matchesGenre && matchesSearch
         }
     }
 
@@ -77,159 +92,224 @@ fun LibraryScreen(
         allBooks.shuffled().take(8)
     }
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        "Audiobooks",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp
-                    )
-                    Text(
-                        if (allBooks.isNotEmpty()) "${allBooks.size} titles in your bookshelf" else "Your Audiobookshelf Library",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "Audiobooks",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp
+                )
+                Text(
+                    if (allBooks.isNotEmpty()) "${allBooks.size} titles in your bookshelf" else "Your Audiobookshelf Library",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = { isGridView = !isGridView },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                ) {
+                    Icon(
+                        if (isGridView) Icons.Default.ViewAgenda else Icons.Default.GridView,
+                        contentDescription = "Toggle 3-Column Choices Grid",
+                        tint = AccentTeal
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (servers.any { it.type == "audiobookshelf" }) {
-                        IconButton(
-                            onClick = {
-                                val server = servers.firstOrNull { it.type == "audiobookshelf" }
-                                if (server != null) viewModel.syncServer(server)
-                            },
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(SurfaceGlass)
-                        ) {
-                            Icon(Icons.Default.Sync, contentDescription = "Sync Audiobookshelf", tint = AccentTeal)
-                        }
+                if (servers.any { it.type == "audiobookshelf" }) {
+                    IconButton(
+                        onClick = {
+                            val server = servers.firstOrNull { it.type == "audiobookshelf" }
+                            if (server != null) viewModel.syncServer(server)
+                        },
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = "Sync Audiobookshelf", tint = AccentTeal)
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search title, author, series, narrator...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = AccentTeal) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = SurfaceGlass,
-                    unfocusedContainerColor = SurfaceGlass,
-                    focusedBorderColor = AccentTeal.copy(alpha = 0.8f),
-                    unfocusedBorderColor = SurfaceGlassBorder
-                )
-            )
         }
 
-        if (allBooks.isEmpty()) {
-            item {
-                Card(
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(AccentTeal.copy(alpha = 0.3f), AccentIndigo.copy(alpha = 0.3f))
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.AutoStories,
-                                contentDescription = null,
-                                tint = AccentTeal,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
+        Spacer(modifier = Modifier.height(14.dp))
 
-                        Spacer(modifier = Modifier.height(18.dp))
-                        Text(
-                            "Your Bookshelf is Empty",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Connect your personal Audiobookshelf server to sync and stream your full library on sliding shelves.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            lineHeight = 20.sp
-                        )
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Button(
-                            onClick = onNavigateToSettings,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Default.Settings, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect Audiobookshelf", fontWeight = FontWeight.SemiBold)
+        // Search Bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search title, author, series, narrator...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = AccentTeal) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = SurfaceGlass,
+                unfocusedContainerColor = SurfaceGlass,
+                focusedBorderColor = AccentTeal.copy(alpha = 0.8f),
+                unfocusedBorderColor = SurfaceGlassBorder
+            )
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Horizontal Genre Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            genreList.forEach { genre ->
+                val isSelected = (selectedGenre == genre) || (selectedGenre == null && genre == "All")
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        selectedGenre = if (genre == "All") null else genre
+                    },
+                    label = { Text(genre, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentTeal
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = if (isSelected) AccentTeal else SurfaceGlassBorder
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 3-COLUMN CHOICES VIEW WHEN GENRE SELECTED OR GRID TOGGLED OR SEARCH ACTIVE
+        if (selectedGenre != null || isGridView || searchQuery.isNotBlank()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${selectedGenre ?: if (searchQuery.isNotBlank()) "Search Results" else "All Titles"} (${filteredBooks.size})",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (selectedGenre != null) {
+                        TextButton(onClick = { selectedGenre = null }) {
+                            Text("Show Shelves", color = AccentTeal, fontSize = 12.sp)
                         }
                     }
                 }
-            }
-        } else if (searchQuery.isNotBlank()) {
-            // Search Mode Results
-            item {
-                Text(
-                    "Search Results (${filteredBooks.size})",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
 
-            items(filteredBooks, key = { it.id }) { book ->
-                BookShelfRowItem(
-                    book = book,
-                    isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
-                    onClick = {
-                        viewModel.playAudiobook(book)
-                        onBookClick(book)
-                    },
-                    onFavoriteToggle = { viewModel.toggleFavorite(book) }
-                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 90.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredBooks, key = { it.id }) { book ->
+                        Audiobook3ColumnCard(
+                            book = book,
+                            isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
+                            onClick = {
+                                viewModel.playAudiobook(book)
+                                onBookClick(book)
+                            }
+                        )
+                    }
+                } // Ends LazyVerticalGrid
+            } // Ends Column
+        } else if (allBooks.isEmpty()) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(AccentTeal.copy(alpha = 0.3f), AccentIndigo.copy(alpha = 0.3f))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.AutoStories,
+                            contentDescription = null,
+                            tint = AccentTeal,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Text(
+                        "Your Bookshelf is Empty",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Connect your personal Audiobookshelf server to sync and stream your full library on sliding shelves.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = onNavigateToSettings,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connect Audiobookshelf", fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         } else {
-            // --- SHELF DESIGN (Scroll down for options, slide sideways for items) ---
+            // Horizontal sliding shelves
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 90.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
 
             // 1. Shelf: Continue Listening
             if (recents.isNotEmpty()) {
@@ -429,14 +509,15 @@ fun LibraryScreen(
                         )
                     }
                 }
-            }
-        }
+            } // Ends item (All Audiobooks)
 
-        item {
-            Spacer(modifier = Modifier.height(28.dp))
-        }
-    }
-}
+            item {
+                Spacer(modifier = Modifier.height(28.dp))
+            }
+        } // Ends LazyColumn
+    } // Ends else
+} // Ends main Column
+} // Ends LibraryScreen Composable
 
 @Composable
 fun ShelfHeader(
@@ -751,4 +832,84 @@ private fun formatDuration(seconds: Long): String {
     val hrs = seconds / 3600
     val mins = (seconds % 3600) / 60
     return if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
+}
+
+@Composable
+fun Audiobook3ColumnCard(
+    book: Audiobook,
+    isPlaying: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(AccentTeal.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (book.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = book.coverUrl,
+                    contentDescription = book.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    Icons.Default.AutoStories,
+                    contentDescription = null,
+                    tint = AccentTeal,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            if (isPlaying) {
+                Surface(
+                    color = AccentTeal,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.GraphicEq,
+                        contentDescription = "Playing",
+                        tint = Color.White,
+                        modifier = Modifier.padding(3.dp).size(12.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            book.title,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            book.author,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 9.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
 }

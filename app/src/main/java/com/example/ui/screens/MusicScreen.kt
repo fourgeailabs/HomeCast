@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -1374,60 +1375,100 @@ fun GenreDetailScreen(
     onAlbumClick: (AlbumGroup) -> Unit,
     onArtistClick: (ArtistGroup) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 4.dp)
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(genreName, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        item {
-            Text("Albums in $genreName", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-
-        items(albums) { album ->
-            Row(
+        // Back Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(CircleShape)
                     .background(SurfaceGlass)
-                    .clickable { onAlbumClick(album) }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .border(1.dp, SurfaceGlassBorder, CircleShape)
             ) {
-                AsyncImage(
-                    model = album.coverUrl,
-                    contentDescription = album.title,
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(album.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(album.artist, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(genreName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text("${albums.size} albums • 3-Column Choices", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        item { Spacer(modifier = Modifier.height(28.dp)) }
+        // 3-in-a-Row Top Down Grid for Genre choices
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 90.dp, top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(albums, key = { "${it.title}_${it.artist}" }) { album ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(12.dp))
+                        .clickable { onAlbumClick(album) }
+                        .padding(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(AccentIndigo.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (album.coverUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = album.coverUrl,
+                                contentDescription = album.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Album,
+                                contentDescription = null,
+                                tint = AccentIndigo,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        album.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        album.artist,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
     }
 }
 

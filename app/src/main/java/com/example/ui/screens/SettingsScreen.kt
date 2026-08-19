@@ -142,6 +142,16 @@ fun SettingsScreen(
             )
         }
 
+        // Booklore Config Card
+        item {
+            BookloreConfigCard(
+                isLoading = serverOpState is ServerOperationState.Loading,
+                onConnect = { name, url, username, password ->
+                    viewModel.saveAndConnectBooklore(name, url, username, password)
+                }
+            )
+        }
+
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -1233,5 +1243,110 @@ fun PlexConfigCard(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun BookloreConfigCard(
+    isLoading: Boolean,
+    onConnect: (String, String, String, String) -> Unit
+) {
+    var serverName by remember { mutableStateOf("Booklore") }
+    var hostUrl by remember { mutableStateOf("http://10.70.14.2:8080") }
+    var username by remember { mutableStateOf("ecollins") }
+    var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MenuBook, contentDescription = "Booklore", tint = AccentIndigo)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Booklore Server", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("E-Books & Comics", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = serverName,
+                onValueChange = { serverName = it },
+                label = { Text("Display Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = hostUrl,
+                onValueChange = { hostUrl = it },
+                label = { Text("Server URL (http://ip:port)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Username") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(image, "Toggle password visibility")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { onConnect(serverName.trim(), hostUrl.trim(), username.trim(), password) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading && hostUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Connecting...", fontSize = 14.sp)
+                } else {
+                    Icon(Icons.Default.Link, contentDescription = "Connect", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Connect to Booklore", fontSize = 14.sp)
+                }
+            }
+        }
     }
 }

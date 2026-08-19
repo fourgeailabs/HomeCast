@@ -48,8 +48,15 @@ enum class ReaderTheme(
     val surface: Color,
     val accent: Color
 ) {
+    REAL_PAPER(
+        title = "Real Paper (Warm Amber)",
+        bg = Color(0xFFF5E8D2),
+        text = Color(0xFF2A1F16),
+        surface = Color(0xFFEAD8BA),
+        accent = Color(0xFFB45309)
+    ),
     SEPIA(
-        title = "Warm Sepia",
+        title = "Classic Sepia",
         bg = Color(0xFFFBF0D9),
         text = Color(0xFF2D241E),
         surface = Color(0xFFF2E3C6),
@@ -192,6 +199,53 @@ fun EReaderScreen(
             .fillMaxSize()
             .background(currentTheme.bg)
     ) {
+        // --- REALISTIC PAPER TEXTURE & BINDING SPINE SHADOW LAYER ---
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Spine Shadow (Left Margin)
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.14f),
+                        Color.Black.copy(alpha = 0.04f),
+                        Color.Transparent
+                    ),
+                    startX = 0f,
+                    endX = 42.dp.toPx()
+                ),
+                size = Size(42.dp.toPx(), size.height)
+            )
+
+            // Outer Page Edge Shadow (Right Margin)
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.06f)
+                    ),
+                    startX = size.width - 24.dp.toPx(),
+                    endX = size.width
+                ),
+                topLeft = Offset(size.width - 24.dp.toPx(), 0f),
+                size = Size(24.dp.toPx(), size.height)
+            )
+
+            // Realistic Paper Fiber & Micro-Grain Noise (warm subtle paper grain)
+            if (currentTheme == ReaderTheme.REAL_PAPER || currentTheme == ReaderTheme.SEPIA) {
+                val step = 32f
+                var y = 0f
+                while (y < size.height) {
+                    val alpha = if (((y / step).toInt() % 2) == 0) 0.025f else 0.015f
+                    drawLine(
+                        color = Color(0xFF6B4226).copy(alpha = alpha),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y + 1f),
+                        strokeWidth = 1f
+                    )
+                    y += step
+                }
+            }
+        }
+
         // --- REALISTIC BOOK PAGE CANVAS & GESTURE LAYER ---
         Box(
             modifier = Modifier

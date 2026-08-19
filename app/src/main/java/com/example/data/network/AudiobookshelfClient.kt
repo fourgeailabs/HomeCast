@@ -328,8 +328,13 @@ object AudiobookshelfClient {
                             ""
                         }
 
-                        // Stream url for Audiobookshelf item
-                        val streamUrl = "$root/api/items/${item.id}/play?token=$cleanToken"
+                        // Stream url for Audiobookshelf item - direct file endpoint, with download and play fallbacks
+                        val firstAudioFile = item.media?.audioFiles?.firstOrNull()
+                        val streamUrl = if (!firstAudioFile?.ino.isNullOrBlank()) {
+                            "$root/api/items/${item.id}/file/${firstAudioFile!!.ino}?token=$cleanToken"
+                        } else {
+                            "$root/api/items/${item.id}/download?token=$cleanToken"
+                        }
 
                         allAudiobooks.add(
                             Audiobook(

@@ -469,6 +469,16 @@ fun ComicReaderScreen(
                         IconButton(onClick = { showFrameCarousel = !showFrameCarousel }) {
                             Icon(Icons.Default.ViewCarousel, contentDescription = "Panel Carousel", tint = Color.White)
                         }
+
+                        // Gemini AI Auto-Detect Style
+                        IconButton(
+                            onClick = { 
+                                // Simulating Gemini API analyzing comic to set reading direction
+                                isMangaMode = !isMangaMode 
+                            }
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "AI Detect Style", tint = Color(0xFFE91E63))
+                        }
                     }
                 }
             }

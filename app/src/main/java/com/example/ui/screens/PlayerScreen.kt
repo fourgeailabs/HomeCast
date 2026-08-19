@@ -1,9 +1,9 @@
 package com.example.ui.screens
 
-import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -16,9 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,13 +33,11 @@ import androidx.palette.graphics.Palette
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import com.example.data.PlaybackState
 import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
-import com.example.ui.theme.PlayButtonColor
-import com.example.ui.theme.PlayButtonIcon
 import com.example.ui.theme.SurfaceGlass
+import com.example.ui.theme.SurfaceGlassBorder
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -61,12 +57,14 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -156,6 +154,7 @@ fun PlayerScreen(
     val coroutineScope = rememberCoroutineScope()
     val dragOffsetY = remember { Animatable(0f) }
 
+    // Full screen Frosted Glass Background
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -187,88 +186,93 @@ fun PlayerScreen(
                     }
                 )
             }
-            .background(MaterialTheme.colorScheme.background)
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(dominantColor.copy(alpha = 0.4f), Color.Transparent),
-                        center = Offset(size.width * 0.2f, size.height * 0.2f),
-                        radius = size.width * 0.95f
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        dominantColor.copy(alpha = 0.45f),
+                        vibrantColor.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                        MaterialTheme.colorScheme.background
                     )
                 )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(vibrantColor.copy(alpha = 0.3f), Color.Transparent),
-                        center = Offset(size.width * 0.8f, size.height * 0.8f),
-                        radius = size.width * 0.95f
-                    )
-                )
-            }
+            )
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Drag Bar / Collapse Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                contentAlignment = Alignment.Center
+            // Header Bar
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (onCollapse != null) {
-                    IconButton(
-                        onClick = onCollapse,
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (onCollapse != null) {
+                        IconButton(
+                            onClick = onCollapse,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(SurfaceGlass)
+                                .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Minimize Player",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    }
+
+                    // Drag Indicator Pill
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .clip(CircleShape)
-                            .background(SurfaceGlass)
+                            .width(44.dp)
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
+                            .clickable { onCollapse?.invoke() }
+                    )
+
+                    Surface(
+                        color = (if (isAudiobook) AccentTeal else AccentIndigo).copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, (if (isAudiobook) AccentTeal else AccentIndigo).copy(alpha = 0.4f)),
+                        modifier = Modifier.align(Alignment.CenterEnd)
                     ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Slide Down / Minimize Player",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
+                        Text(
+                            if (isAudiobook) "AUDIOBOOK" else "PLEX MUSIC",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.5.sp,
+                            color = if (isAudiobook) AccentTeal else AccentIndigo,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }
                 }
-
-                // Drag indicator pill
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f))
-                        .clickable { onCollapse?.invoke() }
-                )
-
-                Surface(
-                    color = (if (isAudiobook) AccentTeal else AccentIndigo).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                ) {
-                    Text(
-                        if (isAudiobook) "AUDIOBOOK" else "PLEX MUSIC",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isAudiobook) AccentTeal else AccentIndigo,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Cover Artwork (Square / Book Aspect Ratio with Rounded Corners & Shadow)
+            // Center Cover Artwork (Larger, dropped slightly, elegant glass frame & shadow)
             Box(
                 modifier = Modifier
-                    .size(if (isAudiobook) 240.dp else 260.dp)
-                    .shadow(16.dp, RoundedCornerShape(24.dp))
+                    .size(280.dp)
+                    .shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = dominantColor, spotColor = dominantColor)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceGlass),
+                    .background(SurfaceGlass)
+                    .border(1.5.dp, SurfaceGlassBorder, RoundedCornerShape(24.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 if (coverUrl.isNotBlank()) {
@@ -284,7 +288,7 @@ fun PlayerScreen(
                             .fillMaxSize()
                             .background(
                                 Brush.linearGradient(
-                                    listOf(dominantColor.copy(alpha = 0.5f), vibrantColor.copy(alpha = 0.4f))
+                                    listOf(dominantColor.copy(alpha = 0.6f), vibrantColor.copy(alpha = 0.5f))
                                 )
                             ),
                         contentAlignment = Alignment.Center
@@ -293,7 +297,7 @@ fun PlayerScreen(
                             if (isAudiobook) Icons.Default.Book else Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(80.dp)
+                            modifier = Modifier.size(90.dp)
                         )
                     }
                 }
@@ -303,14 +307,18 @@ fun PlayerScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.7f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                                )
+                            )
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Text(
                             book.seriesName,
                             fontSize = 12.sp,
                             color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -318,133 +326,126 @@ fun PlayerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Title and Subtitle
-            Text(
-                title,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                subtitle,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Seek Bar
-            Slider(
-                value = progressFraction,
-                onValueChange = { sliderDraggingPosition = it },
-                onValueChangeFinished = {
-                    sliderDraggingPosition?.let { fraction ->
-                        viewModel.seekTo((fraction * durationMs).toLong())
-                        sliderDraggingPosition = null
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    thumbColor = vibrantColor,
-                    activeTrackColor = dominantColor,
-                    inactiveTrackColor = SurfaceGlass
-                )
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            // Bottom Section: Title, Seek Bar, and All Player Controls
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Title and Subtitle
                 Text(
-                    formatTime(currentPositionMs),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold
+                    title,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    formatTime(durationMs),
-                    fontSize = 12.sp,
+                    subtitle,
+                    fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
                 )
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Playback Controls Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Speed Button
-                Box {
-                    Surface(
-                        color = SurfaceGlass,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.clickable { showSpeedMenu = true }
-                    ) {
-                        Text(
-                            "${playbackState.playbackSpeed}x",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showSpeedMenu,
-                        onDismissRequest = { showSpeedMenu = false }
-                    ) {
-                        listOf(0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f).forEach { speed ->
-                            DropdownMenuItem(
-                                text = { Text("${speed}x") },
-                                onClick = {
-                                    viewModel.setSpeed(speed)
-                                    showSpeedMenu = false
-                                }
-                            )
+                // Seek Bar
+                Slider(
+                    value = progressFraction,
+                    onValueChange = { sliderDraggingPosition = it },
+                    onValueChangeFinished = {
+                        sliderDraggingPosition?.let { fraction ->
+                            viewModel.seekTo((fraction * durationMs).toLong())
+                            sliderDraggingPosition = null
                         }
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = vibrantColor,
+                        activeTrackColor = dominantColor,
+                        inactiveTrackColor = SurfaceGlassBorder
+                    )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        formatTime(currentPositionMs),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        formatTime(durationMs),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
-                // Center Controls: Rewind, Big Play/Pause, Fast-Forward
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Bottom Primary Controls: Previous Track, Rewind 10s, Big Play/Pause, Fast-Forward 30s, Next/Skip Track
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Previous Track Button
+                    IconButton(
+                        onClick = { viewModel.skipPreviousTrack() },
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.SkipPrevious,
+                            contentDescription = "Previous Track",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    // Rewind 10s Button
                     IconButton(
                         onClick = { viewModel.skipBackward(10) },
                         modifier = Modifier
-                            .size(50.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
                     ) {
                         Icon(
                             Icons.Default.Replay10,
                             contentDescription = "Rewind 10s",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
+                    // Main Glowing Play/Pause Action Button
                     Box(
                         modifier = Modifier
-                            .size(74.dp)
-                            .shadow(12.dp, CircleShape)
+                            .size(72.dp)
+                            .shadow(16.dp, CircleShape, ambientColor = dominantColor, spotColor = vibrantColor)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
                                     listOf(dominantColor, vibrantColor)
                                 )
-                            ),
+                            )
+                            .border(1.5.dp, Color.White.copy(alpha = 0.3f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(
@@ -455,49 +456,136 @@ fun PlayerScreen(
                                 if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
                                 tint = Color.White,
-                                modifier = Modifier.size(42.dp)
+                                modifier = Modifier.size(40.dp)
                             )
                         }
                     }
 
+                    // Fast Forward 30s Button
                     IconButton(
                         onClick = { viewModel.skipForward(30) },
                         modifier = Modifier
-                            .size(50.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
                     ) {
                         Icon(
                             Icons.Default.Forward30,
                             contentDescription = "Fast Forward 30s",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // Next / Skip Track Button
+                    IconButton(
+                        onClick = { viewModel.skipNextTrack() },
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.SkipNext,
+                            contentDescription = "Next Track",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
 
-                // Sleep Timer Menu
-                Box {
-                    IconButton(
-                        onClick = { showSleepTimerMenu = true },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(SurfaceGlass)
-                    ) {
-                        Icon(
-                            Icons.Default.Timer,
-                            contentDescription = "Sleep Timer",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Secondary Settings Row (Speed, Sleep Timer, Favorite)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Speed Menu
+                    Box {
+                        Surface(
+                            color = SurfaceGlass,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                            modifier = Modifier.clickable { showSpeedMenu = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "${playbackState.playbackSpeed}x",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = showSpeedMenu,
+                            onDismissRequest = { showSpeedMenu = false }
+                        ) {
+                            listOf(0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f).forEach { speed ->
+                                DropdownMenuItem(
+                                    text = { Text("${speed}x") },
+                                    onClick = {
+                                        viewModel.setSpeed(speed)
+                                        showSpeedMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Error indicator if any
+                    if (playbackState.errorMessage != null) {
+                        Text(
+                            playbackState.errorMessage ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                         )
                     }
-                    DropdownMenu(
-                        expanded = showSleepTimerMenu,
-                        onDismissRequest = { showSleepTimerMenu = false }
-                    ) {
-                        DropdownMenuItem(text = { Text("Off") }, onClick = { showSleepTimerMenu = false })
-                        DropdownMenuItem(text = { Text("15 Minutes") }, onClick = { showSleepTimerMenu = false })
-                        DropdownMenuItem(text = { Text("30 Minutes") }, onClick = { showSleepTimerMenu = false })
-                        DropdownMenuItem(text = { Text("45 Minutes") }, onClick = { showSleepTimerMenu = false })
-                        DropdownMenuItem(text = { Text("60 Minutes") }, onClick = { showSleepTimerMenu = false })
+
+                    // Sleep Timer Menu
+                    Box {
+                        Surface(
+                            color = SurfaceGlass,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                            modifier = Modifier.clickable { showSleepTimerMenu = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Timer, contentDescription = "Sleep Timer", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Timer",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = showSleepTimerMenu,
+                            onDismissRequest = { showSleepTimerMenu = false }
+                        ) {
+                            DropdownMenuItem(text = { Text("Off") }, onClick = { showSleepTimerMenu = false })
+                            DropdownMenuItem(text = { Text("15 Minutes") }, onClick = { showSleepTimerMenu = false })
+                            DropdownMenuItem(text = { Text("30 Minutes") }, onClick = { showSleepTimerMenu = false })
+                            DropdownMenuItem(text = { Text("45 Minutes") }, onClick = { showSleepTimerMenu = false })
+                            DropdownMenuItem(text = { Text("60 Minutes") }, onClick = { showSleepTimerMenu = false })
+                        }
                     }
                 }
             }

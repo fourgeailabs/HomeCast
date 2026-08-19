@@ -127,297 +127,92 @@ fun DiscoveryScreen(
     var selectedBookForReading by remember { mutableStateOf<DiscoveryItem?>(null) }
     var bookmarkMessage by remember { mutableStateOf<String?>(null) }
 
-    // Curated Static Shelves Data
-    val trendingAudiobooks = remember {
-        listOf(
-            DiscoveryItem(
-                id = "disc_ab_1",
-                title = "Project Hail Mary",
-                creator = "Andy Weir",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Sci-Fi & Space",
-                coverUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
-                description = "A lone astronaut must save the earth from an extinction-level catastrophe with the help of an unexpected alien ally.",
-                tag = "⭐ 4.9 Top Narrated",
-                durationOrPages = "16h 10m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFF0D47A1), Color(0xFF00E5FF))
-            ),
-            DiscoveryItem(
-                id = "disc_ab_2",
-                title = "Atomic Habits",
-                creator = "James Clear",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Mindset & Growth",
-                coverUrl = "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=600&q=80",
-                description = "Tiny changes yield remarkable results. An actionable guide to breaking bad habits and building extraordinary systems.",
-                tag = "🔥 #1 Bestseller",
-                durationOrPages = "5h 35m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFFE65100), Color(0xFFFFB74D))
-            ),
-            DiscoveryItem(
-                id = "disc_ab_3",
-                title = "Dune",
-                creator = "Frank Herbert",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Epic Saga",
-                coverUrl = "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=600&q=80",
-                description = "Set on the desert planet Arrakis, Dune is the story of Paul Atreides and the battle for the universe's most vital resource: spice.",
-                tag = "✨ Masterpiece",
-                durationOrPages = "21h 02m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFFBF360C), Color(0xFFFF8A65))
-            ),
-            DiscoveryItem(
-                id = "disc_ab_4",
-                title = "The Silent Patient",
-                creator = "Alex Michaelides",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Psychological Thriller",
-                coverUrl = "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=80",
-                description = "Alicia Berenson’s life is seemingly perfect until she shoots her husband five times in the face and never speaks another word.",
-                tag = "🔪 Suspense Pick",
-                durationOrPages = "8h 43m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFF263238), Color(0xFF78909C))
-            ),
-            DiscoveryItem(
-                id = "disc_ab_5",
-                title = "Deep Work",
-                creator = "Cal Newport",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Productivity",
-                coverUrl = "https://images.unsplash.com/photo-1517842645767-c639042777db?w=600&q=80",
-                description = "Rules for focused success in a distracted world. Master difficult information and produce better results in less time.",
-                tag = "💡 Focus Guide",
-                durationOrPages = "7h 44m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFF1B5E20), Color(0xFF66BB6A))
-            )
+    // Select dynamic content from real servers
+    val dynamicAudiobooks = allBooks.map { book ->
+        DiscoveryItem(
+            id = "disc_ab_${book.id}",
+            title = book.title,
+            creator = book.author,
+            mediaType = DiscoveryMediaType.AUDIOBOOK,
+            genre = "Library Audiobook",
+            coverUrl = book.coverUrl.ifEmpty { "https://images.unsplash.com/photo-1589998059171-988d887df646?w=600&q=80" },
+            description = "From your connected server",
+            tag = "🎧 Server Sync",
+            durationOrPages = "${book.duration / 60}m",
+            format = "AUDIOBOOK",
+            gradient = listOf(Color(0xFF0D47A1), Color(0xFF00E5FF))
         )
-    }
+    }.take(10)
 
-    val sciFiSagas = remember {
-        listOf(
-            DiscoveryItem(
-                id = "disc_ab_sf1",
-                title = "Hyperion",
-                creator = "Dan Simmons",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Space Opera",
-                coverUrl = "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&q=80",
-                description = "On the world of Hyperion, beyond the reach of galactic law, waits a creature called the Shrike. Seven pilgrims embark on a final voyage.",
-                tag = "🚀 Hugo Award",
-                durationOrPages = "20h 45m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFF4A148C), Color(0xFFAB47BC))
-            ),
-            DiscoveryItem(
-                id = "disc_ab_sf2",
-                title = "Neuromancer",
-                creator = "William Gibson",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Cyberpunk",
-                coverUrl = "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&q=80",
-                description = "Case was the sharpest data-thief in the matrix until the wrong people caught him. The definitive cyberpunk classic.",
-                tag = "⚡ Cyber Classic",
-                durationOrPages = "10h 15m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFF006064), Color(0xFF00E5FF))
-            ),
-            DiscoveryItem(
-                id = "disc_ab_sf3",
-                title = "The Three-Body Problem",
-                creator = "Cixin Liu",
-                mediaType = DiscoveryMediaType.AUDIOBOOK,
-                genre = "Hard Sci-Fi",
-                coverUrl = "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=600&q=80",
-                description = "Set against the backdrop of China's Cultural Revolution, a secret military project sends signals into space to establish contact with aliens.",
-                tag = "🌌 Epic Trilogy",
-                durationOrPages = "13h 26m",
-                format = "AUDIOBOOK",
-                gradient = listOf(Color(0xFF004D40), Color(0xFF26A69A))
-            )
+    val dynamicMusic = allMusic.map { track ->
+        DiscoveryItem(
+            id = "disc_m_${track.id}",
+            title = track.title,
+            creator = track.artist,
+            mediaType = DiscoveryMediaType.MUSIC,
+            genre = track.genre,
+            coverUrl = track.coverUrl.ifEmpty { "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80" },
+            description = "From your connected server",
+            tag = "🎵 Track",
+            durationOrPages = "${track.duration / 60000}m",
+            format = "FLAC/MP3",
+            gradient = listOf(Color(0xFF004D40), Color(0xFF1DE9B6))
         )
-    }
+    }.take(10)
 
-    val featuredAlbums = remember {
+    // Free/Public Domain Content (LibriVox, Gutenberg)
+    val publicDomainBooks = remember {
         listOf(
             DiscoveryItem(
-                id = "disc_mu_1",
-                title = "Random Access Memories",
-                creator = "Daft Punk",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Electronic & Funk",
-                coverUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80",
-                description = "A sonic journey through vintage modular synthesizers, live disco session musicians, and timeless groove anthems.",
-                tag = "🏆 Album of the Year",
-                durationOrPages = "13 Tracks",
-                format = "LOSSLESS",
-                gradient = listOf(Color(0xFFE65100), Color(0xFFFFD54F))
-            ),
-            DiscoveryItem(
-                id = "disc_mu_2",
-                title = "In Rainbows",
-                creator = "Radiohead",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Art Rock & Ambient",
-                coverUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
-                description = "Warm analog textures, intricate rhythmic tapestries, and haunting melodic poetry recorded in an English country manor.",
-                tag = "✨ Iconic Sound",
-                durationOrPages = "10 Tracks",
-                format = "LOSSLESS",
-                gradient = listOf(Color(0xFFB71C1C), Color(0xFFFF8A80))
-            ),
-            DiscoveryItem(
-                id = "disc_mu_3",
-                title = "Interstellar Soundtrack",
-                creator = "Hans Zimmer",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Cinematic Score",
-                coverUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
-                description = "Magnificent pipe organ arrangements and cosmic synthesizer sweeps celebrating courage and dimensions beyond time.",
-                tag = "🎹 Master Orchestral",
-                durationOrPages = "16 Tracks",
-                format = "ORIGINAL SCORE",
-                gradient = listOf(Color(0xFF1A237E), Color(0xFF5C6BC0))
-            ),
-            DiscoveryItem(
-                id = "disc_mu_4",
-                title = "Midnight City Synthwaves",
-                creator = "M83 & Retro Waves",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Synthwave & Dream Pop",
-                coverUrl = "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80",
-                description = "Nostalgic neon synth leads, driving basslines, and dreamy reverberations inspired by late-night coastal highways.",
-                tag = "🌙 Late Night Vibes",
-                durationOrPages = "14 Tracks",
-                format = "HI-RES",
-                gradient = listOf(Color(0xFF4A148C), Color(0xFFEA80FC))
-            )
-        )
-    }
-
-    val acousticChillMusic = remember {
-        listOf(
-            DiscoveryItem(
-                id = "disc_mu_ch1",
-                title = "Sunday Morning Acoustic",
-                creator = "Various Acoustic Artists",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Acoustic & Folk",
-                coverUrl = "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&q=80",
-                description = "Gentle fingerpicked guitars, mellow cello harmonies, and soothing coffee-shop melodies for relaxed reading and coding.",
-                tag = "☕ Coffee & Chill",
-                durationOrPages = "18 Tracks",
-                format = "ALBUM",
-                gradient = listOf(Color(0xFF3E2723), Color(0xFF8D6E63))
-            ),
-            DiscoveryItem(
-                id = "disc_mu_ch2",
-                title = "Rainy Window Lo-Fi Beats",
-                creator = "ChilledCow Labs",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Lo-Fi Hip Hop",
-                coverUrl = "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80",
-                description = "Tape-saturated electric piano chords, vinyl crackle, and steady downtempo beats crafted for deep focus.",
-                tag = "🎧 Focus Loop",
-                durationOrPages = "22 Tracks",
-                format = "EP",
-                gradient = listOf(Color(0xFF263238), Color(0xFF80CBC4))
-            ),
-            DiscoveryItem(
-                id = "disc_mu_ch3",
-                title = "Quiet Piano Nocturnes",
-                creator = "Ludovico Einaudi & Olafur Arnalds",
-                mediaType = DiscoveryMediaType.MUSIC,
-                genre = "Modern Classical",
-                coverUrl = "https://images.unsplash.com/photo-1520523839898-5071270409fb?w=600&q=80",
-                description = "Delicate upright piano with felt dampers, minimal strings, and contemplative ambient room tone.",
-                tag = "🌿 Mindful Sound",
-                durationOrPages = "12 Tracks",
-                format = "HI-RES",
-                gradient = listOf(Color(0xFF004D40), Color(0xFF80CBC4))
-            )
-        )
-    }
-
-    // Curated Books for the E-Reader Aspect!
-    val bestsellingEBooks = remember {
-        listOf(
-            DiscoveryItem(
-                id = "disc_bk_1",
-                title = "Tomorrow, and Tomorrow, and Tomorrow",
-                creator = "Gabrielle Zevin",
+                id = "disc_bk_pd_1",
+                title = "Frankenstein",
+                creator = "Mary Shelley",
                 mediaType = DiscoveryMediaType.BOOK,
-                genre = "Literary Fiction",
-                coverUrl = "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&q=80",
-                description = "A dazzling and intricately imagined novel about two friends, often in love but never lovers, who become creative partners in video game design.",
-                tag = "📖 E-Reader Ready",
-                durationOrPages = "416 Pages",
+                genre = "Classic Horror",
+                coverUrl = "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=600&q=80",
+                description = "Public domain classic from Project Gutenberg. A scientist creates life with terrifying consequences.",
+                tag = "🏛️ Public Domain",
+                durationOrPages = "280 Pages",
                 format = "EPUB",
-                excerpt = "On a freezing December day, Sam Masur exits a subway car onto the crowded platform of Cambridge's Harvard Square and sees, through the surging throng of commuters, Sadie Green. He calls her name, but she does not hear. Sadie is leaning against a pillar, gazing down at a portable gaming system, her dark hair tucked behind a wool beanie.\n\nWhen they finally meet, years of unsaid memories rush forward. Game design was their language, a world where rebirth and replay were always one coin away.",
-                gradient = listOf(Color(0xFF00695C), Color(0xFF4DB6AC))
-            ),
-            DiscoveryItem(
-                id = "disc_bk_2",
-                title = "Klara and the Sun",
-                creator = "Kazuo Ishiguro",
-                mediaType = DiscoveryMediaType.BOOK,
-                genre = "Speculative Fiction",
-                coverUrl = "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&q=80",
-                description = "From the Nobel Prize winner comes a thrilling book that asks: What does it mean to love, through the eyes of an unforgettable Artificial Friend.",
-                tag = "✨ Nobel Laureate",
-                durationOrPages = "320 Pages",
-                format = "EPUB",
-                excerpt = "When we were new, Rosa and I were mid-store, on the side of the magazine table, and could see through more than half of the front window. So we saw the outside very well—the office workers hurrying by, the taxis, the beggars, and the glorious nourishment of the Sun streaming across the pavement.\n\nI watched the people closely, noting how their eyes held secret shadows even when their mouths smiled.",
-                gradient = listOf(Color(0xFFF57F17), Color(0xFFFFEE58))
-            ),
-            DiscoveryItem(
-                id = "disc_bk_3",
-                title = "1984",
-                creator = "George Orwell",
-                mediaType = DiscoveryMediaType.BOOK,
-                genre = "Dystopian Classic",
-                coverUrl = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600&q=80",
-                description = "The definitive dystopian prophecy of surveillance, censorship, doublespeak, and the struggle of human independence against Big Brother.",
-                tag = "🏛️ Timeless Classic",
-                durationOrPages = "328 Pages",
-                format = "EPUB / PDF",
-                excerpt = "It was a bright cold day in April, and the clocks were striking thirteen. Winston Smith, his chin nuzzled into his breast in an effort to escape the vile wind, slipped quickly through the glass doors of Victory Mansions, though not quickly enough to prevent a swirl of gritty dust from entering along with him.\n\nThe hallway smelt of boiled cabbage and old rag mats. At one end of it a coloured poster, too large for indoor display, had been tacked to the wall.",
+                excerpt = "I am by birth a Genevese, and my family is one of the most distinguished of that republic.",
                 gradient = listOf(Color(0xFF212121), Color(0xFF757575))
             ),
             DiscoveryItem(
-                id = "disc_bk_4",
-                title = "Snow Crash",
-                creator = "Neal Stephenson",
+                id = "disc_bk_pd_2",
+                title = "Pride and Prejudice",
+                creator = "Jane Austen",
                 mediaType = DiscoveryMediaType.BOOK,
-                genre = "Cyberpunk & Tech",
-                coverUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80",
-                description = "In reality, Hiro Protagonist delivers pizza for Uncle Enzo's CosoNostra Pizza Inc. In the Metaverse, he's a warrior prince investigating a dangerous digital virus.",
-                tag = "⚡ Metaverse Origin",
-                durationOrPages = "480 Pages",
+                genre = "Romance Classic",
+                coverUrl = "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&q=80",
+                description = "Public domain classic. The romantic clash between the opinionated Elizabeth and her proud beau, Mr. Darcy.",
+                tag = "🏛️ Public Domain",
+                durationOrPages = "432 Pages",
                 format = "EPUB",
-                excerpt = "The Deliverator belongs to an elite order, a hallowed subculture. In the old days, they had the Pony Express and the samurai. Now they have the Deliverator.\n\nThe Deliverator's car has enough potential energy packed into its batteries to fire a pound of bacon into the Asteroid Belt. He never delivers late.",
-                gradient = listOf(Color(0xFF311B92), Color(0xFF7C4DFF))
+                excerpt = "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+                gradient = listOf(Color(0xFF4E342E), Color(0xFFA1887F))
             ),
             DiscoveryItem(
-                id = "disc_bk_5",
-                title = "Meditations",
-                creator = "Marcus Aurelius",
+                id = "disc_bk_pd_3",
+                title = "The Time Machine",
+                creator = "H. G. Wells",
                 mediaType = DiscoveryMediaType.BOOK,
-                genre = "Philosophy & Stoicism",
-                coverUrl = "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=600&q=80",
-                description = "Private reflections and timeless stoic wisdom from the Roman Emperor on resilience, clarity of mind, virtue, and purpose.",
-                tag = "📜 Stoic Wisdom",
-                durationOrPages = "256 Pages",
-                format = "EPUB / PDF",
-                excerpt = "When you arise in the morning, think of what a precious privilege it is to be alive—to breathe, to think, to enjoy, to love.\n\nSay to yourself in the early morning: I shall meet today ungrateful, violent, treacherous, envious, uncharitable men. All of the ignorance of real good and ill.",
-                gradient = listOf(Color(0xFF4E342E), Color(0xFFA1887F))
+                genre = "Sci-Fi Classic",
+                coverUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80",
+                description = "Public domain classic. A Victorian scientist travels to the year 802,701 AD.",
+                tag = "🏛️ Public Domain",
+                durationOrPages = "118 Pages",
+                format = "EPUB",
+                excerpt = "The Time Traveller (for so it will be convenient to speak of him) was expounding a recondite matter to us.",
+                gradient = listOf(Color(0xFF311B92), Color(0xFF7C4DFF))
             )
         )
     }
+
+    val trendingAudiobooks = if (dynamicAudiobooks.isNotEmpty()) dynamicAudiobooks else publicDomainBooks
+    val sciFiSagas = publicDomainBooks
+    val featuredAlbums = if (dynamicMusic.isNotEmpty()) dynamicMusic else publicDomainBooks
+    val acousticChillMusic = publicDomainBooks
+    val bestsellingEBooks = publicDomainBooks
 
     // Initial load on first render if recommendations are empty
     LaunchedEffect(Unit) {

@@ -403,6 +403,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- Booklore Connect ---
+    fun saveAndConnectBooklore(
+        name: String,
+        hostUrl: String,
+        username: String,
+        password: String
+    ) {
+        viewModelScope.launch {
+            _serverOpState.value = ServerOperationState.Loading
+            try {
+                // TODO: Implement actual Booklore API client and test connection
+                // Mocking a failure because we don't have the client yet
+                _serverOpState.value = ServerOperationState.Error(
+                    "Booklore connection failed: API Client not yet implemented."
+                )
+            } catch (e: Exception) {
+                _serverOpState.value = ServerOperationState.Error("Error: ${e.message}")
+            }
+        }
+    }
+
     fun syncServer(server: ServerConfig) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
@@ -431,18 +452,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Playback Controls ---
-    fun playAudiobook(book: Audiobook) {
+    fun playAudiobook(book: Audiobook, playlist: List<Audiobook>? = null) {
         viewModelScope.launch {
             repository.updateProgress(book.id, book.progress)
-            playbackManager.playAudiobook(book)
+            playbackManager.setAudiobookList(playlist ?: allBooks.value)
+            playbackManager.playAudiobook(book, playlist ?: allBooks.value)
         }
     }
 
-    fun playMusicTrack(track: MusicTrack) {
+    fun playMusicTrack(track: MusicTrack, playlist: List<MusicTrack>? = null) {
         viewModelScope.launch {
             repository.updateMusicLastPlayed(track.id)
-            playbackManager.playMusicTrack(track)
+            playbackManager.setPlaylist(playlist ?: allMusic.value)
+            playbackManager.playMusicTrack(track, playlist ?: allMusic.value)
         }
+    }
+
+    fun skipNextTrack() {
+        playbackManager.skipNextTrack()
+    }
+
+    fun skipPreviousTrack() {
+        playbackManager.skipPreviousTrack()
     }
 
     fun togglePlayPause() {

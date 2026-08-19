@@ -17,7 +17,8 @@ data class Audiobook(
     val isDownloaded: Boolean = false,
     val streamUrl: String = "",
     val seriesName: String = "",
-    val narrator: String = ""
+    val narrator: String = "",
+    val genre: String = "Various"
 )
 
 @Entity(tableName = "music_tracks")

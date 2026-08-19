@@ -3,8 +3,10 @@ package com.example.data
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +18,8 @@ data class PlaybackState(
     val currentPosition: Long = 0L,
     val duration: Long = 0L,
     val playbackSpeed: Float = 1.0f,
-    val sleepTimerMinutes: Int = 0
+    val sleepTimerMinutes: Int = 0,
+    val errorMessage: String? = null
 )
 
 class PlaybackManager(private val context: Context) {
@@ -25,6 +28,9 @@ class PlaybackManager(private val context: Context) {
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+
+    private var currentPlaylist: List<MusicTrack> = emptyList()
+    private var currentAudiobookList: List<Audiobook> = emptyList()
 
     private val updateProgressRunnable = object : Runnable {
         override fun run() {
@@ -43,52 +49,143 @@ class PlaybackManager(private val context: Context) {
         }
     }
 
-    fun playAudiobook(book: Audiobook) {
+    fun setPlaylist(tracks: List<MusicTrack>) {
+        currentPlaylist = tracks
+    }
+
+    fun setAudiobookList(books: List<Audiobook>) {
+        currentAudiobookList = books
+    }
+
+    fun playAudiobook(book: Audiobook, playlist: List<Audiobook>? = null) {
+        if (playlist != null) currentAudiobookList = playlist
         _playbackState.value = _playbackState.value.copy(
             currentAudiobook = book,
             currentMusicTrack = null,
             currentPosition = book.progress,
             duration = if (book.duration > 0) book.duration * 1000L else 0L,
-            isPlaying = true
+            isPlaying = true,
+            errorMessage = null
         )
 
         if (book.streamUrl.isNotBlank()) {
-            startStream(book.streamUrl, book.progress)
+            startStream(book.streamUrl, book.progress, isAudiobook = true, fallbackCandidate = book)
         } else {
-            // Simulated playback progress for offline/preview mode
             handler.removeCallbacks(updateProgressRunnable)
             handler.post(updateProgressRunnable)
         }
     }
 
-    fun playMusicTrack(track: MusicTrack) {
+    fun playMusicTrack(track: MusicTrack, playlist: List<MusicTrack>? = null) {
+        if (playlist != null) currentPlaylist = playlist
         _playbackState.value = _playbackState.value.copy(
             currentMusicTrack = track,
             currentAudiobook = null,
             currentPosition = 0L,
             duration = track.duration,
-            isPlaying = true
+            isPlaying = true,
+            errorMessage = null
         )
 
         if (track.streamUrl.isNotBlank()) {
-            startStream(track.streamUrl, 0L)
+            startStream(track.streamUrl, 0L, isAudiobook = false)
         } else {
             handler.removeCallbacks(updateProgressRunnable)
             handler.post(updateProgressRunnable)
         }
     }
 
-    private fun startStream(url: String, startPositionMs: Long) {
+    fun skipNextTrack() {
+        val currentTrack = _playbackState.value.currentMusicTrack
+        val currentBook = _playbackState.value.currentAudiobook
+
+        if (currentTrack != null && currentPlaylist.isNotEmpty()) {
+            val idx = currentPlaylist.indexOfFirst { it.id == currentTrack.id }
+            if (idx != -1 && idx < currentPlaylist.size - 1) {
+                playMusicTrack(currentPlaylist[idx + 1])
+            } else if (currentPlaylist.isNotEmpty()) {
+                playMusicTrack(currentPlaylist.first())
+            }
+        } else if (currentBook != null && currentAudiobookList.isNotEmpty()) {
+            val idx = currentAudiobookList.indexOfFirst { it.id == currentBook.id }
+            if (idx != -1 && idx < currentAudiobookList.size - 1) {
+                playAudiobook(currentAudiobookList[idx + 1])
+            } else {
+                skipForward(30)
+            }
+        } else {
+            skipForward(30)
+        }
+    }
+
+    fun skipPreviousTrack() {
+        val currentTrack = _playbackState.value.currentMusicTrack
+        val currentBook = _playbackState.value.currentAudiobook
+
+        if (currentTrack != null && currentPlaylist.isNotEmpty()) {
+            // If already played > 3 seconds, restart current track
+            if (_playbackState.value.currentPosition > 3000L) {
+                seekTo(0L)
+            } else {
+                val idx = currentPlaylist.indexOfFirst { it.id == currentTrack.id }
+                if (idx > 0) {
+                    playMusicTrack(currentPlaylist[idx - 1])
+                } else {
+                    seekTo(0L)
+                }
+            }
+        } else if (currentBook != null && currentAudiobookList.isNotEmpty()) {
+            if (_playbackState.value.currentPosition > 5000L) {
+                seekTo(0L)
+            } else {
+                val idx = currentAudiobookList.indexOfFirst { it.id == currentBook.id }
+                if (idx > 0) {
+                    playAudiobook(currentAudiobookList[idx - 1])
+                } else {
+                    seekTo(0L)
+                }
+            }
+        } else {
+            skipBackward(10)
+        }
+    }
+
+    private fun startStream(
+        url: String,
+        startPositionMs: Long,
+        isAudiobook: Boolean = false,
+        fallbackCandidate: Audiobook? = null,
+        attempt: Int = 1
+    ) {
         try {
+            handler.removeCallbacks(updateProgressRunnable)
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setContentType(if (isAudiobook) AudioAttributes.CONTENT_TYPE_SPEECH else AudioAttributes.CONTENT_TYPE_MUSIC)
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
-                setDataSource(url)
+
+                // Build custom headers for authenticated self-hosted audio streaming
+                val headers = mutableMapOf<String, String>()
+                headers["User-Agent"] = "HomeCast-Android/2.2"
+
+                // Extract token from url query if present and inject into Authorization header
+                val uri = Uri.parse(url)
+                val tokenParam = uri.getQueryParameter("token") ?: uri.getQueryParameter("apiKey") ?: uri.getQueryParameter("X-Plex-Token")
+                if (!tokenParam.isNullOrBlank()) {
+                    headers["Authorization"] = "Bearer $tokenParam"
+                }
+
+                try {
+                    setDataSource(context, uri, headers)
+                } catch (e: Exception) {
+                    // Fallback to simple string dataSource
+                    setDataSource(url)
+                }
+
                 prepareAsync()
                 setOnPreparedListener { mp ->
                     if (startPositionMs > 0 && startPositionMs < mp.duration) {
@@ -98,20 +195,46 @@ class PlaybackManager(private val context: Context) {
                     setPlaybackSpeed(_playbackState.value.playbackSpeed)
                     _playbackState.value = _playbackState.value.copy(
                         isPlaying = true,
-                        duration = mp.duration.toLong()
+                        duration = mp.duration.toLong(),
+                        errorMessage = null
                     )
                     handler.post(updateProgressRunnable)
                 }
                 setOnCompletionListener { mp ->
                     _playbackState.value = _playbackState.value.copy(isPlaying = false, currentPosition = mp.duration.toLong())
+                    skipNextTrack()
                 }
-                setOnErrorListener { _, _, _ ->
-                    _playbackState.value = _playbackState.value.copy(isPlaying = false)
+                setOnErrorListener { _, what, extra ->
+                    Log.e("PlaybackManager", "MediaPlayer error: what=$what extra=$extra on url $url")
+                    
+                    // If first attempt failed on audiobook, try fallback download endpoint
+                    if (isAudiobook && fallbackCandidate != null && attempt == 1) {
+                        val originalUrl = fallbackCandidate.streamUrl
+                        val fallbackUrl = when {
+                            originalUrl.contains("/file/") -> originalUrl.replace(Regex("/file/[^?]+"), "/download")
+                            originalUrl.contains("/play") -> originalUrl.replace("/play", "/download")
+                            else -> originalUrl.replace("/download", "/play")
+                        }
+                        if (fallbackUrl != originalUrl) {
+                            Log.i("PlaybackManager", "Retrying with fallback stream url: $fallbackUrl")
+                            startStream(fallbackUrl, startPositionMs, isAudiobook, fallbackCandidate, attempt = 2)
+                            return@setOnErrorListener true
+                        }
+                    }
+
+                    _playbackState.value = _playbackState.value.copy(
+                        isPlaying = false,
+                        errorMessage = "Audio playback error ($what, $extra)"
+                    )
                     true
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("PlaybackManager", "Failed to start stream: ${e.message}", e)
+            _playbackState.value = _playbackState.value.copy(
+                isPlaying = false,
+                errorMessage = e.localizedMessage
+            )
         }
     }
 

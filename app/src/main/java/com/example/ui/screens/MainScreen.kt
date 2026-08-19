@@ -39,6 +39,7 @@ import com.example.ui.theme.TextSecondary
 object Routes {
     const val Library = "library"
     const val Music = "music"
+    const val EBooks = "ebooks"
     const val Player = "player"
     const val Discovery = "discovery"
     const val Settings = "settings"
@@ -59,14 +60,20 @@ fun MainScreen(
     val hasActiveMedia = (activeBook != null || activeTrack != null)
 
     var isPlayerSlidUp by remember { mutableStateOf(false) }
+    var activeEBook by remember { mutableStateOf<EBookData?>(null) }
+    var activeComic by remember { mutableStateOf<ComicData?>(null) }
 
-    // Intercept back button if player is expanded
-    BackHandler(enabled = isPlayerSlidUp) {
-        isPlayerSlidUp = false
+    // Intercept back button if player or reader is expanded
+    BackHandler(enabled = isPlayerSlidUp || activeEBook != null || activeComic != null) {
+        when {
+            activeComic != null -> activeComic = null
+            activeEBook != null -> activeEBook = null
+            isPlayerSlidUp -> isPlayerSlidUp = false
+        }
     }
 
     fun isSelected(route: String): Boolean {
-        return currentDestination == route && !isPlayerSlidUp
+        return currentDestination == route && !isPlayerSlidUp && activeEBook == null && activeComic == null
     }
 
     val navColors = NavigationBarItemDefaults.colors(
@@ -198,6 +205,18 @@ fun MainScreen(
                             colors = navColors
                         )
                         NavigationBarItem(
+                            selected = isSelected(Routes.EBooks),
+                            onClick = {
+                                isPlayerSlidUp = false
+                                navController.navigate(Routes.EBooks) {
+                                    popUpTo(Routes.Library)
+                                }
+                            },
+                            icon = { Icon(Icons.Default.MenuBook, contentDescription = "E-Books") },
+                            label = { Text("E-Books", maxLines = 1) },
+                            colors = navColors
+                        )
+                        NavigationBarItem(
                             selected = isPlayerSlidUp || isSelected(Routes.Player),
                             onClick = {
                                 isPlayerSlidUp = true
@@ -257,6 +276,18 @@ fun MainScreen(
                         onNavigateToSettings = { navController.navigate(Routes.Settings) }
                     )
                 }
+                composable(Routes.EBooks) {
+                    EBooksScreen(
+                        viewModel = viewModel,
+                        onOpenEBook = { book ->
+                            activeEBook = book
+                        },
+                        onOpenComic = { comic ->
+                            activeComic = comic
+                        },
+                        onNavigateToSettings = { navController.navigate(Routes.Settings) }
+                    )
+                }
                 composable(Routes.Player) {
                     PlayerScreen(
                         viewModel = viewModel,
@@ -279,7 +310,7 @@ fun MainScreen(
             }
         }
 
-        // Sliding Full-Screen Player Transition (Slide Up into view when an item is selected or opened)
+        // Sliding Full-Screen Player Transition
         AnimatedVisibility(
             visible = isPlayerSlidUp,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -291,6 +322,36 @@ fun MainScreen(
                 onNavigateToLibrary = { isPlayerSlidUp = false },
                 onCollapse = { isPlayerSlidUp = false }
             )
+        }
+
+        // Full-screen Kindle-Like E-Reader with Paper Texture & Glass HUD
+        AnimatedVisibility(
+            visible = activeEBook != null,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            activeEBook?.let { book ->
+                EReaderScreen(
+                    eBook = book,
+                    onClose = { activeEBook = null }
+                )
+            }
+        }
+
+        // Full-screen Comic & Manga Reader with Guided Smart Panel Zoom
+        AnimatedVisibility(
+            visible = activeComic != null,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            activeComic?.let { comic ->
+                ComicReaderScreen(
+                    comic = comic,
+                    onClose = { activeComic = null }
+                )
+            }
         }
     }
 }
