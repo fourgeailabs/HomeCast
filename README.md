@@ -1,23 +1,19 @@
 # HomeCast
 
-**Version:** 2.3
+**Version:** 2.4
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v2.3)
+## 🚀 Recent Updates (v2.4)
+- **Booklore API Authentication Fix**: Corrected the network client for Booklore instances. The E-Book synchronization engine now natively uses standard OPDS/Basic Authentication endpoints rather than generic Bearer tokens. It will correctly scan OPDS catalogs, `/api/v1/library/books`, and various standard ports (like 6060) to parse your epub/manga collection successfully.
+- **Dynamic Personal Shelves Fix**: Rebuilt the Personal Library shelf system. Instead of arbitrarily hiding books that don't match specific static genres (like "Sci-Fi"), the engine now dynamically groups and displays all synced ebooks by their actual native genre, including a fallback for uncategorized media.
+
+### 🚀 What's New in v2.3
 - **Background Playback & Lock Screen Controls**: Upgraded the internal audio engine to `androidx.media3` ExoPlayer and `MediaSessionService`. Audiobooks and music tracks now continue playing flawlessly in the background. A media notification is pinned to your lock screen and notification panel with Play/Pause, Skip Forward, and Skip Backward controls.
 - **Real Public Domain Content (Project Gutenberg)**: Simulated texts have been replaced! The E-Reader now dynamically fetches real, high-quality public domain books directly from Project Gutenberg (e.g., *The Great Gatsby*, *The Time Machine*) and parses them into chronological chapters for a full reading experience.
-- **Booklore API Sync Integration**: Bound the Booklore network client seamlessly to the MainViewModel repository logic. Your self-hosted Booklore library list now synchronizes perfectly to the UI. Ensure your API keys are accurately set in the Settings.
 - **Dynamic Media & Creator Details**: Clicking on an author, artist, album, or book cover throughout the app now instantly generates a dynamic details page. Gemini synthesizes biographies, synopses, ratings, Wikipedia links, and publishers in real-time.
 - **Strict Library Isolation**: E-Books and Audiobooks are strictly isolated by source tabs. Public domain items no longer bleed into your Personal Library sections, maintaining an organized collection.
-
-### 🚀 What's New in v2.2
-- **Unified Frosted Glass Aesthetic**: The entire application — shelves, navigation bars, bottom sheets, buttons, discovery pages, and media players — has been unified into a beautiful frosted glass aesthetic with `SurfaceGlass` layers and subtle blurring on background elements.
-- **Adaptive Full-Bleed Media Player**: The Now Playing screen has been upgraded to a true full-bleed aesthetic extending behind the system bars, heavily utilizing the `Palette` API to extract dominant and vibrant colors from your book or album art and inject them into a beautiful, smoothly animated gradient mesh background.
-- **E-Reader Animations**: E-Books now feature real paginated page-turning animations that simulate physical pages bending and sliding, replacing the simple vertical scroll approach.
-- **Refined Discovery Engine**: The Discovery page was consolidated to purely AI-powered exploration. The Gemini backend now dynamically crafts unique genres, noteworthy categories, and fresh recommendations without hardcoded mock items.
-- **Decluttered Settings**: The Settings screen was simplified to focus squarely on server connections, app version metadata, and API key management in clean, rounded cards.
 
 *(See commit history for older v1.x feature sets).*
 

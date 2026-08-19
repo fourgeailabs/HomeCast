@@ -1287,7 +1287,7 @@ fun BookloreConfigCard(
     onConnect: (String, String, String, String) -> Unit
 ) {
     var serverName by remember { mutableStateOf("Booklore") }
-    var hostUrl by remember { mutableStateOf("http://10.70.14.2:8080") }
+    var hostUrl by remember { mutableStateOf("http://10.70.14.2:6060") }
     var username by remember { mutableStateOf("ecollins") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }

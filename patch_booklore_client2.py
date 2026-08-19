@@ -1,48 +1,11 @@
-package com.example.data.network
+import re
 
-import android.util.Log
-import com.example.data.EBook
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.util.concurrent.TimeUnit
-import com.squareup.moshi.JsonClass
+file_path = "app/src/main/java/com/example/data/network/BookloreClient.kt"
+with open(file_path, "r") as f:
+    text = f.read()
 
-@JsonClass(generateAdapter = true)
-data class BookloreResponse(
-    val books: List<BookloreBook>? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class BookloreBook(
-    val id: String,
-    val title: String,
-    val author: String,
-    val coverUrl: String? = null,
-    val genre: String? = null,
-    val description: String? = null,
-    val totalPages: Int? = null,
-    val isComic: Boolean? = null
-)
-
-object BookloreClient {
-    private const val TAG = "BookloreClient"
-    
-    private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .build()
-    }
-
-    private val moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
-        .build()
-
-    suspend fun fetchBooks(hostUrl: String, apiKey: String, serverId: String): Result<List<EBook>> = withContext(Dispatchers.IO) {
+# Add a fallback OPDS endpoint just in case it's actually OPDS standard xml, or kavita/komga using specific routes
+replacement = """    suspend fun fetchBooks(hostUrl: String, apiKey: String, serverId: String): Result<List<EBook>> = withContext(Dispatchers.IO) {
         try {
             val normalizedUrl = hostUrl.trimEnd('/')
             // Try standard API first
@@ -109,5 +72,9 @@ object BookloreClient {
             Log.e(TAG, "Failed to fetch Booklore books", e)
             return@withContext Result.failure(e)
         }
-    }
-}
+    }"""
+
+text = re.sub(r"    suspend fun fetchBooks\([\s\S]*?\}\n    \}", replacement, text)
+
+with open(file_path, "w") as f:
+    f.write(text)
