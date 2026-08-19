@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v2.0-brightgreen?style=flat-square" alt="Version 2.0" />
+  <img src="https://img.shields.io/badge/Release-v2.1-brightgreen?style=flat-square" alt="Version 2.1" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -18,6 +18,13 @@
 </p>
 
 ---
+
+### 🚀 What's New in v2.1
+- **🎵 Seamless Plex Music Library Sync & Stream Engine**:
+  - **Selected Server Music Connection**: Seamlessly connects to the music library (`type=artist`, `type=music`, `type=audio`, or custom music sections) of any discovered or selected Plex server.
+  - **Multi-Route Candidate Fallbacks**: Automatically tries local LAN IP (e.g. `192.168.x.x:32400`), SSL `plex.direct` URIs, and remote access addresses, bypassing DNS rebinding protection and network hurdles.
+  - **Resilient Multi-Section Ingestion**: Supports dual endpoint queries (`/library/sections/{key}/all?type=10` with `/library/sections/{key}/all` fallbacks) to capture every artist, album, track, cover art, and stream part cleanly into Room local storage.
+  - **Direct Tokenized Streaming**: Streams audio tracks directly through ExoPlayer/MediaPlayer using authenticated Plex session tokens.
 
 ### 🚀 What's New in v2.0
 - **☁️ Zero-Config Plex Account Login & Automatic Server Discovery**:

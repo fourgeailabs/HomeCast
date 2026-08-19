@@ -131,6 +131,7 @@ data class DiscoveredPlexServer(
     val preferredUri: String,
     val isLocal: Boolean,
     val allConnections: List<PlexConnection> = emptyList(),
+    val candidateUris: List<String> = emptyList(),
     val owned: Boolean = true,
     val isReachable: Boolean = true
 )
@@ -153,9 +154,9 @@ data class PlexMediaContainer(
 
 @JsonClass(generateAdapter = true)
 data class PlexDirectory(
-    val key: String,
-    val title: String,
-    val type: String // "artist" or "movie" or "show"
+    val key: String? = null,
+    val title: String? = null,
+    val type: String? = null // "artist" or "music" or "movie" or "show"
 )
 
 @JsonClass(generateAdapter = true)
@@ -166,9 +167,9 @@ data class PlexTracksContainer(
 
 @JsonClass(generateAdapter = true)
 data class PlexTrackMetadata(
-    val ratingKey: String,
+    val ratingKey: String? = null,
     val key: String? = null,
-    val title: String,
+    val title: String? = null,
     val grandparentTitle: String? = null, // Artist
     val parentTitle: String? = null, // Album
     val thumb: String? = null,

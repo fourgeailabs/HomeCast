@@ -210,32 +210,43 @@ object PlexClient {
                 val serverToken = if (!server.accessToken.isNullOrBlank()) server.accessToken else authToken
                 val connections = server.connections ?: emptyList()
 
-                // Sort connections: local LAN first, then HTTPS plex.direct, then remote, then relay
-                val sortedConnections = connections.sortedWith(
-                    compareByDescending<PlexConnection> { it.local == true }
-                        .thenByDescending { it.uri?.startsWith("https://") == true && it.relay != true }
-                        .thenBy { it.relay == true }
+                // Generate candidate URIs from connections
+                val candidateUris = mutableListOf<String>()
+                for (conn in connections) {
+                    if (!conn.uri.isNullOrBlank()) {
+                        candidateUris.add(conn.uri)
+                    }
+                    if (!conn.address.isNullOrBlank() && conn.port != null) {
+                        val httpUri = "http://${conn.address}:${conn.port}"
+                        val httpsUri = "https://${conn.address}:${conn.port}"
+                        if (!candidateUris.contains(httpUri)) candidateUris.add(httpUri)
+                        if (!candidateUris.contains(httpsUri)) candidateUris.add(httpsUri)
+                    }
+                }
+
+                // Sort candidate URIs: local LAN first (e.g. 192.168.x.x:32400), then local HTTPS, then remote, then relay
+                val sortedCandidates = candidateUris.distinct().sortedWith(
+                    compareByDescending<String> { it.contains("192.168.") || it.contains("10.") || it.contains("172.") }
+                        .thenByDescending { it.startsWith("http://") && !it.contains("relay.plex.services") }
+                        .thenByDescending { it.startsWith("https://") && !it.contains("relay.plex.services") }
+                        .thenBy { it.contains("relay.plex.services") }
                 )
 
                 // Probe candidate connections to find active working URI
                 var activeUri = ""
                 var isLocal = false
-                for (conn in sortedConnections) {
-                    val uri = conn.uri ?: continue
+                for (uri in sortedCandidates) {
                     if (testConnectionQuick(uri, serverToken)) {
                         activeUri = uri
-                        isLocal = conn.local == true
+                        isLocal = uri.contains("192.168.") || uri.contains("10.") || uri.contains("172.") || uri.contains("localhost")
                         break
                     }
                 }
 
                 // If fast probing didn't match immediately, fallback to the first candidate URI
-                if (activeUri.isBlank() && sortedConnections.isNotEmpty()) {
-                    val fallback = sortedConnections.first()
-                    activeUri = fallback.uri ?: (if (fallback.protocol != null && fallback.address != null && fallback.port != null) {
-                        "${fallback.protocol}://${fallback.address}:${fallback.port}"
-                    } else "")
-                    isLocal = fallback.local == true
+                if (activeUri.isBlank() && sortedCandidates.isNotEmpty()) {
+                    activeUri = sortedCandidates.first()
+                    isLocal = activeUri.contains("192.168.") || activeUri.contains("10.") || activeUri.contains("172.")
                 }
 
                 if (activeUri.isNotBlank()) {
@@ -247,6 +258,7 @@ object PlexClient {
                             preferredUri = activeUri,
                             isLocal = isLocal,
                             allConnections = connections,
+                            candidateUris = sortedCandidates,
                             owned = server.owned != false,
                             isReachable = activeUri.isNotBlank()
                         )
@@ -261,18 +273,36 @@ object PlexClient {
         }
     }
 
-    private fun testConnectionQuick(serverUrl: String, token: String): Boolean {
+    fun testConnectionQuick(serverUrl: String, token: String): Boolean {
         val root = normalizeUrl(serverUrl)
         if (root.isBlank()) return false
+        val cleanToken = token.trim()
+        val probeClient = client.newBuilder()
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(3, TimeUnit.SECONDS)
+            .build()
+
+        // 1. Try /library/sections with token
+        if (cleanToken.isNotBlank()) {
+            try {
+                val req = Request.Builder()
+                    .url("$root/library/sections?X-Plex-Token=$cleanToken")
+                    .get()
+                    .apply { buildStandardHeaders(this, cleanToken) }
+                    .build()
+                val res = probeClient.newCall(req).execute()
+                val code = res.code
+                res.close()
+                if (code in 200..299) return true
+            } catch (_: Exception) {}
+        }
+
+        // 2. Fallback to /identity probe
         return try {
             val req = Request.Builder()
                 .url("$root/identity")
                 .get()
-                .apply { buildStandardHeaders(this, token) }
-                .build()
-            val probeClient = client.newBuilder()
-                .connectTimeout(3, TimeUnit.SECONDS)
-                .readTimeout(3, TimeUnit.SECONDS)
+                .apply { buildStandardHeaders(this, cleanToken) }
                 .build()
             val res = probeClient.newCall(req).execute()
             val code = res.code
@@ -286,134 +316,207 @@ object PlexClient {
     /**
      * Tests connection to Plex server with both header and query param token fallbacks.
      */
-    suspend fun testConnection(serverUrl: String, token: String): Result<Boolean> = withContext(Dispatchers.IO) {
-        val root = normalizeUrl(serverUrl)
-        if (root.isBlank()) {
-            return@withContext Result.failure(Exception("Server URL cannot be empty."))
-        }
+    suspend fun testConnection(serverUrl: String, token: String, candidateUrls: List<String> = emptyList()): Result<Boolean> = withContext(Dispatchers.IO) {
         val cleanToken = token.trim()
         if (cleanToken.isBlank()) {
-            return@withContext Result.failure(Exception("X-Plex-Token cannot be empty. Enter your Plex token or sign in via Plex PIN."))
+            return@withContext Result.failure(Exception("X-Plex-Token cannot be empty. Please sign in with your Plex account."))
         }
 
-        // Test with headers and query parameters
-        val candidateUrls = listOf(
-            "$root/library/sections",
-            "$root/library/sections?X-Plex-Token=$cleanToken"
-        )
+        val allCandidates = (listOf(serverUrl) + candidateUrls)
+            .map { normalizeUrl(it) }
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        if (allCandidates.isEmpty()) {
+            return@withContext Result.failure(Exception("Server URL cannot be empty."))
+        }
 
         var lastError: Exception? = null
-        for (url in candidateUrls) {
-            val request = Request.Builder()
-                .url(url)
-                .get()
-                .apply { buildStandardHeaders(this, cleanToken) }
-                .build()
+        for (root in allCandidates) {
+            val candidateUrls = listOf(
+                "$root/library/sections",
+                "$root/library/sections?X-Plex-Token=$cleanToken"
+            )
 
+            for (url in candidateUrls) {
+                val request = Request.Builder()
+                    .url(url)
+                    .get()
+                    .apply { buildStandardHeaders(this, cleanToken) }
+                    .build()
+
+                try {
+                    val response = client.newCall(request).execute()
+                    if (response.isSuccessful) {
+                        return@withContext Result.success(true)
+                    } else if (response.code == 401) {
+                        lastError = Exception("HTTP 401 Unauthorized: Plex token is invalid for $root.")
+                    } else {
+                        lastError = Exception("Plex returned HTTP ${response.code} from $url")
+                    }
+                } catch (e: Exception) {
+                    lastError = e
+                }
+            }
+        }
+
+        Result.failure(lastError ?: Exception("Unable to connect to Plex."))
+    }
+
+    /**
+     * Fetches all music tracks across music libraries in Plex.
+     * Automatically attempts alternate candidate URLs if the primary URL is unreachable.
+     */
+    suspend fun fetchMusicTracks(
+        serverUrl: String,
+        token: String,
+        serverId: String,
+        candidateUrls: List<String> = emptyList()
+    ): Result<List<MusicTrack>> = withContext(Dispatchers.IO) {
+        val cleanToken = token.trim()
+        if (cleanToken.isBlank()) {
+            return@withContext Result.failure(Exception("X-Plex-Token is missing. Please sign into your Plex account."))
+        }
+
+        val allCandidates = (listOf(serverUrl) + candidateUrls)
+            .map { normalizeUrl(it) }
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        var workingRoot = ""
+        var sections = emptyList<PlexDirectory>()
+        var lastError: Exception? = null
+
+        // Step 1: Find working candidate URL and fetch library sections
+        for (candidate in allCandidates) {
             try {
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    return@withContext Result.success(true)
-                } else if (response.code == 401) {
-                    return@withContext Result.failure(
-                        Exception("HTTP 401 Unauthorized: The Plex token is invalid or unauthorized for $root. Please verify your X-Plex-Token or use 'Sign In with Plex PIN'.")
-                    )
+                val secReq = Request.Builder()
+                    .url("$candidate/library/sections?X-Plex-Token=$cleanToken")
+                    .get()
+                    .apply { buildStandardHeaders(this, cleanToken) }
+                    .build()
+
+                val secRes = client.newCall(secReq).execute()
+                val secBody = secRes.body?.string() ?: ""
+
+                if (secRes.isSuccessful && secBody.isNotBlank()) {
+                    val secAdapter = moshi.adapter(PlexSectionsResponse::class.java)
+                    val parsed = secAdapter.fromJson(secBody)
+                    val dirs = parsed?.mediaContainer?.directory ?: emptyList()
+                    if (dirs.isNotEmpty()) {
+                        workingRoot = candidate
+                        sections = dirs
+                        break
+                    } else {
+                        workingRoot = candidate
+                        sections = emptyList()
+                        break
+                    }
                 } else {
-                    lastError = Exception("Plex returned HTTP ${response.code} from $url")
+                    lastError = Exception("Plex section fetch returned HTTP ${secRes.code}")
                 }
             } catch (e: Exception) {
                 lastError = e
             }
         }
 
-        Result.failure(lastError ?: Exception("Unable to connect to Plex at $root"))
-    }
-
-    /**
-     * Fetches all music tracks across artist music libraries in Plex.
-     */
-    suspend fun fetchMusicTracks(serverUrl: String, token: String, serverId: String): Result<List<MusicTrack>> = withContext(Dispatchers.IO) {
-        val root = normalizeUrl(serverUrl)
-        val cleanToken = token.trim()
-
-        try {
-            // 1. Get Library sections
-            val secReq = Request.Builder()
-                .url("$root/library/sections?X-Plex-Token=$cleanToken")
-                .get()
-                .apply { buildStandardHeaders(this, cleanToken) }
-                .build()
-
-            val secRes = client.newCall(secReq).execute()
-            val secBody = secRes.body?.string() ?: ""
-
-            if (!secRes.isSuccessful) {
-                if (secRes.code == 401) {
-                    return@withContext Result.failure(Exception("HTTP 401 Unauthorized: Plex token was rejected."))
-                }
-                return@withContext Result.failure(Exception("Failed to load Plex sections: HTTP ${secRes.code}"))
-            }
-
-            val secAdapter = moshi.adapter(PlexSectionsResponse::class.java)
-            val sections = secAdapter.fromJson(secBody)?.mediaContainer?.directory ?: emptyList()
-            val musicSections = sections.filter { it.type == "artist" }
-
-            val tracksList = mutableListOf<MusicTrack>()
-
-            // 2. For each music section, fetch all tracks (type=10)
-            for (sec in musicSections) {
-                val tracksReq = Request.Builder()
-                    .url("$root/library/sections/${sec.key}/all?type=10&X-Plex-Token=$cleanToken")
-                    .get()
-                    .apply { buildStandardHeaders(this, cleanToken) }
-                    .build()
-
-                val tracksRes = client.newCall(tracksReq).execute()
-                if (tracksRes.isSuccessful) {
-                    val tracksAdapter = moshi.adapter(PlexTracksResponse::class.java)
-                    val metadata = tracksAdapter.fromJson(tracksRes.body?.string() ?: "")?.mediaContainer?.metadata ?: emptyList()
-
-                    for (item in metadata) {
-                        val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
-                        val streamUrl = if (partKey.isNotBlank()) {
-                            "$root$partKey?X-Plex-Token=$cleanToken"
-                        } else {
-                            ""
-                        }
-
-                        val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb
-                        val coverUrl = if (!thumbPath.isNullOrBlank()) {
-                            "$root$thumbPath?X-Plex-Token=$cleanToken"
-                        } else {
-                            ""
-                        }
-
-                        val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() } ?: "Music"
-                        val trackIndex = item.index ?: (tracksList.size + 1)
-
-                        tracksList.add(
-                            MusicTrack(
-                                id = "plex_${item.ratingKey}",
-                                title = item.title,
-                                artist = item.grandparentTitle ?: "Unknown Artist",
-                                album = item.parentTitle ?: "Unknown Album",
-                                coverUrl = coverUrl,
-                                duration = item.duration ?: 0L,
-                                serverId = serverId,
-                                streamUrl = streamUrl,
-                                ratingKey = item.ratingKey,
-                                genre = genreTag,
-                                trackNumber = trackIndex
-                            )
-                        )
-                    }
-                }
-            }
-
-            Result.success(tracksList)
-        } catch (e: Exception) {
-            Result.failure(e)
+        if (workingRoot.isBlank()) {
+            return@withContext Result.failure(lastError ?: Exception("Could not connect to Plex server library."))
         }
+
+        // Filter for music/audio sections or fallback to all sections
+        val musicSections = sections.filter { dir ->
+            val type = dir.type?.lowercase() ?: ""
+            val title = dir.title?.lowercase() ?: ""
+            type == "artist" || type == "music" || type == "audio" || type == "track" ||
+                title.contains("music") || title.contains("song") || title.contains("audio") || title.contains("track")
+        }.ifEmpty {
+            sections
+        }
+
+        val tracksList = mutableListOf<MusicTrack>()
+
+        // Step 2: Fetch tracks from each music section
+        for (sec in musicSections) {
+            val key = (sec.key ?: "").removePrefix("/library/sections/").trim()
+            if (key.isBlank()) continue
+
+            // Try type=10 (tracks) first
+            var metadataItems: List<PlexTrackMetadata> = emptyList()
+            val queryUrls = listOf(
+                "$workingRoot/library/sections/$key/all?type=10&X-Plex-Token=$cleanToken",
+                "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
+            )
+
+            for (tracksUrl in queryUrls) {
+                try {
+                    val tracksReq = Request.Builder()
+                        .url(tracksUrl)
+                        .get()
+                        .apply { buildStandardHeaders(this, cleanToken) }
+                        .build()
+
+                    val tracksRes = client.newCall(tracksReq).execute()
+                    if (tracksRes.isSuccessful) {
+                        val body = tracksRes.body?.string() ?: ""
+                        val tracksAdapter = moshi.adapter(PlexTracksResponse::class.java)
+                        val items = tracksAdapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        if (items.isNotEmpty()) {
+                            metadataItems = items
+                            break
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            for (item in metadataItems) {
+                val ratingKey = item.ratingKey ?: item.key?.substringAfterLast("/") ?: continue
+                val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                val streamUrl = if (partKey.isNotBlank()) {
+                    val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
+                    "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
+                } else {
+                    ""
+                }
+
+                val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb ?: ""
+                val coverUrl = if (thumbPath.isNotBlank()) {
+                    val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
+                    "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
+                } else {
+                    ""
+                }
+
+                val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() } ?: "Music"
+                val trackIndex = item.index ?: (tracksList.size + 1)
+                val trackTitle = item.title?.takeIf { it.isNotBlank() } ?: "Track $trackIndex"
+                val artistName = item.grandparentTitle?.takeIf { it.isNotBlank() }
+                    ?: item.parentTitle?.takeIf { it.isNotBlank() }
+                    ?: sec.title?.takeIf { it.isNotBlank() }
+                    ?: "Plex Artist"
+                val albumName = item.parentTitle?.takeIf { it.isNotBlank() }
+                    ?: sec.title?.takeIf { it.isNotBlank() }
+                    ?: "Plex Album"
+
+                tracksList.add(
+                    MusicTrack(
+                        id = "plex_${serverId}_$ratingKey",
+                        title = trackTitle,
+                        artist = artistName,
+                        album = albumName,
+                        coverUrl = coverUrl,
+                        duration = item.duration ?: 0L,
+                        serverId = serverId,
+                        streamUrl = streamUrl,
+                        ratingKey = ratingKey,
+                        genre = genreTag,
+                        trackNumber = trackIndex
+                    )
+                )
+            }
+        }
+
+        Result.success(tracksList)
     }
 
     /**

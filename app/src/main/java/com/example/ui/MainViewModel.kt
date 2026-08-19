@@ -244,10 +244,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else if (servers.size == 1) {
                         val server = servers.first()
                         _serverOpState.value = ServerOperationState.Success("Found '${server.name}'! Auto-connecting...")
-                        saveAndConnectPlexDirect(
+                        saveAndConnectPlexServer(
                             name = server.name,
                             hostUrl = server.preferredUri,
-                            token = server.token
+                            token = server.token,
+                            candidateUrls = server.candidateUris
                         )
                     } else {
                         _discoveredPlexServers.value = servers
@@ -269,10 +270,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun connectDiscoveredPlexServer(server: DiscoveredPlexServer) {
         _showServerPicker.value = false
-        saveAndConnectPlexDirect(
+        saveAndConnectPlexServer(
             name = server.name,
             hostUrl = server.preferredUri,
-            token = server.token
+            token = server.token,
+            candidateUrls = server.candidateUris
         )
     }
 
@@ -353,10 +355,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Plex Connect & Sync ---
     fun saveAndConnectPlexDirect(name: String, hostUrl: String, token: String) {
+        saveAndConnectPlexServer(name, hostUrl, token)
+    }
+
+    fun saveAndConnectPlexServer(
+        name: String,
+        hostUrl: String,
+        token: String,
+        candidateUrls: List<String> = emptyList()
+    ) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
             try {
-                val testRes = PlexClient.testConnection(hostUrl, token)
+                val testRes = PlexClient.testConnection(hostUrl, token, candidateUrls)
                 if (testRes.isSuccess) {
                     val server = ServerConfig(
                         id = "plex_${System.currentTimeMillis()}",
@@ -369,10 +380,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     repository.addOrUpdateServer(server)
 
-                    val syncRes = repository.syncPlex(server)
+                    val syncRes = repository.syncPlex(server, candidateUrls)
                     if (syncRes.isSuccess) {
+                        val count = syncRes.getOrNull() ?: 0
                         _serverOpState.value = ServerOperationState.Success(
-                            "Connected! Synced ${syncRes.getOrNull()} tracks from Plex."
+                            if (count > 0) "Connected! Synced $count tracks from Plex."
+                            else "Connected to ${server.name}! (0 tracks found in music sections)"
                         )
                     } else {
                         _serverOpState.value = ServerOperationState.Success(

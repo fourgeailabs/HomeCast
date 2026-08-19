@@ -49,8 +49,8 @@ class LibraryRepository(private val dao: LibraryDao) {
         }
     }
 
-    suspend fun syncPlex(server: ServerConfig): Result<Int> {
-        val result = PlexClient.fetchMusicTracks(server.hostUrl, server.apiKey, server.id)
+    suspend fun syncPlex(server: ServerConfig, candidateUrls: List<String> = emptyList()): Result<Int> {
+        val result = PlexClient.fetchMusicTracks(server.hostUrl, server.apiKey, server.id, candidateUrls)
         return if (result.isSuccess) {
             val tracks = result.getOrNull() ?: emptyList()
             if (tracks.isNotEmpty()) {
