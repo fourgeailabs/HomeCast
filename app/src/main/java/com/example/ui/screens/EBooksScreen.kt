@@ -156,7 +156,9 @@ fun EBooksScreen(
     viewModel: MainViewModel,
     onOpenEBook: (EBookData) -> Unit,
     onOpenComic: (ComicData) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDetails: (String, String, String) -> Unit = {_,_,_->},
+    onNavigateToCreator: (String) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
@@ -462,7 +464,7 @@ fun EBooksScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         items(filteredItems) { book ->
-                            BookCard3Column(book = book, onClick = { openItem(book) })
+                            BookCard3Column(book = book, onClick = { onNavigateToDetails(book.title, book.authorOrArtist, "BOOK") }, onAuthorClick = onNavigateToCreator)
                         }
                     }
                 }
@@ -479,8 +481,9 @@ fun EBooksScreen(
                             shelfTitle = "Currently Reading",
                             badge = "RECENT",
                             badgeColor = AccentTeal,
-                            items = sampleBookshelfItems.filter { it.progressPercent in 1..99 },
-                            onItemClick = { openItem(it) }
+                            items = filteredItems.filter { it.progressPercent in 1..99 },
+                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                            onNavigateToCreator = onNavigateToCreator
                         )
                     }
 
@@ -490,8 +493,9 @@ fun EBooksScreen(
                             shelfTitle = "Graphic Novels & Manga",
                             badge = "GEMINI SMART ZOOM",
                             badgeColor = AccentIndigo,
-                            items = sampleBookshelfItems.filter { it.isComic },
-                            onItemClick = { openItem(it) }
+                            items = filteredItems.filter { it.isComic },
+                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                            onNavigateToCreator = onNavigateToCreator
                         )
                     }
 
@@ -501,8 +505,9 @@ fun EBooksScreen(
                             shelfTitle = "Sci-Fi & Cyberpunk",
                             badge = "NOVELS",
                             badgeColor = Color(0xFFF59E0B),
-                            items = sampleBookshelfItems.filter { it.genre in listOf("Sci-Fi", "Cyberpunk") },
-                            onItemClick = { openItem(it) }
+                            items = filteredItems.filter { it.genre in listOf("Sci-Fi", "Cyberpunk") },
+                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                            onNavigateToCreator = onNavigateToCreator
                         )
                     }
 
@@ -512,8 +517,9 @@ fun EBooksScreen(
                             shelfTitle = "Classics & Philosophy",
                             badge = "PUBLIC DOMAIN",
                             badgeColor = Color(0xFF10B981),
-                            items = sampleBookshelfItems.filter { it.genre in listOf("Classic", "Philosophy") },
-                            onItemClick = { openItem(it) }
+                            items = filteredItems.filter { it.genre in listOf("Classic", "Philosophy") },
+                            onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                            onNavigateToCreator = onNavigateToCreator
                         )
                     }
                 }
@@ -528,7 +534,8 @@ fun GlassBookshelfRow(
     badge: String,
     badgeColor: Color,
     items: List<BookshelfItem>,
-    onItemClick: (BookshelfItem) -> Unit
+    onItemClick: (BookshelfItem) -> Unit,
+    onNavigateToCreator: (String) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -569,7 +576,7 @@ fun GlassBookshelfRow(
                 contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
                 items(items) { book ->
-                    BookshelfBookItem(book = book, onClick = { onItemClick(book) })
+                    BookshelfBookItem(book = book, onClick = { onItemClick(book) }, onAuthorClick = onNavigateToCreator)
                 }
             }
 
@@ -599,7 +606,8 @@ fun GlassBookshelfRow(
 @Composable
 fun BookshelfBookItem(
     book: BookshelfItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onAuthorClick: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -678,10 +686,11 @@ fun BookshelfBookItem(
         Text(
             book.authorOrArtist,
             fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AccentTeal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.clickable { onAuthorClick(book.authorOrArtist) }
         )
     }
 }
@@ -689,7 +698,8 @@ fun BookshelfBookItem(
 @Composable
 fun BookCard3Column(
     book: BookshelfItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onAuthorClick: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -760,10 +770,11 @@ fun BookCard3Column(
         Text(
             book.authorOrArtist,
             fontSize = 9.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AccentTeal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.clickable { onAuthorClick(book.authorOrArtist) }
         )
     }
 }

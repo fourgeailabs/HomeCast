@@ -46,7 +46,9 @@ import com.example.ui.theme.SurfaceGlassBorder
 fun LibraryScreen(
     viewModel: MainViewModel,
     onBookClick: (Audiobook) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDetails: (String, String, String) -> Unit = {_,_,_->},
+    onNavigateToCreator: (String) -> Unit = {}
 ) {
     val allBooks by viewModel.allBooks.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
@@ -652,7 +654,8 @@ fun AudiobookShelfCard(
     showProgress: Boolean = false,
     isPlaying: Boolean = false,
     onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit
+    onFavoriteToggle: () -> Unit,
+    onAuthorClick: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -818,9 +821,10 @@ fun AudiobookShelfCard(
         Text(
             book.author,
             fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AccentTeal,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable { onAuthorClick(book.author) }
         )
     }
 }
@@ -830,7 +834,8 @@ fun BookShelfRowItem(
     book: Audiobook,
     isPlaying: Boolean = false,
     onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit
+    onFavoriteToggle: () -> Unit,
+    onAuthorClick: (String) -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -901,7 +906,8 @@ private fun formatDuration(seconds: Long): String {
 fun Audiobook3ColumnCard(
     book: Audiobook,
     isPlaying: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onAuthorClick: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier

@@ -44,6 +44,10 @@ object Routes {
     const val Player = "player"
     const val Discovery = "discovery"
     const val Settings = "settings"
+    
+    fun MediaDetail(title: String, creator: String, type: String) = "media_detail/${android.net.Uri.encode(title)}/${android.net.Uri.encode(creator)}/$type"
+    fun CreatorDetail(name: String) = "creator_detail/${android.net.Uri.encode(name)}"
+
 }
 
 @Composable
@@ -278,7 +282,13 @@ fun MainScreen(
                         onBookClick = {
                             isPlayerSlidUp = true
                         },
-                        onNavigateToSettings = { navController.navigate(Routes.Settings) }
+                        onNavigateToSettings = { navController.navigate(Routes.Settings) },
+                        onNavigateToDetails = { title, creator, type ->
+                            navController.navigate(Routes.MediaDetail(title, creator, type))
+                        },
+                        onNavigateToCreator = { name ->
+                            navController.navigate(Routes.CreatorDetail(name))
+                        }
                     )
                 }
                 composable(Routes.Music) {
