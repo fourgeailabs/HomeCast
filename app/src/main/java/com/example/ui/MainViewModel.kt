@@ -6,8 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.*
 import com.example.data.*
-import com.example.data.network.AudiobookshelfClient
-import com.example.data.network.PlexClient
+import com.example.data.network.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -44,6 +43,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _discoveryError = MutableStateFlow<String?>(null)
     val discoveryError = _discoveryError.asStateFlow()
+
+    // Diagnostic State
+    private val _diagnosticResult = MutableStateFlow<AbsDiagnosticResult?>(null)
+    val diagnosticResult = _diagnosticResult.asStateFlow()
+
+    private val _isDiagnosing = MutableStateFlow(false)
+    val isDiagnosing = _isDiagnosing.asStateFlow()
+
+    fun diagnoseAudiobookshelf(baseUrl: String, username: String = "", password: String = "", token: String = "") {
+        viewModelScope.launch {
+            _isDiagnosing.value = true
+            try {
+                val report = AudiobookshelfClient.diagnoseConnection(baseUrl, username, password, token)
+                _diagnosticResult.value = report
+            } catch (e: Exception) {
+                _diagnosticResult.value = AbsDiagnosticResult(
+                    isReachable = false,
+                    testedUrl = baseUrl,
+                    httpStatusCode = null,
+                    success = false,
+                    statusMessage = "Diagnostic error: ${e.message}",
+                    latencyMs = 0,
+                    sslValid = false,
+                    diagnosticLog = listOf("Unexpected error: ${e.message}")
+                )
+            } finally {
+                _isDiagnosing.value = false
+            }
+        }
+    }
+
+    fun clearDiagnosticResult() {
+        _diagnosticResult.value = null
+    }
 
     // --- Audiobookshelf Connect & Sync ---
     fun saveAndConnectAudiobookshelf(

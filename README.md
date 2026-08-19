@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v1.6-brightgreen?style=flat-square" alt="Version 1.6" />
+  <img src="https://img.shields.io/badge/Release-v1.7-brightgreen?style=flat-square" alt="Version 1.7" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -19,32 +19,22 @@
 
 ---
 
-### 🚀 What's New in v1.6
-- **📖 Kindle-Grade E-Reader**:
-  - **Animated Page Turns**: Physics-based realistic page turns with 3D rotation, corner curl simulation, and smooth finger tracking.
-  - **Customizable Typography & Reading Environment**:
-    - Selectable font families: **Literata Serif (Kindle Classic)**, **Bookerly**, **Inter (Clean Modern)**, and **JetBrains Mono**.
-    - Granular font scaling (13sp to 28sp), line spacing, and margin padding controls.
-    - 5 Distinct Color Palettes: **Warm Sepia**, **Paper White**, **True OLED Black**, **Midnight Slate**, and **Solar Mint**.
-    - Real-time reading speed calculator (words-per-minute) and estimated chapter completion time.
-    - Interactive Table of Contents (TOC) drawer, bookmarks, and instant progress scrubber.
+### 🚀 What's New in v1.7
+- **🛡️ Bulletproof Audiobookshelf Connection & Diagnostic Engine**:
+  - **Permissive SSL/TLS Engine**: Gracefully handles self-signed SSL certificates, internal CA certificates, Let's Encrypt certificates, and custom HTTPS ports on self-hosted home servers (Unraid, TrueNAS, Synology, Docker, Proxmox).
+  - **Live Connection Diagnostics Modal**: Added a dedicated **"Test & Diagnose"** tool in Settings that runs real-time reachability, ping latency, SSL validation, authentication probes, and library discovery checks with monospaced execution logs and tailored remediation tips.
+  - **Deep URL Sanitizer**: Automatically cleanses pasted URLs, strips browser UI suffixes (`/login`, `/audiobooks`, query params, and anchors), handles port formatting, and auto-detects HTTPS vs HTTP.
+  - **Multi-Strategy Token & Credential Auth**: Automatically probes `/login`, `/api/login`, `/api/authorize`, API Bearer tokens, and custom headers.
+  - **1-Tap Save & Connect**: Seamlessly saves and syncs library media immediately once diagnostics confirm server reachability.
+- **📖 Kindle-Grade E-Reader (v1.6 Integration)**:
+  - Physics-based realistic page turns with 3D curl simulation.
+  - 4 Selectable Font Families (Literata, Bookerly, Inter, JetBrains Mono) with granular sizing and 5 color themes (Warm Sepia, OLED Black, Paper White, Midnight Slate, Solar Mint).
 - **💥 Dynamic Comic Reader with Guided Frame Zoom**:
-  - **Guided Panel Zoom Mode**: Automatically crops and zooms into individual comic frames with crisp scaling on tap.
-  - **Slide-In Frame Navigation**:
-    - **Tap Right Side**: Smooth slide-in animation to the next frame.
-    - **Tap Left Side**: Smooth flick back to the previous frame.
-    - **Double-Tap**: Instant zoom in/out toggle on request.
-  - **Manga Mode (RTL Reading)**: Native support for Right-to-Left panel reading sequences.
-  - **Full-Page Grid Mode**: Instant bird's-eye view of all panels with one-tap frame jump.
-- **👇 Drag & Slide-Down Gesture on Now Playing Player**:
-  - Drag or swipe down from anywhere on the top player handle or album artwork to effortlessly collapse the full-screen player into the persistent mini-player.
-  - Interactive tactile resistance and release velocity threshold for natural ergonomics.
+  - Guided panel zoom with tap-right next frame, tap-left previous frame, double-tap zoom toggle, and Manga RTL mode.
+- **👇 Drag & Slide-Down Player Gesture**:
+  - Vertical drag-to-dismiss gesture on the full player screen to collapse smoothly into the mini-player.
 - **🎯 Active Server-Grounded AI Discovery**:
-  - Gemini AI discovery now strictly grounds all media recommendations in your **active local Audiobookshelf and Plex server inventory**.
-  - No more disconnected external suggestions; AI curates playlists and reading lists directly from the media you own and host.
-- **🌐 Robust Remote & WAN Audiobookshelf Connection**:
-  - Intelligent auto-detection of HTTPS endpoints and domain paths.
-  - Fallback authentication mechanisms supporting Cloudflare Tunnels, reverse proxies, and direct API Token authentication when remote password login is restricted.
+  - Strict grounding on connected server inventory for personalized media discovery.
 - **Unified Discovery Shelf-Like Architecture**:
   - **Multi-Media Horizontal Carousels**: Refactored the entire Discovery experience into fluid horizontal sliding shelves matching the Library and Music interfaces.
   - **Complete Media Triad**: Full discovery support across **Audiobooks**, **Music**, and **Books (E-Reader)**.

@@ -14,6 +14,8 @@ data class AbsLoginRequest(
 data class AbsLoginResponse(
     val user: AbsUser? = null,
     val token: String? = null,
+    val bearerToken: String? = null,
+    val apiKey: String? = null,
     val error: String? = null
 )
 
@@ -21,7 +23,24 @@ data class AbsLoginResponse(
 data class AbsUser(
     val id: String? = null,
     val username: String? = null,
-    val token: String? = null
+    val token: String? = null,
+    val apiKey: String? = null,
+    val type: String? = null,
+    val isActive: Boolean? = null
+)
+
+data class AbsDiagnosticResult(
+    val isReachable: Boolean,
+    val testedUrl: String,
+    val httpStatusCode: Int?,
+    val success: Boolean,
+    val statusMessage: String,
+    val latencyMs: Long,
+    val sslValid: Boolean,
+    val resolvedToken: String? = null,
+    val librariesFound: Int = 0,
+    val diagnosticLog: List<String> = emptyList(),
+    val recommendations: List<String> = emptyList()
 )
 
 @JsonClass(generateAdapter = true)

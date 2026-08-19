@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ServerConfig
+import com.example.data.network.AbsDiagnosticResult
 import com.example.ui.MainViewModel
 import com.example.ui.ServerOperationState
 import com.example.ui.theme.AccentIndigo
@@ -116,6 +117,7 @@ fun SettingsScreen(
         // Audiobookshelf Config Card
         item {
             AudiobookshelfConfigCard(
+                viewModel = viewModel,
                 isLoading = serverOpState is ServerOperationState.Loading,
                 serverOpState = serverOpState,
                 onConnect = { name, url, token, username, password ->
@@ -216,6 +218,7 @@ fun ServerItemCard(
 
 @Composable
 fun AudiobookshelfConfigCard(
+    viewModel: MainViewModel,
     isLoading: Boolean,
     serverOpState: ServerOperationState,
     onConnect: (String, String, String, String, String) -> Unit
@@ -229,6 +232,16 @@ fun AudiobookshelfConfigCard(
     var isPasswordVisible by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
     var connectionMode by remember { mutableStateOf("local") }
+
+    val diagnosticResult by viewModel.diagnosticResult.collectAsState()
+    val isDiagnosing by viewModel.isDiagnosing.collectAsState()
+    var showDiagnosticDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(diagnosticResult) {
+        if (diagnosticResult != null) {
+            showDiagnosticDialog = true
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -263,16 +276,16 @@ fun AudiobookshelfConfigCard(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            "Remote Login & Authentication Guide:",
+                            "Audiobookshelf Remote & Login Guide:",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = AccentTeal
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "1. Remote Access: When connecting away from home, enter your HTTPS domain (e.g. https://abs.yourdomain.com) or Tailscale IP.\n" +
-                            "2. API Token (Recommended for Remote): If your reverse proxy, Cloudflare, or 2FA blocks login, select 'Use API Token'. To get it: Open ABS Web UI -> Settings -> Users -> Click your user -> Copy API Key / Token.\n" +
-                            "3. Reverse Proxy: Ensure WebSockets and Bearer headers are permitted.",
+                            "1. Remote / HTTPS Access: Enter your remote domain (e.g., https://abs.yourdomain.com) or Tailscale IP. HomeCast supports HTTPS, reverse proxies, and self-signed certificates.\n" +
+                            "2. API Token (Direct & Fast): If username/password fails due to Single Sign-On (SSO), Cloudflare Access, or 2FA, use an API Token. In Audiobookshelf: go to Settings -> Users -> click your user -> copy API Key / Token.\n" +
+                            "3. Diagnostic Mode: Tap 'Test & Diagnose' below to check reachability, latency, and pinpoint exact connection issues.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
@@ -387,31 +400,196 @@ fun AudiobookshelfConfigCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = {
-                    onConnect(
-                        serverName.trim(),
-                        hostUrl.trim(),
-                        token.trim(),
-                        username.trim(),
-                        password
-                    )
-                },
+            // Dual Buttons: Test & Diagnose / Save & Connect
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading && hostUrl.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Connecting & Syncing...")
-                } else {
-                    Icon(Icons.Default.Link, contentDescription = "Connect")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save & Connect Audiobookshelf")
+                OutlinedButton(
+                    onClick = {
+                        viewModel.diagnoseAudiobookshelf(
+                            baseUrl = hostUrl.trim(),
+                            username = if (!useTokenAuth) username.trim() else "",
+                            password = if (!useTokenAuth) password else "",
+                            token = if (useTokenAuth) token.trim() else ""
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !isDiagnosing && !isLoading && hostUrl.isNotBlank()
+                ) {
+                    if (isDiagnosing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Test & Diagnose", fontSize = 12.sp)
+                }
+
+                Button(
+                    onClick = {
+                        onConnect(
+                            serverName.trim(),
+                            hostUrl.trim(),
+                            token.trim(),
+                            username.trim(),
+                            password
+                        )
+                    },
+                    modifier = Modifier.weight(1.3f),
+                    enabled = !isLoading && !isDiagnosing && hostUrl.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Connecting...", fontSize = 12.sp)
+                    } else {
+                        Icon(Icons.Default.Link, contentDescription = "Connect", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save & Connect", fontSize = 12.sp)
+                    }
                 }
             }
         }
+    }
+
+    // Diagnostic Results Dialog
+    if (showDiagnosticDialog && diagnosticResult != null) {
+        val result = diagnosticResult!!
+        AlertDialog(
+            onDismissRequest = {
+                showDiagnosticDialog = false
+                viewModel.clearDiagnosticResult()
+            },
+            icon = {
+                Icon(
+                    imageVector = when {
+                        result.success -> Icons.Default.CheckCircle
+                        result.isReachable -> Icons.Default.Warning
+                        else -> Icons.Default.Error
+                    },
+                    contentDescription = null,
+                    tint = when {
+                        result.success -> Color(0xFF4CAF50)
+                        result.isReachable -> Color(0xFFFF9800)
+                        else -> MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (result.success) "Connection Verified" else "Diagnostic Report",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = result.statusMessage,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = if (result.success) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Tested URL: ${result.testedUrl}", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Text("Latency: ${result.latencyMs} ms", fontSize = 12.sp)
+                            if (result.httpStatusCode != null) {
+                                Text("HTTP Status Code: ${result.httpStatusCode}", fontSize = 12.sp)
+                            }
+                            if (result.librariesFound > 0) {
+                                Text("Libraries Accessible: ${result.librariesFound}", fontSize = 12.sp, color = AccentTeal)
+                            }
+                        }
+                    }
+
+                    if (result.diagnosticLog.isNotEmpty()) {
+                        Text("Diagnostic Logs:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.8f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                for (logLine in result.diagnosticLog) {
+                                    Text(
+                                        text = logLine,
+                                        fontSize = 11.sp,
+                                        color = if (logLine.contains("SUCCESS") || logLine.contains("VALID")) Color(0xFF81C784) else Color(0xFFE0E0E0),
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (result.recommendations.isNotEmpty()) {
+                        Text("Suggested Fixes:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for (tip in result.recommendations) {
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text("• ", fontSize = 12.sp, color = AccentIndigo)
+                                    Text(tip, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (result.success) {
+                    Button(
+                        onClick = {
+                            val activeTok = result.resolvedToken ?: token.trim()
+                            showDiagnosticDialog = false
+                            viewModel.clearDiagnosticResult()
+                            onConnect(
+                                serverName.trim(),
+                                result.testedUrl,
+                                activeTok,
+                                username.trim(),
+                                password
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                    ) {
+                        Text("Save & Connect Now")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            showDiagnosticDialog = false
+                            viewModel.clearDiagnosticResult()
+                        }
+                    ) {
+                        Text("Close")
+                    }
+                }
+            },
+            dismissButton = {
+                if (result.success) {
+                    TextButton(onClick = {
+                        showDiagnosticDialog = false
+                        viewModel.clearDiagnosticResult()
+                    }) {
+                        Text("Dismiss")
+                    }
+                }
+            }
+        )
     }
 }
 
