@@ -10,6 +10,7 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
     val recents: Flow<List<Audiobook>> = dao.getRecents()
     val allMusic: Flow<List<MusicTrack>> = dao.getAllMusic()
     val recentMusic: Flow<List<MusicTrack>> = dao.getRecentMusic()
+    val allEBooks: Flow<List<EBook>> = dao.getAllEBooks()
     val servers: Flow<List<ServerConfig>> = secureConfigManager.serversFlow
 
     suspend fun insertBook(book: Audiobook) = dao.insertBook(book)
@@ -65,8 +66,17 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
     }
 
     suspend fun syncBooklore(server: ServerConfig): Result<Int> {
-        // Mock successful Booklore sync with zero items (or some predefined mocked ones if necessary)
-        secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
-        return Result.success(0)
+        val result = com.example.data.network.BookloreClient.fetchBooks(server.hostUrl, server.apiKey, server.id)
+        return if (result.isSuccess) {
+            val books = result.getOrNull() ?: emptyList()
+            if (books.isNotEmpty()) {
+                dao.deleteEBooksByServer(server.id)
+                dao.insertEBooks(books)
+            }
+            secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
+            Result.success(books.size)
+        } else {
+            Result.failure(result.exceptionOrNull() ?: Exception("Unknown error"))
+        }
     }
 }

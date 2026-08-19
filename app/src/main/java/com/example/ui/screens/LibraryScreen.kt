@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,14 +57,46 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var isGridView by remember { mutableStateOf(false) }
+    var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
 
-    val genreList = remember(allBooks) {
-        val extracted = allBooks.map { it.genre.trim() }.filter { it.isNotBlank() }.distinct()
+    val publicDomainAudiobooks = remember {
+        listOf(
+            Audiobook(
+                id = "pd_audio_1",
+                title = "The Art of War",
+                author = "Sun Tzu",
+                duration = 4320000L, // 1h 12m
+                coverUrl = "https://images.unsplash.com/photo-1545041793-272e50529d84?w=600&q=80",
+                serverId = "pd_server",
+                streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
+                narrator = "Public Domain",
+                seriesName = "Philosophy"
+            ),
+            Audiobook(
+                id = "pd_audio_2",
+                title = "Frankenstein",
+                author = "Mary Shelley",
+                duration = 29000000L, // ~8h
+                coverUrl = "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=600&q=80",
+                serverId = "pd_server",
+                streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
+                narrator = "Project Gutenberg",
+                seriesName = "Classic Horror"
+            )
+        )
+    }
+
+    val currentBooks = remember(allBooks, selectedSource) {
+        if (selectedSource == 0) allBooks else publicDomainAudiobooks
+    }
+
+    val genreList = remember(currentBooks) {
+        val extracted = currentBooks.map { it.genre.trim() }.filter { it.isNotBlank() }.distinct()
         if (extracted.isNotEmpty()) listOf("All") + extracted else listOf("All", "Sci-Fi", "Fantasy", "Mystery", "Non-Fiction", "Classics")
     }
 
-    val filteredBooks = remember(allBooks, searchQuery, selectedGenre) {
-        allBooks.filter { book ->
+    val filteredBooks = remember(currentBooks, searchQuery, selectedGenre) {
+        currentBooks.filter { book ->
             val matchesGenre = selectedGenre == null || selectedGenre == "All" || book.genre.equals(selectedGenre, ignoreCase = true)
             val matchesSearch = searchQuery.isBlank() ||
                 book.title.contains(searchQuery, ignoreCase = true) ||
@@ -75,21 +108,21 @@ fun LibraryScreen(
     }
 
     // Curated Shelves
-    val newArrivals = remember(allBooks) {
-        allBooks.takeLast(10).reversed()
+    val newArrivals = remember(currentBooks) {
+        currentBooks.takeLast(10).reversed()
     }
 
-    val seriesBooks = remember(allBooks) {
-        allBooks.filter { it.seriesName.isNotBlank() }
+    val seriesBooks = remember(currentBooks) {
+        currentBooks.filter { it.seriesName.isNotBlank() }
     }
 
-    val popularBooks = remember(allBooks) {
+    val popularBooks = remember(currentBooks) {
         // High engagement or standout titles
-        allBooks.sortedByDescending { it.duration }.take(8)
+        currentBooks.sortedByDescending { it.duration }.take(8)
     }
 
-    val noteworthyBooks = remember(allBooks) {
-        allBooks.shuffled().take(8)
+    val noteworthyBooks = remember(currentBooks) {
+        currentBooks.shuffled().take(8)
     }
 
     Column(
@@ -143,6 +176,34 @@ fun LibraryScreen(
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentTeal)
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        androidx.compose.material3.TabRow(
+            selectedTabIndex = selectedSource,
+            containerColor = Color.Transparent,
+            indicator = { tabPositions ->
+                androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
+                    color = AccentIndigo
+                )
+            }
+        ) {
+            listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
+                androidx.compose.material3.Tab(
+                    selected = selectedSource == index,
+                    onClick = { selectedSource = index },
+                    text = {
+                        Text(
+                            text = title,
+                            fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
+                        )
+                    },
+                    selectedContentColor = AccentIndigo,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -522,10 +583,15 @@ fun ShelfHeader(
     subtitle: String,
     badge: String? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    iconTint: Color = AccentTeal
+    iconTint: Color = AccentTeal,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) Modifier.clickable { onClick() } else Modifier
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

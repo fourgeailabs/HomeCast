@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -253,6 +255,8 @@ fun AudiobookshelfConfigCard(
     val isDiagnosing by viewModel.isDiagnosing.collectAsState()
     var showDiagnosticDialog by remember { mutableStateOf(false) }
 
+    var isExpanded by remember { mutableStateOf(false) }
+    
     LaunchedEffect(diagnosticResult) {
         if (diagnosticResult != null) {
             showDiagnosticDialog = true
@@ -262,7 +266,9 @@ fun AudiobookshelfConfigCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -279,10 +285,24 @@ fun AudiobookshelfConfigCard(
                     }
                 }
 
-                IconButton(onClick = { showHelp = !showHelp }) {
-                    Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MaterialTheme.colorScheme.primary)
-                }
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        IconButton(onClick = { showHelp = !showHelp }) {
+                            Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
 
             AnimatedVisibility(visible = showHelp) {
                 Surface(
@@ -467,6 +487,8 @@ fun AudiobookshelfConfigCard(
                     }
                 }
             }
+            }
+            }
         }
     }
 
@@ -635,6 +657,8 @@ fun PlexConfigCard(
 
     var showDiagnosticDialog by remember { mutableStateOf(false) }
 
+    var isExpanded by remember { mutableStateOf(false) }
+
     LaunchedEffect(plexDiagnosticResult) {
         if (plexDiagnosticResult != null) {
             showDiagnosticDialog = true
@@ -644,7 +668,9 @@ fun PlexConfigCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -660,9 +686,16 @@ fun PlexConfigCard(
                         Text("Music & Audio Streaming", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(14.dp))
 
             // Primary 1-Tap Cloud Account Sign-In Card
             Surface(
@@ -906,6 +939,8 @@ fun PlexConfigCard(
                         }
                     }
                 }
+            }
+            }
             }
         }
     }
@@ -1256,11 +1291,14 @@ fun BookloreConfigCard(
     var username by remember { mutableStateOf("ecollins") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(false) }
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -1276,9 +1314,16 @@ fun BookloreConfigCard(
                         Text("E-Books & Comics", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = serverName,
@@ -1346,6 +1391,8 @@ fun BookloreConfigCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Connect to Booklore", fontSize = 14.sp)
                 }
+            }
+            }
             }
         }
     }

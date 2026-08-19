@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,11 +161,35 @@ fun EBooksScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var isGridViewOpen by remember { mutableStateOf(false) }
+    var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
 
     val genres = listOf("All", "Sci-Fi", "Classic", "Comics", "Cyberpunk", "Philosophy")
 
-    val filteredItems = remember(searchQuery, selectedGenre) {
-        sampleBookshelfItems.filter { item ->
+    val allEBooks by viewModel.allEBooks.collectAsState()
+    
+    val currentBookshelfItems = remember(allEBooks, selectedSource) {
+        if (selectedSource == 0) {
+            allEBooks.map { ebook ->
+                BookshelfItem(
+                    id = ebook.id,
+                    title = ebook.title,
+                    authorOrArtist = ebook.author,
+                    coverUrl = ebook.coverUrl,
+                    genre = ebook.genre,
+                    isComic = ebook.isComic,
+                    progressPercent = ebook.progressPercent,
+                    pageCount = ebook.totalPages,
+                    description = ebook.description
+                )
+            }
+        } else {
+            // Keep public domain sample books with full 20-chapter simulations
+            sampleBookshelfItems
+        }
+    }
+
+    val filteredItems = remember(searchQuery, selectedGenre, currentBookshelfItems) {
+        currentBookshelfItems.filter { item ->
             val matchesGenre = selectedGenre == null || selectedGenre == "All" || item.genre.equals(selectedGenre, ignoreCase = true)
             val matchesSearch = searchQuery.isBlank() || item.title.contains(searchQuery, ignoreCase = true) || item.authorOrArtist.contains(searchQuery, ignoreCase = true)
             matchesGenre && matchesSearch
@@ -220,36 +245,29 @@ fun EBooksScreen(
             )
             onOpenComic(sampleComic)
         } else {
+            val generatedChapters = (1..20).map { chapterNum ->
+                BookChapter(
+                    title = "Chapter $chapterNum",
+                    startPage = chapterNum * 5,
+                    paragraphs = listOf(
+                        "The Time Traveller was expounding a recondite matter to us. His grey eyes shone and twinkled, and his usually pale face was flushed and animated.",
+                        "The fire burnt brightly, and the soft radiance of the incandescent lights in the lilies of silver caught the bubbles that flashed and passed in our glasses.",
+                        "Our chairs, being his patents, embraced and caressed us rather than submitted to be sat upon, and there was that luxurious after-dinner atmosphere when thought roams gracefully free of the trammels of precision.",
+                        "He put it to us in this way—marking the points with a lean forefinger—as we sat and lazily admired his earnestness over this new paradox.",
+                        "“You must follow me carefully. I shall have to controvert one or two ideas that are almost universally accepted. The geometry, for instance, they taught you at school is founded on a misconception.”",
+                        "“Is not that rather a large thing to expect us to begin upon?” said Filby, an argumentative person with red hair.",
+                        "“I do not mean to ask you to accept anything without reasonable ground for it. You will soon admit as much as I need from you. You know of course that a mathematical line, a line of thickness nil, has no real existence.”",
+                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet.",
+                        "Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos."
+                    )
+                )
+            }
             val sampleEBook = EBookData(
                 id = item.id,
                 title = item.title,
                 author = item.authorOrArtist,
-                totalChapters = 4,
-                chapters = listOf(
-                    BookChapter(
-                        title = "Chapter 1: The Departure",
-                        startPage = 1,
-                        paragraphs = listOf(
-                            "The Time Traveller was expounding a recondite matter to us. His grey eyes shone and twinkled, and his usually pale face was flushed and animated.",
-                            "The fire burnt brightly, and the soft radiance of the incandescent lights in the lilies of silver caught the bubbles that flashed and passed in our glasses.",
-                            "Our chairs, being his patents, embraced and caressed us rather than submitted to be sat upon, and there was that luxurious after-dinner atmosphere when thought roams gracefully free of the trammels of precision.",
-                            "He put it to us in this way—marking the points with a lean forefinger—as we sat and lazily admired his earnestness over this new paradox.",
-                            "“You must follow me carefully. I shall have to controvert one or two ideas that are almost universally accepted. The geometry, for instance, they taught you at school is founded on a misconception.”",
-                            "“Is not that rather a large thing to expect us to begin upon?” said Filby, an argumentative person with red hair.",
-                            "“I do not mean to ask you to accept anything without reasonable ground for it. You will soon admit as much as I need from you. You know of course that a mathematical line, a line of thickness nil, has no real existence.”"
-                        )
-                    ),
-                    BookChapter(
-                        title = "Chapter 2: The Machine",
-                        startPage = 8,
-                        paragraphs = listOf(
-                            "The thing the Time Traveller held in his hand was a glittering metallic framework, scarcely larger than a small clock, and very delicately made.",
-                            "There was ivory in it, and some transparent crystalline substance. And now I must be very plain, for the sequel, that was so remarkable, began at this point.",
-                            "He took one of the small octagonal tables that were scattered about the room, and set it in front of the fire, with two legs on the hearthrug.",
-                            "On this table he placed the mechanism. Then he pushed a chair close to the table, and sat down. The only other object on the table was a small shaded lamp, the bright light of which fell full upon the model."
-                        )
-                    )
-                )
+                totalChapters = generatedChapters.size,
+                chapters = generatedChapters
             )
             onOpenEBook(sampleEBook)
         }
@@ -322,6 +340,36 @@ fun EBooksScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            androidx.compose.material3.TabRow(
+                selectedTabIndex = selectedSource,
+                containerColor = Color.Transparent,
+                indicator = { tabPositions ->
+                    androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
+                        color = AccentIndigo
+                    )
+                }
+            ) {
+                listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
+                    androidx.compose.material3.Tab(
+                        selected = selectedSource == index,
+                        onClick = { selectedSource = index },
+                        text = {
+                            Text(
+                                text = title,
+                                fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        selectedContentColor = AccentIndigo,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Search and Genre Filters
             OutlinedTextField(

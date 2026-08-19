@@ -37,6 +37,22 @@ data class MusicTrack(
     val trackNumber: Int = 1
 )
 
+@Entity(tableName = "ebooks")
+data class EBook(
+    @PrimaryKey val id: String,
+    val title: String,
+    val author: String,
+    val coverUrl: String,
+    val serverId: String,
+    val genre: String = "Various",
+    val description: String = "",
+    val totalPages: Int = 0,
+    val progressPercent: Int = 0,
+    val lastRead: Long = 0L,
+    val downloadUrl: String = "",
+    val isComic: Boolean = false
+)
+
 data class ServerConfig(
     val id: String, // e.g. "abs_server" or "plex_server" or uuid
     val name: String,

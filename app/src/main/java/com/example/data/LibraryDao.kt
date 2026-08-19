@@ -45,4 +45,14 @@ interface LibraryDao {
 
     @Query("UPDATE music_tracks SET lastPlayed = :timestamp WHERE id = :id")
     suspend fun updateMusicLastPlayed(id: String, timestamp: Long)
+
+    // EBooks
+    @Query("SELECT * FROM ebooks ORDER BY lastRead DESC, title ASC")
+    fun getAllEBooks(): Flow<List<EBook>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEBooks(ebooks: List<EBook>)
+
+    @Query("DELETE FROM ebooks WHERE serverId = :serverId")
+    suspend fun deleteEBooksByServer(serverId: String)
 }

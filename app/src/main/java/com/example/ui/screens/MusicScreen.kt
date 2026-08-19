@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,28 @@ fun MusicScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(MusicNavTab.SHELVES) }
+    var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
+
+    val publicDomainMusic = remember {
+        listOf(
+            MusicTrack(
+                id = "pd_track_1",
+                title = "Acoustic Chill",
+                artist = "Various Artists",
+                album = "Public Domain Sounds",
+                duration = 2700000L,
+                coverUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
+                serverId = "pd_server",
+                streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
+                trackNumber = 1,
+                genre = "Acoustic"
+            )
+        )
+    }
+
+    val currentMusic = remember(allMusic, selectedSource) {
+        if (selectedSource == 0) allMusic else publicDomainMusic
+    }
 
     // Navigation Stack for File Structure Drilldown
     var selectedGenre by remember { mutableStateOf<String?>(null) }
@@ -85,8 +108,8 @@ fun MusicScreen(
     var selectedAlbum by remember { mutableStateOf<AlbumGroup?>(null) }
 
     // Pre-calculated groupings
-    val albumGroups = remember(allMusic) {
-        allMusic.groupBy { "${it.artist}___${it.album}" }
+    val albumGroups = remember(currentMusic) {
+        currentMusic.groupBy { "${it.artist}___${it.album}" }
             .map { (_, tracks) ->
                 val first = tracks.first()
                 AlbumGroup(
@@ -99,8 +122,8 @@ fun MusicScreen(
             }.sortedBy { it.title }
     }
 
-    val artistGroups = remember(albumGroups, allMusic) {
-        allMusic.groupBy { it.artist.ifBlank { "Unknown Artist" } }
+    val artistGroups = remember(albumGroups, currentMusic) {
+        currentMusic.groupBy { it.artist.ifBlank { "Unknown Artist" } }
             .map { (artistName, tracks) ->
                 val artistAlbums = albumGroups.filter { it.artist == artistName }
                 val cover = tracks.firstOrNull { it.coverUrl.isNotBlank() }?.coverUrl ?: ""
@@ -167,9 +190,9 @@ fun MusicScreen(
     }
 
     // Filtered tracks for global search
-    val filteredTracks = remember(allMusic, searchQuery) {
-        if (searchQuery.isBlank()) allMusic
-        else allMusic.filter {
+    val filteredTracks = remember(currentMusic, searchQuery) {
+        if (searchQuery.isBlank()) currentMusic
+        else currentMusic.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
             it.artist.contains(searchQuery, ignoreCase = true) ||
             it.album.contains(searchQuery, ignoreCase = true) ||
@@ -209,7 +232,7 @@ fun MusicScreen(
                     letterSpacing = (-0.5).sp
                 )
                 Text(
-                    if (allMusic.isNotEmpty()) "${allMusic.size} tracks • ${albumGroups.size} albums" else "Your Personal Music Cloud",
+                    if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums" else "Your Personal Music Cloud",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -224,6 +247,34 @@ fun MusicScreen(
                     .border(1.dp, SurfaceGlassBorder, CircleShape)
             ) {
                 Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentIndigo)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        androidx.compose.material3.TabRow(
+            selectedTabIndex = selectedSource,
+            containerColor = Color.Transparent,
+            indicator = { tabPositions ->
+                androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
+                    color = AccentIndigo
+                )
+            }
+        ) {
+            listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
+                androidx.compose.material3.Tab(
+                    selected = selectedSource == index,
+                    onClick = { selectedSource = index },
+                    text = {
+                        Text(
+                            text = title,
+                            fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
+                        )
+                    },
+                    selectedContentColor = AccentIndigo,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 

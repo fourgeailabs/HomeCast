@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -121,6 +122,7 @@ fun DiscoveryScreen(
     val recommendations by viewModel.recommendations.collectAsState()
     val isLoading by viewModel.isDiscoveryLoading.collectAsState()
     val error by viewModel.discoveryError.collectAsState()
+    val geminiCategoryItems by viewModel.geminiCategoryItems.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
     val allBooks by viewModel.allBooks.collectAsState()
     val allMusic by viewModel.allMusic.collectAsState()
@@ -134,6 +136,22 @@ fun DiscoveryScreen(
     var bookmarkMessage by remember { mutableStateOf<String?>(null) }
 
     // Select dynamic content from real servers
+    val dynamicEBooks = viewModel.allEBooks.collectAsState().value.map { book ->
+        DiscoveryItem(
+            id = "disc_bk_${book.id}",
+            title = book.title,
+            creator = book.author,
+            mediaType = DiscoveryMediaType.BOOK,
+            genre = book.genre,
+            coverUrl = book.coverUrl.ifEmpty { "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&q=80" },
+            description = book.description.ifEmpty { "From your connected Booklore server" },
+            tag = "📚 E-Book",
+            durationOrPages = "${book.totalPages} Pages",
+            format = "EPUB",
+            gradient = listOf(Color(0xFF311B92), Color(0xFF7C4DFF))
+        )
+    }.take(10)
+
     val dynamicAudiobooks = allBooks.map { book ->
         DiscoveryItem(
             id = "disc_ab_${book.id}",
@@ -250,11 +268,21 @@ fun DiscoveryScreen(
         )
     }
 
-    val trendingAudiobooks = if (selectedSource == DiscoverySourceTab.PERSONAL) dynamicAudiobooks else publicDomainAudio
-    val sciFiSagas = publicDomainBooks
-    val featuredAlbums = if (selectedSource == DiscoverySourceTab.PERSONAL) dynamicMusic else publicDomainMusic
-    val acousticChillMusic = publicDomainMusic
-    val bestsellingEBooks = publicDomainBooks
+    var activeCategory by remember { mutableStateOf<String?>(null) }
+    
+    val allDiscoverableItems = remember(dynamicAudiobooks, dynamicEBooks, dynamicMusic, publicDomainAudio, publicDomainBooks, publicDomainMusic) {
+        dynamicAudiobooks + dynamicEBooks + dynamicMusic + publicDomainAudio + publicDomainBooks + publicDomainMusic
+    }
+
+    val inventorySummary = remember(allDiscoverableItems) {
+        allDiscoverableItems.take(50).joinToString("; ") { "${it.title} by ${it.creator} (${it.mediaType})" }
+    }
+
+
+    val categoryNew = remember(allDiscoverableItems) { allDiscoverableItems.shuffled().take(12) }
+    val categoryNoteworthy = remember(allDiscoverableItems) { allDiscoverableItems.shuffled().take(12) }
+    val categoryPopular = remember(allDiscoverableItems) { allDiscoverableItems.shuffled().take(12) }
+    val categorySagas = remember(allDiscoverableItems) { allDiscoverableItems.filter { it.genre.contains("Sci-Fi") || it.genre.contains("Comics") || it.genre.contains("Classic") }.take(12) }
 
     // Initial load on first render if recommendations are empty
     LaunchedEffect(Unit) {
@@ -263,6 +291,163 @@ fun DiscoveryScreen(
                 "Recommend top trending audiobooks, standout music albums, and popular e-books for readers and listeners"
             )
         }
+    }
+
+    if (activeCategory != null) {
+        val itemsToShow = geminiCategoryItems
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { activeCategory = null }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = activeCategory ?: "Category",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                contentPadding = PaddingValues(bottom = 90.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (isLoading) {
+                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = AccentTeal)
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text("Gemini AI is curating this category...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+                items(itemsToShow, key = { it.id }) { item ->
+                    DiscoveryMediaCard(
+                        item = item,
+                        isPlaying = playbackState.currentAudiobook?.title?.equals(item.title, ignoreCase = true) == true && playbackState.isPlaying,
+                        onPrimaryClick = {
+                            val localBook = allBooks.firstOrNull { it.title.equals(item.title, ignoreCase = true) }
+                            val localTrack = allMusic.firstOrNull { it.title.equals(item.title, ignoreCase = true) }
+                            if (localBook != null) {
+                                viewModel.playAudiobook(localBook)
+                                onMediaSelected()
+                            } else if (localTrack != null) {
+                                viewModel.playMusicTrack(localTrack)
+                                onMediaSelected()
+                            } else if (item.mediaType == DiscoveryMediaType.BOOK) {
+                                selectedBookForReading = item
+                            } else {
+                                val demoBook = Audiobook(
+                                    id = item.id,
+                                    title = item.title,
+                                    author = item.creator,
+                                    coverUrl = item.coverUrl,
+                                    duration = 36000L,
+                                    serverId = "discovery_demo",
+                                    streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
+                                    narrator = "Discovery Narrator",
+                                    seriesName = item.genre
+                                )
+                                viewModel.playAudiobook(demoBook)
+                                onMediaSelected()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        
+        // E-reader overlay needs to be placed at the top level
+        if (selectedBookForReading != null) {
+            val book = selectedBookForReading!!
+            var isViewingAsComic by remember {
+                mutableStateOf(
+                    book.genre.contains("Comic", ignoreCase = true) ||
+                    book.genre.contains("Cyberpunk", ignoreCase = true) ||
+                    book.genre.contains("Tech", ignoreCase = true)
+                )
+            }
+
+            val eBookData = remember(book) {
+                val generatedChapters = (1..20).map { chapterNum ->
+                    BookChapter(
+                        title = "Chapter $chapterNum",
+                        startPage = chapterNum * 5,
+                        paragraphs = listOf(
+                            book.excerpt.ifBlank { "The sun hung low over the horizon, casting long, stylized shadows across the metallic landscape." },
+                            "This is a substantially longer representation of a book chapter. In a fully connected Booklore environment, this content would be streamed directly from your server.",
+                            "As the protagonist navigated the labyrinthine streets, the neon signs buzzed with a low electric hum. The air tasted of ozone and rain.",
+                            "Far above, transport ships painted streaks of fire against the bruised purple sky. They were leaving the atmosphere, bound for colonies on Mars and beyond.",
+                            "Every step felt heavier than the last, weighed down not just by gravity, but by the burden of secrets carried in the cybernetic drive implanted at the base of the skull.",
+                            "To be continued in the next sequence...",
+                            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+                            "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+                        )
+                    )
+                }
+                EBookData(
+                    id = book.id,
+                    title = book.title,
+                    author = book.creator,
+                    totalChapters = generatedChapters.size,
+                    chapters = generatedChapters
+                )
+            }
+
+            val sampleComic = remember(book) {
+                ComicData(
+                    id = "comic_${book.id}",
+                    title = book.title,
+                    series = if (book.genre.contains("Cyberpunk", ignoreCase = true)) "Cyberpunk: Neon Horizon" else "Chronicles of the Cosmos",
+                    issueNumber = "01",
+                    writer = book.creator,
+                    artist = "Master Illustrator",
+                    coverUrl = book.coverUrl,
+                    pages = listOf(
+                        ComicPage(
+                            pageNumber = 1,
+                            pageTitle = "Prologue: High Orbit",
+                            frames = listOf(
+                                ComicFrame(
+                                    id = "f1",
+                                    frameNumber = 1,
+                                    title = "Approach Vector",
+                                    speaker = "Commander Vex",
+                                    dialogue = "All telemetry streams are synchronized. Home server link established.",
+                                    sfx = "HUMMMM...",
+                                    gradientColors = listOf(Color(0xFF0F172A), Color(0xFF1E1B4B))
+                                )
+                            )
+                        )
+                    )
+                )
+            }
+
+            if (isViewingAsComic) {
+                ComicReaderScreen(
+                    comic = sampleComic,
+                    onClose = { selectedBookForReading = null },
+                    onSwitchToNovel = { isViewingAsComic = false }
+                )
+            } else {
+                EReaderScreen(
+                    eBook = eBookData,
+                    onClose = { selectedBookForReading = null },
+                    onSwitchToComic = { isViewingAsComic = true }
+                )
+            }
+        }
+        return
     }
 
     LazyColumn(
@@ -281,13 +466,13 @@ fun DiscoveryScreen(
             ) {
                 Column {
                     Text(
-                        "AI Discovery Hub",
+                        "Discover",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.5).sp
                     )
                     Text(
-                        "Audiobooks, Music & E-Books curated with Gemini AI",
+                        "Curated categories & Gemini AI insights",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -355,103 +540,57 @@ fun DiscoveryScreen(
             )
         }
 
-        // 2. Source Selection (Personal vs Public Domain)
+        // Large Visual Category Clickables
         item {
-            TabRow(
-                selectedTabIndex = selectedSource.ordinal,
-                containerColor = Color.Transparent,
-                indicator = { tabPositions ->
-                    if (selectedSource.ordinal < tabPositions.size) {
-                        TabRowDefaults.Indicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedSource.ordinal]),
-                            color = AccentTeal
-                        )
-                    }
-                },
-                divider = { Divider(color = SurfaceGlassBorder) }
-            ) {
-                Tab(
-                    selected = selectedSource == DiscoverySourceTab.PERSONAL,
-                    onClick = { selectedSource = DiscoverySourceTab.PERSONAL },
-                    text = { Text("Personal Collection", fontWeight = FontWeight.SemiBold) },
-                    selectedContentColor = AccentTeal,
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Tab(
-                    selected = selectedSource == DiscoverySourceTab.PUBLIC_DOMAIN,
-                    onClick = { selectedSource = DiscoverySourceTab.PUBLIC_DOMAIN },
-                    text = { Text("Public Domain Library", fontWeight = FontWeight.SemiBold) },
-                    selectedContentColor = AccentTeal,
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // 3. Category Filter Chips: All, Audiobooks, Music, Books (E-Reader), Regional
-        item {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
-            ) {
-                items(DiscoveryCategoryTab.values()) { tab ->
-                    val isSelected = selectedTab == tab
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            selectedTab = tab
-                            when (tab) {
-                                DiscoveryCategoryTab.ALL -> {
-                                    viewModel.fetchDiscoveryRecommendations("Recommend exceptional audiobooks, music albums, and books", location)
-                                }
-                                DiscoveryCategoryTab.AUDIOBOOKS -> {
-                                    viewModel.fetchDiscoveryRecommendations("Recommend top trending audiobooks with great narrators", location, "audiobooks")
-                                }
-                                DiscoveryCategoryTab.MUSIC -> {
-                                    viewModel.fetchDiscoveryRecommendations("Recommend standout music albums across various genres", location, "music")
-                                }
-                                DiscoveryCategoryTab.BOOKS -> {
-                                    viewModel.fetchDiscoveryRecommendations("Recommend captivating e-books, novels, and literature for readers", location, "books")
-                                }
-                                DiscoveryCategoryTab.REGIONAL -> {
-                                    if (!hasLocationPermission) {
-                                        launcher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                                    } else {
-                                        viewModel.fetchDiscoveryRecommendations("Recommend audiobooks, music albums, and books inspired by regional culture and geography", location)
-                                    }
-                                }
-                            }
-                        },
-                        label = {
-                            Text(
-                                when (tab) {
-                                    DiscoveryCategoryTab.ALL -> "All Media"
-                                    DiscoveryCategoryTab.AUDIOBOOKS -> "Audiobooks"
-                                    DiscoveryCategoryTab.MUSIC -> "Music"
-                                    DiscoveryCategoryTab.BOOKS -> "Books (E-Reader)"
-                                    DiscoveryCategoryTab.REGIONAL -> "Nearby Culture"
-                                },
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                when (tab) {
-                                    DiscoveryCategoryTab.ALL -> Icons.Default.TravelExplore
-                                    DiscoveryCategoryTab.AUDIOBOOKS -> Icons.Default.Headphones
-                                    DiscoveryCategoryTab.MUSIC -> Icons.Default.MusicNote
-                                    DiscoveryCategoryTab.BOOKS -> Icons.Default.AutoStories
-                                    DiscoveryCategoryTab.REGIONAL -> Icons.Default.LocationOn
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
-                            selectedLabelColor = AccentTeal,
-                            selectedLeadingIconColor = AccentTeal
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CategoryCard(
+                        title = "New Releases",
+                        icon = Icons.Default.NewReleases,
+                        color = AccentTeal,
+                        modifier = Modifier.weight(1f).aspectRatio(1.2f),
+                        onClick = { 
+                            activeCategory = "New Releases"
+                            viewModel.fetchGeminiCategoryItems("New Releases", inventorySummary)
+                        }
+                    )
+                    CategoryCard(
+                        title = "Noteworthy",
+                        icon = Icons.Default.Star,
+                        color = Color(0xFFFFB300),
+                        modifier = Modifier.weight(1f).aspectRatio(1.2f),
+                        onClick = { 
+                            activeCategory = "Noteworthy"
+                            viewModel.fetchGeminiCategoryItems("Noteworthy", inventorySummary)
+                        }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CategoryCard(
+                        title = "Popular",
+                        icon = Icons.Default.TrendingUp,
+                        color = AccentIndigo,
+                        modifier = Modifier.weight(1f).aspectRatio(1.2f),
+                        onClick = { 
+                            activeCategory = "Popular"
+                            viewModel.fetchGeminiCategoryItems("Popular", inventorySummary)
+                        }
+                    )
+                    CategoryCard(
+                        title = "Sagas & Epics",
+                        icon = Icons.Default.AutoStories,
+                        color = Color(0xFFE91E63),
+                        modifier = Modifier.weight(1f).aspectRatio(1.2f),
+                        onClick = { 
+                            activeCategory = "Sagas & Epics"
+                            viewModel.fetchGeminiCategoryItems("Sagas & Epics", inventorySummary)
+                        }
                     )
                 }
             }
@@ -564,264 +703,8 @@ fun DiscoveryScreen(
             }
         }
 
-        // 4. VERTICAL SHELF SECTIONS (Audiobooks, Music, Books)
-
-        // --- AUDIOBOOKS SHELVES ---
-        if (selectedTab == DiscoveryCategoryTab.ALL || selectedTab == DiscoveryCategoryTab.AUDIOBOOKS) {
-            // Shelf: Trending Audiobooks
-            item {
-                ShelfHeader(
-                    title = "Trending Audiobooks",
-                    subtitle = "Slide sideways for top-rated narratives & epics",
-                    badge = "AUDIOBOOK",
-                    icon = Icons.Default.Headphones,
-                    iconTint = AccentTeal
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(trendingAudiobooks, key = { it.id }) { item ->
-                        DiscoveryMediaCard(
-                            item = item,
-                            isPlaying = playbackState.currentAudiobook?.title?.equals(item.title, ignoreCase = true) == true && playbackState.isPlaying,
-                            onPrimaryClick = {
-                                val local = allBooks.firstOrNull { it.title.equals(item.title, ignoreCase = true) }
-                                if (local != null) {
-                                    viewModel.playAudiobook(local)
-                                } else {
-                                    val demoBook = Audiobook(
-                                        id = item.id,
-                                        title = item.title,
-                                        author = item.creator,
-                                        coverUrl = item.coverUrl,
-                                        duration = 36000L,
-                                        serverId = "discovery_demo",
-                                        streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
-                                        narrator = "Discovery Narrator",
-                                        seriesName = item.genre
-                                    )
-                                    viewModel.playAudiobook(demoBook)
-                                }
-                                onMediaSelected()
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Shelf: Sci-Fi & Speculative Sagas
-            item {
-                ShelfHeader(
-                    title = "Sci-Fi & Cyberpunk Sagas",
-                    subtitle = "Deep universes, distant galaxies & tech futures",
-                    icon = Icons.Default.RocketLaunch,
-                    iconTint = Color(0xFF80D8FF)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(sciFiSagas, key = { it.id }) { item ->
-                        DiscoveryMediaCard(
-                            item = item,
-                            isPlaying = playbackState.currentAudiobook?.title?.equals(item.title, ignoreCase = true) == true && playbackState.isPlaying,
-                            onPrimaryClick = {
-                                val demoBook = Audiobook(
-                                    id = item.id,
-                                    title = item.title,
-                                    author = item.creator,
-                                    coverUrl = item.coverUrl,
-                                    duration = 38000L,
-                                    serverId = "discovery_demo",
-                                    streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
-                                    narrator = "Full Cast Audio",
-                                    seriesName = item.genre
-                                )
-                                viewModel.playAudiobook(demoBook)
-                                onMediaSelected()
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // --- MUSIC SHELVES ---
-        if (selectedTab == DiscoveryCategoryTab.ALL || selectedTab == DiscoveryCategoryTab.MUSIC) {
-            // Shelf: Featured Music Albums
-            item {
-                ShelfHeader(
-                    title = "Featured Music Albums",
-                    subtitle = "Slide sideways to discover iconic soundscapes",
-                    badge = "MUSIC",
-                    icon = Icons.Default.Album,
-                    iconTint = AccentIndigo
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(featuredAlbums, key = { it.id }) { item ->
-                        DiscoveryMediaCard(
-                            item = item,
-                            isPlaying = playbackState.currentMusicTrack?.album?.equals(item.title, ignoreCase = true) == true && playbackState.isPlaying,
-                            onPrimaryClick = {
-                                val local = allMusic.firstOrNull { it.album.equals(item.title, ignoreCase = true) }
-                                if (local != null) {
-                                    viewModel.playMusicTrack(local)
-                                } else {
-                                    val demoTrack = MusicTrack(
-                                        id = item.id,
-                                        title = item.title,
-                                        artist = item.creator,
-                                        album = item.title,
-                                        coverUrl = item.coverUrl,
-                                        duration = 240000L,
-                                        serverId = "discovery_music",
-                                        streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3",
-                                        genre = item.genre,
-                                        trackNumber = 1
-                                    )
-                                    viewModel.playMusicTrack(demoTrack)
-                                }
-                                onMediaSelected()
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Shelf: Acoustic & Lo-Fi Chill
-            item {
-                ShelfHeader(
-                    title = "Acoustic & Lo-Fi Chill",
-                    subtitle = "Mellow frequencies for relaxing, reading, and deep focus",
-                    icon = Icons.Default.Spa,
-                    iconTint = Color(0xFF4DB6AC)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(acousticChillMusic, key = { it.id }) { item ->
-                        DiscoveryMediaCard(
-                            item = item,
-                            isPlaying = playbackState.currentMusicTrack?.title?.equals(item.title, ignoreCase = true) == true && playbackState.isPlaying,
-                            onPrimaryClick = {
-                                val demoTrack = MusicTrack(
-                                    id = item.id,
-                                    title = item.title,
-                                    artist = item.creator,
-                                    album = "Acoustic & Chill Discovery",
-                                    coverUrl = item.coverUrl,
-                                    duration = 190000L,
-                                    serverId = "discovery_music",
-                                    streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3",
-                                    genre = item.genre,
-                                    trackNumber = 1
-                                )
-                                viewModel.playMusicTrack(demoTrack)
-                                onMediaSelected()
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // --- BOOKS (E-READER READY) SHELVES ---
-        if (selectedTab == DiscoveryCategoryTab.ALL || selectedTab == DiscoveryCategoryTab.BOOKS) {
-            // Shelf: Bestselling E-Books & Novels
-            item {
-                ShelfHeader(
-                    title = "Bestselling E-Books",
-                    subtitle = "Tap any book to open the E-Reader preview & chapter excerpt",
-                    badge = "E-READER",
-                    icon = Icons.Default.AutoStories,
-                    iconTint = Color(0xFFFFB300)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(bestsellingEBooks, key = { it.id }) { bookItem ->
-                        DiscoveryMediaCard(
-                            item = bookItem,
-                            isBook = true,
-                            onPrimaryClick = {
-                                selectedBookForReading = bookItem
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Shelf: E-Reader Showcase & Literature
-            item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedBookForReading = bestsellingEBooks.first() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Brush.linearGradient(listOf(AccentIndigo, AccentTeal))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-                        }
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("E-Reader Aspect Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    color = Color(0xFFFFB300).copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(
-                                        "EPUB / PDF",
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFFFB300)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Preview typography, customizable reading canvas, and excerpts ahead of full reader sync.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = AccentTeal)
-                    }
-                }
-            }
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(32.dp))
-        }
     }
+
 
     // -------------------------------------------------------------------------
     // KINDLE E-READER & COMIC FRAME-BY-FRAME VIEWER
@@ -837,40 +720,28 @@ fun DiscoveryScreen(
         }
 
         val eBookData = remember(book) {
+            val generatedChapters = (1..20).map { chapterNum ->
+                BookChapter(
+                    title = "Chapter $chapterNum",
+                    startPage = chapterNum * 5,
+                    paragraphs = listOf(
+                        book.excerpt.ifBlank { "The sun hung low over the horizon, casting long, stylized shadows across the metallic landscape." },
+                        "This is a substantially longer representation of a book chapter. In a fully connected Booklore environment, this content would be streamed directly from your server.",
+                        "As the protagonist navigated the labyrinthine streets, the neon signs buzzed with a low electric hum. The air tasted of ozone and rain.",
+                        "Far above, transport ships painted streaks of fire against the bruised purple sky. They were leaving the atmosphere, bound for colonies on Mars and beyond.",
+                        "Every step felt heavier than the last, weighed down not just by gravity, but by the burden of secrets carried in the cybernetic drive implanted at the base of the skull.",
+                        "To be continued in the next sequence...",
+                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+                        "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+                    )
+                )
+            }
             EBookData(
                 id = book.id,
                 title = book.title,
                 author = book.creator,
-                totalChapters = 4,
-                chapters = listOf(
-                    BookChapter(
-                        title = "Chapter 1: The Beginning",
-                        startPage = 1,
-                        paragraphs = listOf(
-                            book.excerpt.ifBlank { "It was a bright cold day in April, and the clocks were striking thirteen. The air smelled of vintage paper and quiet serenity." },
-                            "Every passage was rendered with crystalline clarity upon the display. The gentle curve of the pages responded to each gesture, turning with fluid grace.",
-                            "In that quiet sanctuary, the reader flicked a thumb against the right edge of the screen, advancing effortlessly into the next scene.",
-                            "With personalized typography, custom margins, and warm sepia tones, the digital words felt as intimate as a bound heirloom volume."
-                        )
-                    ),
-                    BookChapter(
-                        title = "Chapter 2: The Archive",
-                        startPage = 2,
-                        paragraphs = listOf(
-                            "The library had stood for ages, guarding stories from every era.",
-                            "Audiobooks, music albums, and literature rested in complete harmony within the home server vault, accessible anywhere without restriction.",
-                            "As darkness fell, the true black OLED canvas offered deep contrast and comfort for long nocturnal reading sessions."
-                        )
-                    ),
-                    BookChapter(
-                        title = "Chapter 3: Odyssey",
-                        startPage = 3,
-                        paragraphs = listOf(
-                            "Every story is an expedition across stars and minds.",
-                            "With interactive bookmarks, reading speed estimates, and chapter navigation, the entire catalog came alive at the touch of a finger."
-                        )
-                    )
-                )
+                totalChapters = generatedChapters.size,
+                chapters = generatedChapters
             )
         }
 
@@ -1169,6 +1040,39 @@ fun AiRecommendationShelfCard(
                 Spacer(modifier = Modifier.width(4.dp))
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(14.dp))
             }
+        }
+    }
+}
+
+@Composable
+fun CategoryCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.15f)),
+        modifier = modifier.clickable { onClick() }
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = color,
+                modifier = Modifier.size(36.dp)
+            )
+            Text(
+                text = title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

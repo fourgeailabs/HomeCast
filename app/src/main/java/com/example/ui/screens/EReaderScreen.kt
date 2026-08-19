@@ -308,11 +308,28 @@ fun EReaderScreen(
                     .fillMaxSize()
                     .padding(horizontal = marginPaddingDp.dp, vertical = 32.dp)
                     .graphicsLayer {
-                        // Dynamic Realistic Page Curl 3D tilt
                         if (pageTurnAnim.value > 0f) {
-                            rotationY = if (isTurningForward) -pageTurnAnim.value * 28f else (1f - pageTurnAnim.value) * 28f
-                            cameraDistance = 12f * density
-                            alpha = 1f - (abs(pageTurnAnim.value - 0.5f) * 0.15f)
+                            val progress = pageTurnAnim.value
+                            // Set pivot to the spine (left edge)
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                            
+                            if (isTurningForward) {
+                                // Peel from right to left
+                                rotationY = -progress * 90f // fold over to the left
+                                translationX = -progress * 100f
+                                scaleX = 1f - (progress * 0.1f)
+                                scaleY = 1f + (Math.sin(progress.toDouble() * Math.PI).toFloat() * 0.05f) // bend vertically
+                                alpha = 1f - progress
+                            } else {
+                                // Bring from left to right
+                                val invProgress = 1f - progress
+                                rotationY = -invProgress * 90f
+                                translationX = -invProgress * 100f
+                                scaleX = 1f - (invProgress * 0.1f)
+                                scaleY = 1f + (Math.sin(invProgress.toDouble() * Math.PI).toFloat() * 0.05f)
+                                alpha = progress
+                            }
+                            cameraDistance = 16f * density
                         }
                     }
             ) {

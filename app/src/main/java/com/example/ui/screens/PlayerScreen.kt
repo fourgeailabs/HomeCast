@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -186,21 +187,55 @@ fun PlayerScreen(
                     }
                 )
             }
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        dominantColor.copy(alpha = 0.45f),
-                        vibrantColor.copy(alpha = 0.25f),
-                        Color.Transparent,
-                        Color.Transparent
-                    )
-                )
-            )
-            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        // Frosted Glass Blurred Cover Background
+        if (coverUrl.isNotBlank()) {
+            coil.compose.AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(coverUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(80.dp, edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded)
+            )
+            // Dark glass overlay to ensure text is readable
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                dominantColor.copy(alpha = 0.6f),
+                                Color(0xFF0F172A).copy(alpha = 0.85f),
+                                Color(0xFF020617).copy(alpha = 0.95f)
+                            )
+                        )
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                dominantColor.copy(alpha = 0.45f),
+                                vibrantColor.copy(alpha = 0.25f),
+                                Color.Transparent,
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
