@@ -1,0 +1,48 @@
+import re
+
+file_path = "app/src/main/java/com/example/data/network/BookloreClient.kt"
+with open(file_path, "r") as f:
+    text = f.read()
+
+start_idx = text.find("    suspend fun login(")
+end_idx = text.find("    suspend fun fetchBooks(")
+
+replacement = """    suspend fun login(hostUrl: String, username: String, password: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val normalizedUrl = hostUrl.trimEnd('/')
+            val url = "$normalizedUrl/api/v1/auth/login"
+            
+            val jsonBody = "{\\"username\\":\\"$username\\", \\"password\\":\\"$password\\"}"
+            val requestBody = okhttp3.RequestBody.create(okhttp3.MediaType.parse("application/json"), jsonBody)
+            
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+                
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val bodyString = response.body?.string()
+                if (bodyString != null) {
+                    val tokenKey = "\\"accessToken\\":\\""
+                    val idx = bodyString.indexOf(tokenKey)
+                    if (idx != -1) {
+                        val start = idx + tokenKey.length
+                        val end = bodyString.indexOf("\\"", start)
+                        if (end != -1) {
+                            return@withContext Result.success(bodyString.substring(start, end))
+                        }
+                    }
+                }
+            }
+            return@withContext Result.failure(Exception("HTTP ${response.code}: Login failed"))
+        } catch (e: Exception) {
+            return@withContext Result.failure(e)
+        }
+    }
+"""
+
+text = text[:start_idx] + replacement + text[end_idx:]
+
+with open(file_path, "w") as f:
+    f.write(text)

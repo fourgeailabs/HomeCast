@@ -492,20 +492,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
             try {
-                // For Booklore OPDS/personal server, save config and sync immediately
-                val serverId = "booklore_${System.currentTimeMillis()}"
+                // Fetch JWT from Booklore login endpoint
+                val loginResult = com.example.data.network.BookloreClient.login(hostUrl, username, password)
+                if (loginResult.isFailure) {
+                    _serverOpState.value = ServerOperationState.Error("Login failed: ${loginResult.exceptionOrNull()?.message}")
+                    return@launch
+                }
+                val token = loginResult.getOrNull() ?: ""
                 
-                // Let's assume for Booklore OPDS, token/apiKey is derived or just basic auth username:password.
-                // We'll store basic auth in the apiKey field if that's what BookloreClient uses.
-                // Actually BookloreClient uses Bearer token, but let's pass a basic auth token or simply fetch it directly.
-                val authString = okhttp3.Credentials.basic(username, password)
+                val serverId = "booklore_${System.currentTimeMillis()}"
                 
                 val server = ServerConfig(
                     id = serverId,
                     type = "booklore",
                     name = name,
                     hostUrl = hostUrl,
-                    apiKey = authString, // BookloreClient will send this
+                    apiKey = token, // Store the JWT token
                     username = username,
                     password = password,
                     isConnected = true,
