@@ -73,6 +73,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPollingPin = MutableStateFlow(false)
     val isPollingPin = _isPollingPin.asStateFlow()
 
+    // Plex Account Server Discovery State
+    private val _discoveredPlexServers = MutableStateFlow<List<DiscoveredPlexServer>>(emptyList())
+    val discoveredPlexServers = _discoveredPlexServers.asStateFlow()
+
+    private val _isDiscoveringPlexServers = MutableStateFlow(false)
+    val isDiscoveringPlexServers = _isDiscoveringPlexServers.asStateFlow()
+
+    private val _showServerPicker = MutableStateFlow(false)
+    val showServerPicker = _showServerPicker.asStateFlow()
+
     private var pinPollJob: kotlinx.coroutines.Job? = null
 
     fun diagnoseAudiobookshelf(baseUrl: String, username: String = "", password: String = "", token: String = "") {
@@ -172,7 +182,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _plexAuthToken.value = token
                             _plexPinCode.value = null
                             _plexPinId.value = null
-                            _serverOpState.value = ServerOperationState.Success("Plex account linked successfully!")
+                            _serverOpState.value = ServerOperationState.Success("Plex account linked! Discovering your servers...")
+                            discoverAndAutoConnectPlex(token)
                             break
                         }
                     }
@@ -198,7 +209,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _plexPinId.value = null
                         _plexAuthToken.value = token
                         onTokenReceived(token)
-                        _serverOpState.value = ServerOperationState.Success("Plex account linked successfully!")
+                        _serverOpState.value = ServerOperationState.Success("Plex account linked! Discovering your servers...")
+                        discoverAndAutoConnectPlex(token)
                     } else {
                         _serverOpState.value = ServerOperationState.Error("PIN not claimed yet on plex.tv/link. Please verify in your browser.")
                     }
@@ -211,6 +223,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _isPollingPin.value = false
             }
         }
+    }
+
+    /**
+     * Auto-discovers and connects to Plex servers associated with the online Plex account.
+     * Zero manual IP/port or token configuration needed!
+     */
+    fun discoverAndAutoConnectPlex(authToken: String) {
+        viewModelScope.launch {
+            _isDiscoveringPlexServers.value = true
+            _serverOpState.value = ServerOperationState.Loading
+            try {
+                val result = PlexClient.fetchAccountServers(authToken)
+                if (result.isSuccess) {
+                    val servers = result.getOrNull() ?: emptyList()
+                    if (servers.isEmpty()) {
+                        _serverOpState.value = ServerOperationState.Error(
+                            "Signed into Plex account, but no Plex Media Servers were found on this account."
+                        )
+                    } else if (servers.size == 1) {
+                        val server = servers.first()
+                        _serverOpState.value = ServerOperationState.Success("Found '${server.name}'! Auto-connecting...")
+                        saveAndConnectPlexDirect(
+                            name = server.name,
+                            hostUrl = server.preferredUri,
+                            token = server.token
+                        )
+                    } else {
+                        _discoveredPlexServers.value = servers
+                        _showServerPicker.value = true
+                        _serverOpState.value = ServerOperationState.Success("Plex account linked! ${servers.size} servers discovered.")
+                    }
+                } else {
+                    _serverOpState.value = ServerOperationState.Error(
+                        "Plex server discovery error: ${result.exceptionOrNull()?.message}"
+                    )
+                }
+            } catch (e: Exception) {
+                _serverOpState.value = ServerOperationState.Error("Discovery error: ${e.message}")
+            } finally {
+                _isDiscoveringPlexServers.value = false
+            }
+        }
+    }
+
+    fun connectDiscoveredPlexServer(server: DiscoveredPlexServer) {
+        _showServerPicker.value = false
+        saveAndConnectPlexDirect(
+            name = server.name,
+            hostUrl = server.preferredUri,
+            token = server.token
+        )
+    }
+
+    fun dismissServerPicker() {
+        _showServerPicker.value = false
     }
 
     fun dismissPlexPin() {

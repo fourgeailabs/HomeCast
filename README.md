@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v1.9-brightgreen?style=flat-square" alt="Version 1.9" />
+  <img src="https://img.shields.io/badge/Release-v2.0-brightgreen?style=flat-square" alt="Version 2.0" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -19,11 +19,15 @@
 
 ---
 
-### 🚀 What's New in v1.9
-- **🔑 True 4-Character Plex Link Code**:
-  - Configured `strong=false` on Plex API to generate standard 4-character linking codes formatted specifically for `plex.tv/link`.
-  - Upgraded Link UI with individual digit/character tile displays, 1-tap "Copy Code", and automated browser link generation (`https://plex.tv/link?code=...`).
-  - **Zero-Touch Background Token Claiming**: HomeCast now automatically polls and claims the auth token in real-time as soon as the PIN is approved on `plex.tv/link` in your browser, automatically filling the token and dismissing the dialog.
+### 🚀 What's New in v2.0
+- **☁️ Zero-Config Plex Account Login & Automatic Server Discovery**:
+  - **No IP Address, Port, or Manual Token Required**: Users simply tap "Sign In with Plex Account" and approve the 4-character code on their browser.
+  - **Plex Online Account Resources API Integration**: HomeCast queries `https://plex.tv/api/v2/resources` directly to discover all Plex Media Servers attached to your account.
+  - **Smart Fast Probing**: Probes and selects the fastest connection candidate automatically (prioritizes local LAN IP, secure plex.direct HTTPS certificates, and remote fallbacks).
+  - **Auto-Connect or Multi-Server Picker**: Automatically connects if 1 server is found, or displays a server picker if you own or share multiple Plex servers.
+  - **Collapsible Power-User Setup**: Kept manual IP/token inputs tucked away under a collapsible accordion for advanced/custom proxy configurations.
+- **🔑 True 4-Character Plex Link Code (v1.9 Integration)**:
+  - 4-character formatting, single-digit box tiles, 1-tap clipboard copy, and real-time background token detection.
 - **🎵 Bulletproof Plex Connection & HTTP 401 Resolution (v1.8 Integration)**:
   - Official Plex PIN sign-in, full standard client header negotiation, URL & port auto-sanitization, permissive SSL fallback, and comprehensive connection diagnostics.
 - **🛡️ Bulletproof Audiobookshelf Connection & Diagnostics (v1.7 Integration)**:

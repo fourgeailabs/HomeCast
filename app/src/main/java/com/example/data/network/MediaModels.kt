@@ -100,6 +100,42 @@ data class PlexPinResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class PlexDevice(
+    val name: String? = null,
+    val product: String? = null,
+    val productVersion: String? = null,
+    val platform: String? = null,
+    val device: String? = null,
+    val clientIdentifier: String? = null,
+    val provides: String? = null, // e.g. "server"
+    val owned: Boolean? = null,
+    val accessToken: String? = null,
+    val connections: List<PlexConnection>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PlexConnection(
+    val protocol: String? = null,
+    val address: String? = null,
+    val port: Int? = null,
+    val uri: String? = null,
+    val local: Boolean? = null,
+    val relay: Boolean? = null,
+    val IPv6: Boolean? = null
+)
+
+data class DiscoveredPlexServer(
+    val name: String,
+    val clientIdentifier: String,
+    val token: String,
+    val preferredUri: String,
+    val isLocal: Boolean,
+    val allConnections: List<PlexConnection> = emptyList(),
+    val owned: Boolean = true,
+    val isReachable: Boolean = true
+)
+
+@JsonClass(generateAdapter = true)
 data class PlexSectionsResponse(
     @Json(name = "MediaContainer") val mediaContainer: PlexMediaContainer? = null
 )

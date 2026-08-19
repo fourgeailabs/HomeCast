@@ -3,6 +3,7 @@ package com.example.data.network
 import android.util.Log
 import com.example.data.MusicTrack
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -170,6 +171,115 @@ object PlexClient {
             Result.success(pin?.authToken)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetches all Plex Media Servers linked to the user's Plex account via plex.tv/api/v2/resources.
+     * Probes and resolves the best reachable connection (local LAN IP, secure plex.direct, or remote)
+     * so the user NEVER has to manually enter an IP address or port!
+     */
+    suspend fun fetchAccountServers(authToken: String): Result<List<DiscoveredPlexServer>> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1")
+            .get()
+            .apply { buildStandardHeaders(this, authToken) }
+            .build()
+
+        try {
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("Failed to fetch Plex servers: HTTP ${response.code}"))
+            }
+
+            val listType = Types.newParameterizedType(List::class.java, PlexDevice::class.java)
+            val adapter = moshi.adapter<List<PlexDevice>>(listType)
+            val devices = adapter.fromJson(body) ?: emptyList()
+
+            // Filter for media servers
+            val servers = devices.filter { it.provides?.contains("server", ignoreCase = true) == true }
+            if (servers.isEmpty()) {
+                return@withContext Result.success(emptyList())
+            }
+
+            val discoveredList = mutableListOf<DiscoveredPlexServer>()
+
+            for (server in servers) {
+                val serverName = server.name ?: "Plex Server"
+                val serverToken = if (!server.accessToken.isNullOrBlank()) server.accessToken else authToken
+                val connections = server.connections ?: emptyList()
+
+                // Sort connections: local LAN first, then HTTPS plex.direct, then remote, then relay
+                val sortedConnections = connections.sortedWith(
+                    compareByDescending<PlexConnection> { it.local == true }
+                        .thenByDescending { it.uri?.startsWith("https://") == true && it.relay != true }
+                        .thenBy { it.relay == true }
+                )
+
+                // Probe candidate connections to find active working URI
+                var activeUri = ""
+                var isLocal = false
+                for (conn in sortedConnections) {
+                    val uri = conn.uri ?: continue
+                    if (testConnectionQuick(uri, serverToken)) {
+                        activeUri = uri
+                        isLocal = conn.local == true
+                        break
+                    }
+                }
+
+                // If fast probing didn't match immediately, fallback to the first candidate URI
+                if (activeUri.isBlank() && sortedConnections.isNotEmpty()) {
+                    val fallback = sortedConnections.first()
+                    activeUri = fallback.uri ?: (if (fallback.protocol != null && fallback.address != null && fallback.port != null) {
+                        "${fallback.protocol}://${fallback.address}:${fallback.port}"
+                    } else "")
+                    isLocal = fallback.local == true
+                }
+
+                if (activeUri.isNotBlank()) {
+                    discoveredList.add(
+                        DiscoveredPlexServer(
+                            name = serverName,
+                            clientIdentifier = server.clientIdentifier ?: serverName,
+                            token = serverToken,
+                            preferredUri = activeUri,
+                            isLocal = isLocal,
+                            allConnections = connections,
+                            owned = server.owned != false,
+                            isReachable = activeUri.isNotBlank()
+                        )
+                    )
+                }
+            }
+
+            Result.success(discoveredList)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching account servers", e)
+            Result.failure(e)
+        }
+    }
+
+    private fun testConnectionQuick(serverUrl: String, token: String): Boolean {
+        val root = normalizeUrl(serverUrl)
+        if (root.isBlank()) return false
+        return try {
+            val req = Request.Builder()
+                .url("$root/identity")
+                .get()
+                .apply { buildStandardHeaders(this, token) }
+                .build()
+            val probeClient = client.newBuilder()
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(3, TimeUnit.SECONDS)
+                .build()
+            val res = probeClient.newCall(req).execute()
+            val code = res.code
+            res.close()
+            code in 200..299 || code == 401
+        } catch (_: Exception) {
+            false
         }
     }
 

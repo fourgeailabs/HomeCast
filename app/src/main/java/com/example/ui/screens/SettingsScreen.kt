@@ -610,7 +610,7 @@ fun PlexConfigCard(
     var serverName by remember { mutableStateOf("My Plex Server") }
     var hostUrl by remember { mutableStateOf("http://192.168.1.100:32400") }
     var plexToken by remember { mutableStateOf("") }
-    var showTokenHelp by remember { mutableStateOf(false) }
+    var showManualSetup by remember { mutableStateOf(false) }
     var connectionMode by remember { mutableStateOf("local") }
 
     val plexDiagnosticResult by viewModel.plexDiagnosticResult.collectAsState()
@@ -619,21 +619,15 @@ fun PlexConfigCard(
     val plexAuthToken by viewModel.plexAuthToken.collectAsState()
     val isRequestingPin by viewModel.isRequestingPin.collectAsState()
     val isPollingPin by viewModel.isPollingPin.collectAsState()
+    val isDiscoveringPlexServers by viewModel.isDiscoveringPlexServers.collectAsState()
+    val discoveredPlexServers by viewModel.discoveredPlexServers.collectAsState()
+    val showServerPicker by viewModel.showServerPicker.collectAsState()
 
     var showDiagnosticDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(plexDiagnosticResult) {
         if (plexDiagnosticResult != null) {
             showDiagnosticDialog = true
-        }
-    }
-
-    LaunchedEffect(plexAuthToken) {
-        val token = plexAuthToken
-        if (!token.isNullOrBlank()) {
-            plexToken = token
-            Toast.makeText(context, "Plex token acquired! You can now Save & Connect.", Toast.LENGTH_LONG).show()
-            viewModel.clearPlexAuthToken()
         }
     }
 
@@ -656,187 +650,313 @@ fun PlexConfigCard(
                         Text("Music & Audio Streaming", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
 
-                IconButton(onClick = { showTokenHelp = !showTokenHelp }) {
-                    Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Primary 1-Tap Cloud Account Sign-In Card
+            Surface(
+                color = AccentIndigo.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AccentIndigo.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CloudSync, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Zero-Config Account Login",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = AccentIndigo
+                        )
+                    }
+
+                    Text(
+                        "Sign in once on your browser. HomeCast automatically discovers your Plex Media Servers and connects directly without needing IP addresses, ports, or manual tokens.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 16.sp
+                    )
+
+                    Button(
+                        onClick = { viewModel.requestPlexPin() },
+                        enabled = !isRequestingPin && !isDiscoveringPlexServers && !isLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isRequestingPin || isDiscoveringPlexServers) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isRequestingPin) "Generating Code..." else "Discovering Servers...", fontSize = 13.sp)
+                        } else {
+                            Icon(Icons.Default.VpnKey, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Sign In with Plex Account", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
 
-            AnimatedVisibility(visible = showTokenHelp) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Why Plex returns HTTP 401 Unauthorized:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentIndigo)
-                        Text(
-                            "1. Missing or Invalid X-Plex-Token: Plex requires an account auth token for all library endpoints.\n" +
-                            "2. Easy Fix -> 'Sign in with Plex PIN': Tap the button below to link your Plex account in 5 seconds without manual tokens.\n" +
-                            "3. Manual Token: Open Plex Web -> Play any track -> Click '...' -> View Info -> View XML -> Copy the token after 'X-Plex-Token=' at the end of the URL.\n" +
-                            "4. Default Port: Local Plex servers run on port :32400 (e.g. http://192.168.1.50:32400).",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 16.sp
-                        )
+            // Discovered Servers Quick List (if available)
+            if (discoveredPlexServers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text("Discovered Servers on Your Account:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (server in discoveredPlexServers) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(server.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            color = if (server.isLocal) AccentTeal.copy(alpha = 0.2f) else AccentIndigo.copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = if (server.isLocal) "Local LAN" else "Remote / Secure",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (server.isLocal) AccentTeal else AccentIndigo,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Button(
+                                    onClick = { viewModel.connectDiscoveredPlexServer(server) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Connect", fontSize = 12.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Quick Connection Mode Selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = connectionMode == "local",
-                    onClick = {
-                        connectionMode = "local"
-                        if (hostUrl.startsWith("https://") || hostUrl.isBlank()) {
-                            hostUrl = "http://192.168.1.100:32400"
-                        }
-                    },
-                    label = { Text("Local LAN (:32400)", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
-                        selectedLabelColor = AccentIndigo
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-
-                FilterChip(
-                    selected = connectionMode == "remote",
-                    onClick = {
-                        connectionMode = "remote"
-                        if (hostUrl.startsWith("http://192.") || hostUrl.startsWith("http://10.")) {
-                            hostUrl = "https://"
-                        }
-                    },
-                    label = { Text("Remote / HTTPS", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
-                        selectedLabelColor = AccentTeal
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Fast 1-Tap Plex PIN Sign-In Banner
-            Surface(
-                color = AccentIndigo.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(10.dp),
+            // Collapsible Manual / Advanced IP & Token Configuration
+            TextButton(
+                onClick = { showManualSetup = !showManualSetup },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Instant Plex Authorization", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentIndigo)
-                        Text("Get valid token via official Plex PIN flow", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Button(
-                        onClick = { viewModel.requestPlexPin() },
-                        enabled = !isRequestingPin,
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        if (isRequestingPin) {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Sign In with PIN", fontSize = 12.sp)
-                        }
-                    }
+                    Text(
+                        "Advanced: Manual IP & Token Setup",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        imageVector = if (showManualSetup) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = serverName,
-                onValueChange = { serverName = it },
-                label = { Text("Display Name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = hostUrl,
-                onValueChange = { hostUrl = it },
-                label = { Text("Plex URL (e.g. http://192.168.1.100:32400)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = plexToken,
-                onValueChange = { plexToken = it },
-                label = { Text("X-Plex-Token") },
-                placeholder = { Text("Paste token or use PIN login above") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Dual Action Buttons: Test & Diagnose / Save & Connect
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        viewModel.diagnosePlex(
-                            serverUrl = hostUrl.trim(),
-                            token = plexToken.trim()
+            AnimatedVisibility(visible = showManualSetup) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    // Quick Connection Mode Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = connectionMode == "local",
+                            onClick = {
+                                connectionMode = "local"
+                                if (hostUrl.startsWith("https://") || hostUrl.isBlank()) {
+                                    hostUrl = "http://192.168.1.100:32400"
+                                }
+                            },
+                            label = { Text("Local LAN (:32400)", fontSize = 12.sp) },
+                            leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
+                                selectedLabelColor = AccentIndigo
+                            ),
+                            modifier = Modifier.weight(1f)
                         )
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isDiagnosingPlex && !isLoading && hostUrl.isNotBlank()
-                ) {
-                    if (isDiagnosingPlex) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Test & Diagnose", fontSize = 12.sp)
-                }
 
-                Button(
-                    onClick = {
-                        onConnect(serverName.trim(), hostUrl.trim(), plexToken.trim())
-                    },
-                    modifier = Modifier.weight(1.3f),
-                    enabled = !isLoading && !isDiagnosingPlex && hostUrl.isNotBlank() && plexToken.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Connecting...", fontSize = 12.sp)
-                    } else {
-                        Icon(Icons.Default.Link, contentDescription = "Connect", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Save & Connect", fontSize = 12.sp)
+                        FilterChip(
+                            selected = connectionMode == "remote",
+                            onClick = {
+                                connectionMode = "remote"
+                                if (hostUrl.startsWith("http://192.") || hostUrl.startsWith("http://10.")) {
+                                    hostUrl = "https://"
+                                }
+                            },
+                            label = { Text("Remote / HTTPS", fontSize = 12.sp) },
+                            leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
+                                selectedLabelColor = AccentTeal
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = serverName,
+                        onValueChange = { serverName = it },
+                        label = { Text("Display Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = hostUrl,
+                        onValueChange = { hostUrl = it },
+                        label = { Text("Plex URL (e.g. http://192.168.1.100:32400)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = plexToken,
+                        onValueChange = { plexToken = it },
+                        label = { Text("X-Plex-Token") },
+                        placeholder = { Text("Enter manual token or use account login above") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.diagnosePlex(
+                                    serverUrl = hostUrl.trim(),
+                                    token = plexToken.trim()
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isDiagnosingPlex && !isLoading && hostUrl.isNotBlank()
+                        ) {
+                            if (isDiagnosingPlex) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Test & Diagnose", fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                onConnect(serverName.trim(), hostUrl.trim(), plexToken.trim())
+                            },
+                            modifier = Modifier.weight(1.3f),
+                            enabled = !isLoading && !isDiagnosingPlex && hostUrl.isNotBlank() && plexToken.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Connecting...", fontSize = 12.sp)
+                            } else {
+                                Icon(Icons.Default.Link, contentDescription = "Connect", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Save & Connect", fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    // Plex Server Picker Dialog (if user has multiple servers on their Plex account)
+    if (showServerPicker && discoveredPlexServers.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissServerPicker() },
+            icon = {
+                Icon(Icons.Default.Dns, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(36.dp))
+            },
+            title = {
+                Text("Select Plex Server", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "We found ${discoveredPlexServers.size} servers linked to your Plex account. Choose which one to connect:",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    for (server in discoveredPlexServers) {
+                        Surface(
+                            onClick = { viewModel.connectDiscoveredPlexServer(server) },
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentIndigo.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(server.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Text(
+                                        text = if (server.isLocal) "⚡ Local LAN (Fastest)" else "🌐 Remote / Direct",
+                                        fontSize = 11.sp,
+                                        color = if (server.isLocal) AccentTeal else AccentIndigo
+                                    )
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = "Select", tint = AccentIndigo)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissServerPicker() }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Plex PIN Link Flow Dialog
