@@ -239,11 +239,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val servers = result.getOrNull() ?: emptyList()
                     if (servers.isEmpty()) {
                         _serverOpState.value = ServerOperationState.Error(
-                            "Signed into Plex account, but no Plex Media Servers were found on this account."
+                            "Signed into Plex account, but no Plex Media Server owned by your account was found (shared servers are excluded)."
                         )
                     } else if (servers.size == 1) {
                         val server = servers.first()
-                        _serverOpState.value = ServerOperationState.Success("Found '${server.name}'! Auto-connecting...")
+                        _serverOpState.value = ServerOperationState.Success("Found owned server '${server.name}'! Auto-connecting and searching music library...")
                         saveAndConnectPlexServer(
                             name = server.name,
                             hostUrl = server.preferredUri,
@@ -253,7 +253,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         _discoveredPlexServers.value = servers
                         _showServerPicker.value = true
-                        _serverOpState.value = ServerOperationState.Success("Plex account linked! ${servers.size} servers discovered.")
+                        _serverOpState.value = ServerOperationState.Success("Plex account linked! Found ${servers.size} owned servers.")
                     }
                 } else {
                     _serverOpState.value = ServerOperationState.Error(
@@ -384,8 +384,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (syncRes.isSuccess) {
                         val count = syncRes.getOrNull() ?: 0
                         _serverOpState.value = ServerOperationState.Success(
-                            if (count > 0) "Connected! Synced $count tracks from Plex."
-                            else "Connected to ${server.name}! (0 tracks found in music sections)"
+                            if (count > 0) "Connected to owned server '${server.name}'! Auto-searched and synced $count tracks from your music library."
+                            else "Connected to owned server '${server.name}'! Music library auto-searched (0 tracks found in music sections)."
                         )
                     } else {
                         _serverOpState.value = ServerOperationState.Success(

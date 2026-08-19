@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/your-username/HomeCast/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/your-username/HomeCast/build.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=Build%20APK" alt="Build Status" /></a>
-  <img src="https://img.shields.io/badge/Release-v2.1-brightgreen?style=flat-square" alt="Version 2.1" />
+  <img src="https://img.shields.io/badge/Release-v2.2-brightgreen?style=flat-square" alt="Version 2.2" />
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform: Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20M3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
@@ -18,6 +18,14 @@
 </p>
 
 ---
+
+### 🚀 What's New in v2.2
+- **🔒 Strictly Owned Plex Servers Exclusivity**:
+  - **Shared Servers Filtered Out**: Filters device resources to connect exclusively to the Plex Media Server **owned by the logging-in user** (`owned == true`), omitting any third-party or shared servers.
+- **🔍 Deep Auto-Search & Auto-Connect for Music Libraries**:
+  - **Zero-Touch Music Ingestion**: Automatically scans, discovers, and connects to music library sections immediately upon linking your Plex account.
+  - **Multi-Level Fallback Search**: Checks primary artist/music sections (`type=artist`, `type=music`, `type=audio`), and if empty, automatically performs a global server-wide music query (`/library/all?type=10` and `/hubs/search?type=10`) to ensure 100% of your tracks and albums are indexed.
+  - **Clear Real-Time Status**: Instant feedback displaying the owned server name, connection route, and the total count of auto-synced music tracks.
 
 ### 🚀 What's New in v2.1
 - **🎵 Seamless Plex Music Library Sync & Stream Engine**:

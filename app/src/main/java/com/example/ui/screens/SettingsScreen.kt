@@ -677,7 +677,7 @@ fun PlexConfigCard(
                     }
 
                     Text(
-                        "Sign in once on your browser. HomeCast automatically discovers your Plex Media Servers and connects directly without needing IP addresses, ports, or manual tokens.",
+                        "Sign in once in your browser. HomeCast automatically discovers your owned Plex Media Server and auto-searches and syncs your music library directly.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 16.sp
@@ -705,7 +705,7 @@ fun PlexConfigCard(
             // Discovered Servers Quick List (if available)
             if (discoveredPlexServers.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(14.dp))
-                Text("Discovered Servers on Your Account:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Discovered Owned Servers on Your Account:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (server in discoveredPlexServers) {
@@ -916,7 +916,7 @@ fun PlexConfigCard(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "We found ${discoveredPlexServers.size} servers linked to your Plex account. Choose which one to connect:",
+                        "We found ${discoveredPlexServers.size} owned servers linked to your Plex account (shared servers excluded). Choose which one to connect:",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

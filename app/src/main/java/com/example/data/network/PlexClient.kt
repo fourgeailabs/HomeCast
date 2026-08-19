@@ -197,8 +197,10 @@ object PlexClient {
             val adapter = moshi.adapter<List<PlexDevice>>(listType)
             val devices = adapter.fromJson(body) ?: emptyList()
 
-            // Filter for media servers
-            val servers = devices.filter { it.provides?.contains("server", ignoreCase = true) == true }
+            // Filter exclusively for media servers OWNED by the user (strictly excluding shared servers)
+            val servers = devices.filter {
+                it.provides?.contains("server", ignoreCase = true) == true && it.owned == true
+            }
             if (servers.isEmpty()) {
                 return@withContext Result.success(emptyList())
             }
@@ -513,6 +515,76 @@ object PlexClient {
                         trackNumber = trackIndex
                     )
                 )
+            }
+        }
+
+        // Step 3: Global server-wide fallback search if section queries found 0 tracks
+        if (tracksList.isEmpty()) {
+            val globalQueries = listOf(
+                "$workingRoot/library/all?type=10&X-Plex-Token=$cleanToken",
+                "$workingRoot/hubs/search?query=&type=10&X-Plex-Token=$cleanToken"
+            )
+
+            for (globalUrl in globalQueries) {
+                try {
+                    val tracksReq = Request.Builder()
+                        .url(globalUrl)
+                        .get()
+                        .apply { buildStandardHeaders(this, cleanToken) }
+                        .build()
+
+                    val tracksRes = client.newCall(tracksReq).execute()
+                    if (tracksRes.isSuccessful) {
+                        val body = tracksRes.body?.string() ?: ""
+                        val tracksAdapter = moshi.adapter(PlexTracksResponse::class.java)
+                        val items = tracksAdapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+
+                        for (item in items) {
+                            val ratingKey = item.ratingKey ?: item.key?.substringAfterLast("/") ?: continue
+                            val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                            val streamUrl = if (partKey.isNotBlank()) {
+                                val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
+                                "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
+                            } else {
+                                ""
+                            }
+
+                            val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb ?: ""
+                            val coverUrl = if (thumbPath.isNotBlank()) {
+                                val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
+                                "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
+                            } else {
+                                ""
+                            }
+
+                            val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() } ?: "Music"
+                            val trackIndex = item.index ?: (tracksList.size + 1)
+                            val trackTitle = item.title?.takeIf { it.isNotBlank() } ?: "Track $trackIndex"
+                            val artistName = item.grandparentTitle?.takeIf { it.isNotBlank() }
+                                ?: item.parentTitle?.takeIf { it.isNotBlank() }
+                                ?: "Plex Artist"
+                            val albumName = item.parentTitle?.takeIf { it.isNotBlank() } ?: "Plex Album"
+
+                            tracksList.add(
+                                MusicTrack(
+                                    id = "plex_${serverId}_$ratingKey",
+                                    title = trackTitle,
+                                    artist = artistName,
+                                    album = albumName,
+                                    coverUrl = coverUrl,
+                                    duration = item.duration ?: 0L,
+                                    serverId = serverId,
+                                    streamUrl = streamUrl,
+                                    ratingKey = ratingKey,
+                                    genre = genreTag,
+                                    trackNumber = trackIndex
+                                )
+                            )
+                        }
+
+                        if (tracksList.isNotEmpty()) break
+                    }
+                } catch (_: Exception) {}
             }
         }
 
