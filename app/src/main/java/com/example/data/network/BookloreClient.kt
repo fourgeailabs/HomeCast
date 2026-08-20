@@ -68,8 +68,12 @@ object BookloreClient {
             val normalizedUrl = hostUrl.trimEnd('/')
             val url = "$normalizedUrl/api/v1/auth/login"
             
-            val jsonBody = "{\"username\":\"$username\", \"password\":\"$password\"}"
-            val requestBody = okhttp3.RequestBody.create("application/json".toMediaType(), jsonBody)
+            // Build JSON safely
+            val jsonBody = org.json.JSONObject()
+            jsonBody.put("username", username)
+            jsonBody.put("password", password)
+            
+            val requestBody = okhttp3.RequestBody.create("application/json".toMediaType(), jsonBody.toString())
             
             val request = Request.Builder()
                 .url(url)
@@ -80,14 +84,14 @@ object BookloreClient {
             if (response.isSuccessful) {
                 val bodyString = response.body?.string()
                 if (bodyString != null) {
-                    val tokenKey = "\"accessToken\":\""
-                    val idx = bodyString.indexOf(tokenKey)
-                    if (idx != -1) {
-                        val start = idx + tokenKey.length
-                        val end = bodyString.indexOf("\"", start)
-                        if (end != -1) {
-                            return@withContext Result.success(bodyString.substring(start, end))
+                    try {
+                        val json = org.json.JSONObject(bodyString)
+                        val token = json.optString("accessToken", "")
+                        if (token.isNotEmpty()) {
+                            return@withContext Result.success(token)
                         }
+                    } catch (e: Exception) {
+                        return@withContext Result.failure(Exception("Failed to parse login response"))
                     }
                 }
             }
