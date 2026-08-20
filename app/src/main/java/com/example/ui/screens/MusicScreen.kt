@@ -226,10 +226,11 @@ fun MusicScreen(
         ) {
             Column {
                 Text(
-                    "Plex Music",
+                    "Music",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.5).sp,
+                    color = Color.White
                 )
                 Text(
                     if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums" else "Your Personal Music Cloud",
@@ -341,7 +342,7 @@ fun MusicScreen(
                             }
 
                             Spacer(modifier = Modifier.height(18.dp))
-                            Text("No Plex Music Synced", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text("No Music Synced", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "Connect your personal Plex server with your URL & Token to stream your library with full genre, artist, and album hierarchy.",
@@ -605,7 +606,7 @@ fun AlbumSongsScreen(
                         .clip(CircleShape)
                         .background(SurfaceGlass)
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text("Album Details", fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -708,7 +709,7 @@ fun AlbumSongsScreen(
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.height(44.dp)
                     ) {
-                        Icon(Icons.Default.Shuffle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Shuffle", color = MaterialTheme.colorScheme.onSurface)
                     }
@@ -947,14 +948,14 @@ fun GenreCard(genre: GenreItem, onClick: () -> Unit) {
                 genre.name,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 15.sp,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 genre.description,
                 fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                 maxLines = 2,
                 lineHeight = 14.sp
             )
@@ -1148,7 +1149,7 @@ fun MusicTrackShelfCard(
                     ) {
                         Icon(Icons.Default.GraphicEq, contentDescription = "Playing", tint = Color.White, modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text("PLAYING", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                        Text("PLAYING", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -1203,7 +1204,7 @@ fun AlbumShelfCard(album: AlbumGroup, onClick: () -> Unit) {
                     "${album.tracks.size} tracks",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                 )
             }
@@ -1406,7 +1407,7 @@ fun ArtistDetailScreen(
                     Text(album.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text("${album.tracks.size} Tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
             }
         }
 
@@ -1442,7 +1443,7 @@ fun GenreDetailScreen(
                     .background(SurfaceGlass)
                     .border(1.dp, SurfaceGlassBorder, CircleShape)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column {

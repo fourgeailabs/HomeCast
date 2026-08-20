@@ -156,7 +156,7 @@ object BookloreClient {
                                             }
                                             val queryParam = if (rawToken.isNotBlank() && !rawToken.startsWith("Basic ")) "?token=$rawToken" else ""
                                             val cover = book.coverUrl ?: if (normalizedUrl.contains("komga") || endpoint.contains("komga")) {
-                                                "$normalizedUrl/api/v1/books/${book.id}/thumbnail"
+                                                "$normalizedUrl/api/v1/books/${book.id}/pages/1"
                                             } else {
                                                 "$normalizedUrl/api/v1/media/book/${book.id}/cover$queryParam"
                                             }
@@ -194,7 +194,7 @@ object BookloreClient {
                                             }
                                             val queryParam = if (rawToken.isNotBlank() && !rawToken.startsWith("Basic ")) "?token=$rawToken" else ""
                                             val cover = book.coverUrl ?: if (normalizedUrl.contains("komga") || endpoint.contains("komga")) {
-                                                "$normalizedUrl/api/v1/books/${book.id}/thumbnail"
+                                                "$normalizedUrl/api/v1/books/${book.id}/pages/1"
                                             } else {
                                                 "$normalizedUrl/api/v1/media/book/${book.id}/cover$queryParam"
                                             }

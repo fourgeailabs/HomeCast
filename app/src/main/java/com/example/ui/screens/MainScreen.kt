@@ -28,6 +28,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import coil.compose.AsyncImage
 import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
@@ -45,8 +47,8 @@ object Routes {
     const val Discovery = "discovery"
     const val Settings = "settings"
     
-    fun MediaDetail(title: String, creator: String, type: String) = "media_detail/${android.net.Uri.encode(title)}/${android.net.Uri.encode(creator)}/$type"
-    fun CreatorDetail(name: String) = "creator_detail/${android.net.Uri.encode(name)}"
+    fun MediaDetail(title: String, creator: String, type: String) = "media_detail?title=${android.net.Uri.encode(title.ifEmpty { "Unknown" })}&creator=${android.net.Uri.encode(creator.ifEmpty { "Unknown" })}&type=$type"
+    fun CreatorDetail(name: String) = "creator_detail?name=${android.net.Uri.encode(name.ifEmpty { "Unknown" })}"
 
 }
 
@@ -201,7 +203,7 @@ fun MainScreen(
                     }
 
                     NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                        containerColor = SurfaceGlass,
                         modifier = Modifier.drawBehind {
                             drawLine(
                                 color = SurfaceGlassBorder,
@@ -216,9 +218,9 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.Library) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    popUpTo(navController.graph.startDestinationId) { saveState = false }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    restoreState = false
                                 }
                             },
                             icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Audiobooks") },
@@ -230,9 +232,9 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.Music) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    popUpTo(navController.graph.startDestinationId) { saveState = false }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    restoreState = false
                                 }
                             },
                             icon = { Icon(Icons.Default.MusicNote, contentDescription = "Music") },
@@ -244,9 +246,9 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.EBooks) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    popUpTo(navController.graph.startDestinationId) { saveState = false }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    restoreState = false
                                 }
                             },
                             icon = { Icon(Icons.Default.MenuBook, contentDescription = "E-Books") },
@@ -258,13 +260,13 @@ fun MainScreen(
                             onClick = {
                                 isPlayerSlidUp = false
                                 navController.navigate(Routes.Discovery) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    popUpTo(navController.graph.startDestinationId) { saveState = false }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    restoreState = false
                                 }
                             },
                             icon = { Icon(Icons.Default.TravelExplore, contentDescription = "Discovery") },
-                            label = { Text("Discovery", maxLines = 1) },
+                            label = { Text("Discover", maxLines = 1) },
                             colors = navColors
                         )
                     }
@@ -335,6 +337,41 @@ fun MainScreen(
                     SettingsScreen(
                         viewModel = viewModel,
                         onThemeToggle = onThemeToggle
+                    )
+                }
+                composable(
+                    route = "media_detail?title={title}&creator={creator}&type={type}",
+                    arguments = listOf(
+                        navArgument("title") { type = NavType.StringType; defaultValue = "Unknown" },
+                        navArgument("creator") { type = NavType.StringType; defaultValue = "Unknown" },
+                        navArgument("type") { type = NavType.StringType; defaultValue = "BOOK" }
+                    )
+                ) { backStackEntry ->
+                    val title = backStackEntry.arguments?.getString("title") ?: ""
+                    val creator = backStackEntry.arguments?.getString("creator") ?: ""
+                    val type = backStackEntry.arguments?.getString("type") ?: ""
+                    
+                    MediaDetailScreen(
+                        viewModel = viewModel,
+                        title = title,
+                        creator = creator,
+                        type = type,
+                        onBack = { navController.popBackStack() },
+                        onCreatorClick = { navController.navigate(Routes.CreatorDetail(it)) },
+                        onPlayReadClick = { /* Handled contextually */ }
+                    )
+                }
+                composable(
+                    route = "creator_detail?name={name}",
+                    arguments = listOf(
+                        navArgument("name") { type = NavType.StringType; defaultValue = "Unknown" }
+                    )
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("name") ?: ""
+                    CreatorDetailScreen(
+                        viewModel = viewModel,
+                        creatorName = name,
+                        onBack = { navController.popBackStack() }
                     )
                 }
             }

@@ -167,6 +167,7 @@ fun EBooksScreen(
     onNavigateToCreator: (String) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedCollection by remember { mutableStateOf<Pair<String, List<BookshelfItem>>?>(null) }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var isGridViewOpen by remember { mutableStateOf(false) }
     var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
@@ -174,6 +175,7 @@ fun EBooksScreen(
     val genres = listOf("All", "Sci-Fi", "Classic", "Comics", "Cyberpunk", "Philosophy")
 
     val allEBooks by viewModel.allEBooks.collectAsState()
+    val archiveBooks by viewModel.publicDomainBooks.collectAsState()
     
     val currentBookshelfItems = remember(allEBooks, selectedSource) {
         if (selectedSource == 0) {
@@ -191,8 +193,29 @@ fun EBooksScreen(
                 )
             }
         } else {
-            // Keep public domain sample books with full 20-chapter simulations
-            sampleBookshelfItems
+            archiveBooks.map { doc ->
+                val coverUrl = "https://archive.org/services/img/${doc.identifier}"
+                val title = doc.title ?: "Unknown Title"
+                val author = when (doc.creator) {
+                    is List<*> -> doc.creator.firstOrNull()?.toString() ?: "Unknown Author"
+                    is String -> doc.creator
+                    else -> "Unknown Author"
+                }
+                val desc = when (doc.description) {
+                    is List<*> -> doc.description.firstOrNull()?.toString() ?: ""
+                    is String -> doc.description
+                    else -> ""
+                }
+                BookshelfItem(
+                    id = doc.identifier,
+                    title = title,
+                    authorOrArtist = author,
+                    publicDomainUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_djvu.txt", // best effort
+                    coverUrl = coverUrl,
+                    genre = "Classic",
+                    description = desc
+                )
+            }
         }
     }
 
@@ -475,6 +498,7 @@ fun EBooksScreen(
                                 badgeColor = AccentTeal,
                                 items = currentlyReading,
                                 onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                                onHeaderClick = { selectedCollection = Pair("Currently Reading", currentlyReading) },
                                 onNavigateToCreator = onNavigateToCreator
                             )
                         }
@@ -490,6 +514,7 @@ fun EBooksScreen(
                                 badgeColor = AccentIndigo,
                                 items = comics,
                                 onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                                onHeaderClick = { selectedCollection = Pair("Graphic Novels & Manga", comics) },
                                 onNavigateToCreator = onNavigateToCreator
                             )
                         }
@@ -509,6 +534,7 @@ fun EBooksScreen(
                                 badgeColor = Color(0xFFF59E0B),
                                 items = books,
                                 onItemClick = { onNavigateToDetails(it.title, it.authorOrArtist, "BOOK") },
+                                onHeaderClick = { selectedCollection = Pair(genre, books) },
                                 onNavigateToCreator = onNavigateToCreator
                             )
                         }
@@ -526,11 +552,12 @@ fun GlassBookshelfRow(
     badgeColor: Color,
     items: List<BookshelfItem>,
     onItemClick: (BookshelfItem) -> Unit,
-    onNavigateToCreator: (String) -> Unit = {}
+    onNavigateToCreator: (String) -> Unit = {},
+    onHeaderClick: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
+            modifier = Modifier.clickable { onHeaderClick() }
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,

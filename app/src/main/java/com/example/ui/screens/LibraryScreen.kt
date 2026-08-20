@@ -51,6 +51,7 @@ fun LibraryScreen(
     onNavigateToCreator: (String) -> Unit = {}
 ) {
     val allBooks by viewModel.allBooks.collectAsState()
+    val archiveAudiobooks by viewModel.publicDomainAudiobooks.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val recents by viewModel.recents.collectAsState()
     val servers by viewModel.servers.collectAsState()
@@ -59,36 +60,34 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var isGridView by remember { mutableStateOf(false) }
+    var selectedCollection by remember { mutableStateOf<Pair<String, List<com.example.data.Audiobook>>?>(null) }
     var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
 
-    val publicDomainAudiobooks = remember {
-        listOf(
-            Audiobook(
-                id = "pd_audio_1",
-                title = "The Art of War",
-                author = "Sun Tzu",
-                duration = 4320000L, // 1h 12m
-                coverUrl = "https://images.unsplash.com/photo-1545041793-272e50529d84?w=600&q=80",
+    val publicDomainAudiobooks = remember(archiveAudiobooks) {
+        archiveAudiobooks.map { doc ->
+            val coverUrl = "https://archive.org/services/img/${doc.identifier}"
+            val title = doc.title ?: "Unknown Title"
+            val author = when (doc.creator) {
+                is List<*> -> (doc.creator as List<*>).firstOrNull()?.toString() ?: "Unknown Author"
+                is String -> doc.creator
+                else -> "Unknown Author"
+            }
+            com.example.data.Audiobook(
+                id = doc.identifier,
+                title = title,
+                author = author,
+                duration = 3600000L,
+                coverUrl = coverUrl,
                 serverId = "pd_server",
-                streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
-                narrator = "Public Domain",
-                seriesName = "Philosophy"
-            ),
-            Audiobook(
-                id = "pd_audio_2",
-                title = "Frankenstein",
-                author = "Mary Shelley",
-                duration = 29000000L, // ~8h
-                coverUrl = "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=600&q=80",
-                serverId = "pd_server",
-                streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
-                narrator = "Project Gutenberg",
-                seriesName = "Classic Horror"
+                streamUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_64kb.mp3", // best effort
+                narrator = "Archive.org",
+                genre = "Classic",
             )
-        )
+        }
     }
 
-    val currentBooks = remember(allBooks, selectedSource) {
+
+    val currentBooks = remember(allBooks, publicDomainAudiobooks, selectedSource) {
         if (selectedSource == 0) allBooks else publicDomainAudiobooks
     }
 
@@ -97,42 +96,26 @@ fun LibraryScreen(
         if (extracted.isNotEmpty()) listOf("All") + extracted else listOf("All", "Sci-Fi", "Fantasy", "Mystery", "Non-Fiction", "Classics")
     }
 
+
+    val newArrivals = currentBooks.sortedByDescending { it.id }.take(10)
+    val popularBooks = currentBooks.shuffled().take(5)
+    val noteworthyBooks = currentBooks.filter { it.genre == "Classics" || it.genre == "Sci-Fi" }
+    val seriesBooks = currentBooks.filter { it.genre == "Fantasy" || it.genre == "Sci-Fi" }
+
     val filteredBooks = remember(currentBooks, searchQuery, selectedGenre) {
         currentBooks.filter { book ->
             val matchesGenre = selectedGenre == null || selectedGenre == "All" || book.genre.equals(selectedGenre, ignoreCase = true)
-            val matchesSearch = searchQuery.isBlank() ||
-                book.title.contains(searchQuery, ignoreCase = true) ||
-                book.author.contains(searchQuery, ignoreCase = true) ||
-                book.seriesName.contains(searchQuery, ignoreCase = true) ||
-                book.narrator.contains(searchQuery, ignoreCase = true)
+            val matchesSearch = searchQuery.isBlank() || book.title.contains(searchQuery, ignoreCase = true) || book.author.contains(searchQuery, ignoreCase = true)
             matchesGenre && matchesSearch
         }
-    }
-
-    // Curated Shelves
-    val newArrivals = remember(currentBooks) {
-        currentBooks.takeLast(10).reversed()
-    }
-
-    val seriesBooks = remember(currentBooks) {
-        currentBooks.filter { it.seriesName.isNotBlank() }
-    }
-
-    val popularBooks = remember(currentBooks) {
-        // High engagement or standout titles
-        currentBooks.sortedByDescending { it.duration }.take(8)
-    }
-
-    val noteworthyBooks = remember(currentBooks) {
-        currentBooks.shuffled().take(8)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        // Header Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -143,74 +126,60 @@ fun LibraryScreen(
                     "Audiobooks",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.5).sp,
+                    color = Color.White
                 )
                 Text(
-                    if (allBooks.isNotEmpty()) "${allBooks.size} titles in your bookshelf" else "Your Audiobookshelf Library",
+                    if (currentBooks.isNotEmpty()) "${currentBooks.size} titles in your bookshelf" else "Your Audiobookshelf Library",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(
                     onClick = { isGridView = !isGridView },
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        .background(SurfaceGlass, CircleShape)
                 ) {
                     Icon(
-                        if (isGridView) Icons.Default.ViewAgenda else Icons.Default.GridView,
-                        contentDescription = "Toggle 3-Column Choices Grid",
+                        if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                        contentDescription = "Toggle View",
                         tint = AccentTeal
                     )
                 }
-
                 IconButton(
                     onClick = onNavigateToSettings,
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        .background(SurfaceGlass, CircleShape)
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentTeal)
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        androidx.compose.material3.TabRow(
-            selectedTabIndex = selectedSource,
-            containerColor = Color.Transparent,
-            indicator = { tabPositions ->
-                androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
-                    color = AccentIndigo
-                )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = selectedSource == 0,
+                onClick = { selectedSource = 0 },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) {
+                Text("Personal Library")
             }
-        ) {
-            listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
-                androidx.compose.material3.Tab(
-                    selected = selectedSource == index,
-                    onClick = { selectedSource = index },
-                    text = {
-                        Text(
-                            text = title,
-                            fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
-                        )
-                    },
-                    selectedContentColor = AccentIndigo,
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            SegmentedButton(
+                selected = selectedSource == 1,
+                onClick = { selectedSource = 1 },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) {
+                Text("Public Domain")
             }
         }
-
+        
         Spacer(modifier = Modifier.height(14.dp))
-
+        
         // Search Bar
         OutlinedTextField(
             value = searchQuery,
@@ -268,7 +237,37 @@ fun LibraryScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // 3-COLUMN CHOICES VIEW WHEN GENRE SELECTED OR GRID TOGGLED OR SEARCH ACTIVE
-        if (selectedGenre != null || isGridView || searchQuery.isNotBlank()) {
+        if (selectedCollection != null) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    IconButton(onClick = { selectedCollection = null }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                    Text(selectedCollection!!.first, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(selectedCollection!!.second, key = { it.id }) { book ->
+                        Audiobook3ColumnCard(
+                            book = book,
+                            isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
+                            onClick = {
+                                viewModel.playAudiobook(book)
+                                onBookClick(book)
+                            }
+                        )
+                    }
+                }
+            }
+        } else if (selectedGenre != null || isGridView || searchQuery.isNotBlank()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -784,7 +783,7 @@ fun AudiobookShelfCard(
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            formatDuration(book.duration),
+                            com.example.utils.formatDuration(book.duration),
                             fontSize = 10.sp,
                             color = Color.White,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
@@ -896,11 +895,7 @@ fun BookShelfRowItem(
     }
 }
 
-private fun formatDuration(seconds: Long): String {
-    val hrs = seconds / 3600
-    val mins = (seconds % 3600) / 60
-    return if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
-}
+
 
 @Composable
 fun Audiobook3ColumnCard(

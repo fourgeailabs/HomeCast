@@ -4,8 +4,7 @@ file_path = "app/src/main/java/com/example/ui/screens/SettingsScreen.kt"
 with open(file_path, "r") as f:
     text = f.read()
 
-# Update the default hostUrl in BookloreConfigCard to point to 6060 just as a hint, since they use 6060.
-text = text.replace('var hostUrl by remember { mutableStateOf("http://10.70.14.2:8080") }', 'var hostUrl by remember { mutableStateOf("http://10.70.14.2:6060") }')
+# Add About Section at the end of LazyColumn in SettingsScreen
+target_lazycolumn_end = r"        item \{\n            Spacer\(modifier = Modifier.height\(80\.dp\)\)\n        \}\n    \}"
 
-with open(file_path, "w") as f:
-    f.write(text)
+# Need to find the end of the LazyColumn. Let's see what's currently at the end.

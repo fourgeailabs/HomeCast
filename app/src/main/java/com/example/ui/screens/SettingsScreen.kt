@@ -156,6 +156,109 @@ fun SettingsScreen(
 
         item {
             Spacer(modifier = Modifier.height(24.dp))
+            Text("AI Magic Optimizer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Intelligent Library Curation", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Optimize and refine your media library automatically or on-demand using Google Gemini API.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    val isCleaningUp by viewModel.isCleaningUp.collectAsState()
+                    val isLocatingCovers by viewModel.isLocatingCovers.collectAsState()
+
+                    Button(
+                        onClick = { viewModel.triggerManualDailyCleanup() },
+                        enabled = !isCleaningUp,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                    ) {
+                        if (isCleaningUp) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Curating Library...")
+                        } else {
+                            Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Refresh Daily Menus & Authors")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { viewModel.triggerManualCoverLocation() },
+                        enabled = !isLocatingCovers,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                    ) {
+                        if (isLocatingCovers) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Locating Cover Art...")
+                        } else {
+                            Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Scan & Locate Missing Covers")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("About", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Booklore", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    Text("Version ${com.example.BuildConfig.VERSION_NAME}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Made by FourgeAI LABS", fontSize = 14.sp)
+                    Text("© 2026", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("AI-Powered Features", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "✨ Dynamic Daily Menus & Themes\nRotates category bookshelves automatically at midnight to keep collections fresh daily.\n\n" +
+                        "✨ Intelligent Author Cleaning\nRefines messy catalog indexing (e.g. 'Wells, H.G. (1866-1946)') into clean human author names.\n\n" +
+                        "✨ Smart Cover Art Locator\nLeverages Gemini to identify and source missing cover art based on media titles.\n\n" +
+                        "✨ AI Discovery Blends\nGenerate bespoke thematic playlists and discovery mixes in the Discovery tab.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri("https://github.com/booklore-app/booklore") },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Code, contentDescription = "GitHub")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View on GitHub")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }

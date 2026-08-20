@@ -1,11 +1,23 @@
 # HomeCast
 
-**Version:** 2.6
+**Version:** 4.0.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v2.6)
+## 🚀 Recent Updates (v4.0.0)
+- **AI-Powered Cover Art Locator**: Built a robust system utilizing Google Gemini that scans your media files (audiobooks, music tracks, e-books) for missing or placeholder artwork and contextually sources high-quality, beautiful thematic image covers from public curators.
+- **Daily Dynamic Menu & Category Curation**: Engineered an automated scheduling system. On launch or daily date changes, the app utilizes Gemini to generate fresh, unique daily thematic category sets and automatically groups your media assets contextually based on their titles and contents (avoiding unhelpful or directory-like names).
+- **Intelligent Author & Artist Cleaning**: Integrated AI-powered catalog normalization that processes messy listing structures (e.g. `Smith, Jeff, 1960 Feb...` or `Wells, H. G. (Herbert George), 1866-1946`) into clean, reader-friendly, beautiful human-readable names.
+- **Cohesive Frosted Glass UI Overhaul**: Elevated the application's visual presence by applying frosted glass translucency styling (`SurfaceGlass` / `SurfaceGlassBorder` with dark slate alpha overlays) across all bottom navigation controls, lists, and main layers.
+- **AI Magic Optimizer Controls**: Added a dedicated control section in Settings to trigger live optimization cycles for authors and cover locator routines with interactive loading indicators.
+
+### 🚀 Previous Updates (v3.4.0)
+- **AI-Powered E-Book Genre Categorization**: Added an automated categorization system to the E-Books interface. Clicking the ✨ button in the E-Books screen header sends a batch of books/comics metadata (IDs, titles, and authors) to Google Gemini. Gemini classifies each book into a single high-level precise genre (e.g., `Sci-Fi`, `Fantasy`, `Manga`, `Non-Fiction`), which is then saved to the local Room database, immediately refreshing your dynamic genre tabs!
+- **Fixed Media3 & Playback Formats**: Resolved formatting mismatches for audiobook durations by using reliable formatting helpers.
+- **Fixed WhiteVariant Color Reference**: Fixed compilation issues with `WhiteVariant` color references in the Music Player controls, replacing them with standard Material theme and custom translucent values.
+
+### 🚀 Previous Updates (v2.6)
 - **Booklore API Authentication Fix**: Fixed the 403 Forbidden error when connecting to Booklore. The app now correctly executes a pre-flight authentication sequence against Booklore's `/api/v1/auth/login` endpoint to exchange credentials for a secure JWT Bearer token before requesting your library data.
 
 ### 🚀 What's New in v2.5

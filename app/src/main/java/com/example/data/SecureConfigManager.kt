@@ -67,4 +67,12 @@ class SecureConfigManager(context: Context) {
         sharedPreferences.edit().putString("servers", json).apply()
         _serversFlow.value = currentServers
     }
+
+    fun getLastCleanupDate(): String? {
+        return sharedPreferences.getString("last_cleanup_date", null)
+    }
+
+    fun saveLastCleanupDate(dateStr: String) {
+        sharedPreferences.edit().putString("last_cleanup_date", dateStr).apply()
+    }
 }

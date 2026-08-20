@@ -17,6 +17,9 @@ import com.example.data.*
 import com.example.data.network.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 sealed class ServerOperationState {
     object Idle : ServerOperationState()
@@ -46,6 +49,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Discovery State
     val _recommendations = MutableStateFlow<List<String>>(emptyList())
+
+    private val _publicDomainBooks = MutableStateFlow<List<ArchiveDoc>>(emptyList())
+    val publicDomainBooks = _publicDomainBooks.asStateFlow()
+
+    private val _publicDomainAudiobooks = MutableStateFlow<List<ArchiveDoc>>(emptyList())
+    val publicDomainAudiobooks = _publicDomainAudiobooks.asStateFlow()
+
+    private val _isCleaningUp = MutableStateFlow(false)
+    val isCleaningUp = _isCleaningUp.asStateFlow()
+
+    private val _isLocatingCovers = MutableStateFlow(false)
+    val isLocatingCovers = _isLocatingCovers.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _publicDomainBooks.value = ArchiveOrgClient.fetchPublicDomain("gutenberg")
+            _publicDomainAudiobooks.value = ArchiveOrgClient.fetchPublicDomain("librivoxaudio")
+        }
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2000)
+            checkAndTriggerDailyCleanupIfNeeded()
+        }
+    }
+
+    fun checkAndTriggerDailyCleanupIfNeeded() {
+        viewModelScope.launch {
+            val lastCleanup = secureConfigManager.getLastCleanupDate()
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val todayStr = sdf.format(Date())
+            if (lastCleanup != todayStr) {
+                val success = performDailyDynamicMenuAndCategoryCleanup()
+                if (success) {
+                    secureConfigManager.saveLastCleanupDate(todayStr)
+                }
+            }
+        }
+    }
+
     val recommendations = _recommendations.asStateFlow()
 
     val _isDiscoveryLoading = MutableStateFlow(false)
@@ -55,14 +96,339 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _geminiCategoryItems = MutableStateFlow<List<com.example.ui.screens.DiscoveryItem>>(emptyList())
     val geminiCategoryItems: StateFlow<List<com.example.ui.screens.DiscoveryItem>> = _geminiCategoryItems.asStateFlow()
 
-    fun fetchGeminiCategoryItems(category: String, inventorySummary: String) {
+
+    fun categorizeBooksWithAI() {
+        viewModelScope.launch {
+            val books = allEBooks.value
+            if (books.isEmpty()) return@launch
+            
+            // We batch them to avoid huge prompts
+            val batch = books.take(30)
+            val titles = batch.joinToString("\n") { it.id + ":::" + it.title + " by " + it.author }
+            
+            val prompt = "Here is a list of books and comics with IDs, titles, and authors.\n" +
+                "Please categorize each into a single, high-level, precise genre (e.g., 'Sci-Fi', 'Fantasy', 'Cyberpunk', 'Manga', 'Superhero Comic', 'Non-Fiction').\n" +
+                "Return ONLY a raw JSON array matching this schema:\n" +
+                "[\n" +
+                "  {\n" +
+                "    \"id\": \"book id\",\n" +
+                "    \"genre\": \"assigned genre\"\n" +
+                "  }\n" +
+                "]\n\n" +
+                "List:\n" + titles
+
+            try {
+                val request = com.example.GenerateContentRequest(
+                    contents = listOf(com.example.Content(parts = listOf(com.example.Part(text = prompt))))
+                )
+                val response = com.example.RetrofitClient.service.generateContent(com.example.BuildConfig.GEMINI_API_KEY, request)
+                val rawText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+                if (rawText.isNotBlank()) {
+                    val jsonStr = rawText.substringAfter("[").substringBeforeLast("]")
+                    val jsonArray = org.json.JSONArray("[" + jsonStr + "]")
+                    
+                    val updatedBooks = mutableListOf<com.example.data.EBook>()
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        val id = obj.optString("id")
+                        val genre = obj.optString("genre")
+                        
+                        val book = batch.find { it.id == id }
+                        if (book != null && genre.isNotBlank()) {
+                            updatedBooks.add(book.copy(genre = genre))
+                        }
+                    }
+                    if (updatedBooks.isNotEmpty()) {
+                        database.libraryDao().insertEBooks(updatedBooks)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun extractJsonString(rawText: String): String {
+        val startIndex = rawText.indexOfAny(listOf("{", "["))
+        val endIndex = rawText.lastIndexOfAny(listOf("}", "]"))
+        return if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+            rawText.substring(startIndex, endIndex + 1)
+        } else {
+            rawText
+        }
+    }
+
+    fun triggerManualDailyCleanup() {
+        viewModelScope.launch {
+            performDailyDynamicMenuAndCategoryCleanup()
+        }
+    }
+
+    fun triggerManualCoverLocation() {
+        viewModelScope.launch {
+            locateMissingCoverArtWithAI()
+        }
+    }
+
+    suspend fun performDailyDynamicMenuAndCategoryCleanup(): Boolean {
+        _isCleaningUp.value = true
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val ebooks = database.libraryDao().getAllEBooks().firstOrNull() ?: emptyList()
+                val audiobooks = database.libraryDao().getAllBooks().firstOrNull() ?: emptyList()
+                val music = database.libraryDao().getAllMusic().firstOrNull() ?: emptyList()
+
+                if (ebooks.isEmpty() && audiobooks.isEmpty() && music.isEmpty()) {
+                    return@withContext false
+                }
+
+                val itemsText = java.lang.StringBuilder()
+                ebooks.forEach { itemsText.append("${it.id} | EBOOK | ${it.title} | ${it.author} | ${it.genre}\n") }
+                audiobooks.forEach { itemsText.append("${it.id} | AUDIOBOOK | ${it.title} | ${it.author} | ${it.genre}\n") }
+                music.forEach { itemsText.append("${it.id} | MUSIC | ${it.title} | ${it.artist} | ${it.genre}\n") }
+
+                val sdfDay = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
+                val dayOfWeekString = sdfDay.format(Date())
+
+                val prompt = """
+                    You are the HomeCast Media Optimizer AI.
+                    Today's Date/Day context is: $dayOfWeekString.
+                    Your task is to:
+                    1. Generate exactly 5-6 fresh, beautiful, high-level, unique thematic categories for today (e.g. "Cosmic Journeys", "Vintage Classics", "Retro Synth Beats", "Philosophical Strategy", "Neon Cyberpunk", "Mindful Resonance"). These must vary on a daily basis (use today's date context to make them different).
+                    2. Review the list of active library items below.
+                    3. Categorize each item into ONE of these 5-6 newly generated categories based on its title and author/artist.
+                    4. Clean up raw library catalog author/artist names into clean, reader-friendly, natural human names. For example:
+                       - 'Smith, Jeff, 1960 Feb...' should become 'Jeff Smith'
+                       - 'Wells, H. G. (Herbert George), 1866-1946' should become 'H.G. Wells'
+                       - 'Sun Tzu, 5th cent. B.C.' should become 'Sun Tzu'
+                       - 'Fitzgerald, F. Scott (Francis Scott), 1896-1940' should become 'F. Scott Fitzgerald'
+                       - Remove any birth/death dates, raw catalog parentheticals, and trailing commas/periods.
+                    5. Ensure that NO categories resemble raw directories, folder paths, URLs, or file extensions (e.g., no '/bonevolume...', no 'gutenberg', no '.txt', no 'Various', no 'Uncategorized', no 'https://...'). Everything must be beautifully categorized in proper English.
+                    
+                    Active Items:
+                    $itemsText
+                    
+                    Return ONLY valid JSON matching this exact schema:
+                    {
+                      "categories": ["Category 1", "Category 2", "Category 3", "Category 4", "Category 5", "Category 6"],
+                      "items": [
+                        {
+                          "id": "item ID",
+                          "type": "EBOOK" | "AUDIOBOOK" | "MUSIC",
+                          "cleanedAuthor": "Clean Human Name",
+                          "genre": "Assigned Category"
+                        }
+                      ]
+                    }
+                    Do not wrap in markdown or code blocks. Just raw JSON.
+                """.trimIndent()
+
+                val request = GenerateContentRequest(
+                    contents = listOf(Content(parts = listOf(Part(text = prompt))))
+                )
+                val response = RetrofitClient.service.generateContent(BuildConfig.GEMINI_API_KEY, request)
+                val rawText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+                if (rawText.isBlank()) return@withContext false
+
+                val cleanedJsonStr = extractJsonString(rawText)
+                val rootObj = org.json.JSONObject(cleanedJsonStr)
+                val itemsArray = rootObj.optJSONArray("items") ?: org.json.JSONArray()
+
+                val updatedEbooks = mutableListOf<com.example.data.EBook>()
+                val updatedAudiobooks = mutableListOf<com.example.data.Audiobook>()
+                val updatedMusic = mutableListOf<com.example.data.MusicTrack>()
+
+                for (i in 0 until itemsArray.length()) {
+                    val obj = itemsArray.getJSONObject(i)
+                    val id = obj.optString("id")
+                    val type = obj.optString("type")
+                    val cleanedAuthor = obj.optString("cleanedAuthor")
+                    val genre = obj.optString("genre")
+
+                    if (id.isBlank() || genre.isBlank()) continue
+
+                    when (type.uppercase()) {
+                        "EBOOK" -> {
+                            val original = ebooks.find { it.id == id }
+                            if (original != null) {
+                                updatedEbooks.add(original.copy(
+                                    author = cleanedAuthor.ifBlank { original.author },
+                                    genre = genre
+                                ))
+                            }
+                        }
+                        "AUDIOBOOK" -> {
+                            val original = audiobooks.find { it.id == id }
+                            if (original != null) {
+                                updatedAudiobooks.add(original.copy(
+                                    author = cleanedAuthor.ifBlank { original.author },
+                                    genre = genre
+                                ))
+                            }
+                        }
+                        "MUSIC" -> {
+                            val original = music.find { it.id == id }
+                            if (original != null) {
+                                updatedMusic.add(original.copy(
+                                    artist = cleanedAuthor.ifBlank { original.artist },
+                                    genre = genre
+                                ))
+                            }
+                        }
+                    }
+                }
+
+                if (updatedEbooks.isNotEmpty()) database.libraryDao().insertEBooks(updatedEbooks)
+                if (updatedAudiobooks.isNotEmpty()) database.libraryDao().insertBooks(updatedAudiobooks)
+                if (updatedMusic.isNotEmpty()) database.libraryDao().insertMusicTracks(updatedMusic)
+
+                true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            } finally {
+                _isCleaningUp.value = false
+            }
+        }
+    }
+
+    suspend fun locateMissingCoverArtWithAI(): Boolean {
+        _isLocatingCovers.value = true
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val ebooks = database.libraryDao().getAllEBooks().firstOrNull() ?: emptyList()
+                val audiobooks = database.libraryDao().getAllBooks().firstOrNull() ?: emptyList()
+                val music = database.libraryDao().getAllMusic().firstOrNull() ?: emptyList()
+
+                val missingEbooks = ebooks.filter { 
+                    it.coverUrl.isBlank() || 
+                    it.coverUrl.contains("photo-1544716278-ca5e3f4abd8c") || 
+                    it.coverUrl.startsWith("http://localhost") ||
+                    it.coverUrl == "placeholder"
+                }
+                val missingAudiobooks = audiobooks.filter { 
+                    it.coverUrl.isBlank() || 
+                    it.coverUrl.contains("photo-1544716278-ca5e3f4abd8c") || 
+                    it.coverUrl == "placeholder"
+                }
+                val missingMusic = music.filter { 
+                    it.coverUrl.isBlank() || 
+                    it.coverUrl.contains("photo-1544716278-ca5e3f4abd8c") || 
+                    it.coverUrl == "placeholder"
+                }
+
+                if (missingEbooks.isEmpty() && missingAudiobooks.isEmpty() && missingMusic.isEmpty()) {
+                    return@withContext true
+                }
+
+                val itemsText = java.lang.StringBuilder()
+                missingEbooks.take(15).forEach { itemsText.append("${it.id} | EBOOK | ${it.title} | ${it.author}\n") }
+                missingAudiobooks.take(15).forEach { itemsText.append("${it.id} | AUDIOBOOK | ${it.title} | ${it.author}\n") }
+                missingMusic.take(15).forEach { itemsText.append("${it.id} | MUSIC | ${it.title} | ${it.artist}\n") }
+
+                val prompt = """
+                    You are the HomeCast Media Cover Locator AI.
+                    The items below are missing high-quality cover art. Your task is to provide a highly relevant, high-quality, beautiful public image URL for each item's cover.
+                    
+                    Instructions for choosing URLs:
+                    1. Use specific, beautiful, and thematic image URLs from Unsplash, curated to match the title or mood of the media (e.g. cyberpunk, classic books, acoustic guitar, dark space scenery, synthwave elements).
+                    2. Example high-quality Unsplash images:
+                       - Sci-Fi: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=500'
+                       - Tech/Cyberpunk: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=500'
+                       - Fantasy/Adventure: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500'
+                       - Classic Books: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500'
+                       - Music/Synth: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500'
+                       - Audiobooks: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500'
+                    3. Return ONLY valid JSON matching this exact schema:
+                    [
+                      {
+                        "id": "item ID",
+                        "type": "EBOOK" | "AUDIOBOOK" | "MUSIC",
+                        "coverUrl": "Direct image URL"
+                      }
+                    ]
+                    Do not wrap in markdown or code blocks. Just raw JSON.
+                    
+                    Missing Cover Items:
+                    $itemsText
+                """.trimIndent()
+
+                val request = GenerateContentRequest(
+                    contents = listOf(Content(parts = listOf(Part(text = prompt))))
+                )
+                val response = RetrofitClient.service.generateContent(BuildConfig.GEMINI_API_KEY, request)
+                val rawText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+                if (rawText.isBlank()) return@withContext false
+
+                val cleanedJsonStr = extractJsonString(rawText)
+                val itemsArray = org.json.JSONArray(cleanedJsonStr)
+
+                val updatedEbooks = mutableListOf<com.example.data.EBook>()
+                val updatedAudiobooks = mutableListOf<com.example.data.Audiobook>()
+                val updatedMusic = mutableListOf<com.example.data.MusicTrack>()
+
+                for (i in 0 until itemsArray.length()) {
+                    val obj = itemsArray.getJSONObject(i)
+                    val id = obj.optString("id")
+                    val type = obj.optString("type")
+                    val coverUrl = obj.optString("coverUrl")
+
+                    if (id.isBlank() || coverUrl.isBlank()) continue
+
+                    when (type.uppercase()) {
+                        "EBOOK" -> {
+                            val original = ebooks.find { it.id == id }
+                            if (original != null) {
+                                updatedEbooks.add(original.copy(coverUrl = coverUrl))
+                            }
+                        }
+                        "AUDIOBOOK" -> {
+                            val original = audiobooks.find { it.id == id }
+                            if (original != null) {
+                                updatedAudiobooks.add(original.copy(coverUrl = coverUrl))
+                            }
+                        }
+                        "MUSIC" -> {
+                            val original = music.find { it.id == id }
+                            if (original != null) {
+                                updatedMusic.add(original.copy(coverUrl = coverUrl))
+                            }
+                        }
+                    }
+                }
+
+                if (updatedEbooks.isNotEmpty()) database.libraryDao().insertEBooks(updatedEbooks)
+                if (updatedAudiobooks.isNotEmpty()) database.libraryDao().insertBooks(updatedAudiobooks)
+                if (updatedMusic.isNotEmpty()) database.libraryDao().insertMusicTracks(updatedMusic)
+
+                true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            } finally {
+                _isLocatingCovers.value = false
+            }
+        }
+    }
+
+    fun fetchGeminiCategoryItems(category: String, sourceStr: String) {
         viewModelScope.launch {
             _isDiscoveryLoading.value = true
             try {
+                val inventory = if (sourceStr.contains("private")) {
+                    val b = allBooks.value.take(20).joinToString { it.title + " by " + it.author }
+                    val e = allEBooks.value.take(20).joinToString { it.title + " by " + it.author }
+                    val m = allMusic.value.take(20).joinToString { it.title + " by " + it.artist }
+                    "Audiobooks: $b\nEBooks: $e\nMusic: $m"
+                } else {
+                    val pb = _publicDomainBooks.value.take(20).joinToString { it.title + " by " + (it.creator ?: "Unknown") }
+                    val pa = _publicDomainAudiobooks.value.take(20).joinToString { it.title + " by " + (it.creator ?: "Unknown") }
+                    "Public Domain Books: $pb\nPublic Domain Audiobooks: $pa"
+                }
                 val prompt = "You are curating the '" + category + "' section for a media library app.\n" +
                     "Based on the user's active inventory below, or using your own knowledge of public domain/popular media, \n" +
                     "generate a list of 10 items (mix of books, audiobooks, and music) that perfectly fit the '" + category + "' category.\n\n" +
-                    "User Inventory:\n" + inventorySummary + "\n\n" +
+                    "User Inventory:\n" + inventory + "\n\n" +
                     "Return ONLY valid JSON matching this schema:\n" +
                     "{\n" +
                     "  \"items\": [\n" +
@@ -94,7 +460,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (geminiRes != null) {
                     val newItems = geminiRes.items.mapIndexed { index, item ->
                         com.example.ui.screens.DiscoveryItem(
-                            id = "gemini_${category.replace(" ", "_")}_$index",
                             title = item.title,
                             creator = item.creator,
                             mediaType = when (item.mediaType.uppercase()) {
@@ -104,11 +469,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             },
                             genre = item.genre,
                             coverUrl = item.coverUrl.ifBlank { "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&q=80" },
-                            description = item.description,
-                            tag = "✨ AI Curated",
-                            durationOrPages = "N/A",
-                            format = "Digital",
-                            gradient = listOf(androidx.compose.ui.graphics.Color(0xFF311B92), androidx.compose.ui.graphics.Color(0xFF7C4DFF))
+                            description = item.description
                         )
                     }
                     _geminiCategoryItems.value = newItems
