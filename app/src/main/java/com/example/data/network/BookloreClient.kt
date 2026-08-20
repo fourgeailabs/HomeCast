@@ -38,6 +38,7 @@ data class BookloreBook(
 
 @JsonClass(generateAdapter = true)
 data class BookloreMetadata(
+    val title: String? = null,
     val authors: List<String>? = null,
     val description: String? = null,
     val pageCount: Int? = null,
@@ -148,11 +149,23 @@ object BookloreClient {
                                             val categoriesList = book.metadata?.categories ?: emptyList()
                                             val genreName = if (categoriesList.isNotEmpty()) categoriesList.first() else book.genre ?: "Unknown"
                                             
+                                            // Determine cover url based on Booklore vs Komga
+                                            var rawToken = apiKey
+                                            if (rawToken.startsWith("Bearer ")) {
+                                                rawToken = rawToken.substring(7)
+                                            }
+                                            val queryParam = if (rawToken.isNotBlank() && !rawToken.startsWith("Basic ")) "?token=$rawToken" else ""
+                                            val cover = book.coverUrl ?: if (normalizedUrl.contains("komga") || endpoint.contains("komga")) {
+                                                "$normalizedUrl/api/v1/books/${book.id}/thumbnail"
+                                            } else {
+                                                "$normalizedUrl/api/v1/media/book/${book.id}/cover$queryParam"
+                                            }
+                                            
                                             EBook(
                                                 id = book.id,
-                                                title = book.title ?: book.name ?: "Unknown",
+                                                title = book.metadata?.title ?: book.title ?: book.name ?: "Unknown",
                                                 author = authorName,
-                                                coverUrl = book.coverUrl ?: if (endpoint.contains("books") || endpoint == "") "$normalizedUrl/api/v1/books/${book.id}/thumbnail" else "",
+                                                coverUrl = cover,
                                                 serverId = serverId,
                                                 genre = genreName,
                                                 description = book.metadata?.description ?: book.description ?: book.summary ?: "",
@@ -174,11 +187,23 @@ object BookloreClient {
                                             val categoriesList = book.metadata?.categories ?: emptyList()
                                             val genreName = if (categoriesList.isNotEmpty()) categoriesList.first() else book.genre ?: "Unknown"
                                             
+                                            // Determine cover url based on Booklore vs Komga
+                                            var rawToken = apiKey
+                                            if (rawToken.startsWith("Bearer ")) {
+                                                rawToken = rawToken.substring(7)
+                                            }
+                                            val queryParam = if (rawToken.isNotBlank() && !rawToken.startsWith("Basic ")) "?token=$rawToken" else ""
+                                            val cover = book.coverUrl ?: if (normalizedUrl.contains("komga") || endpoint.contains("komga")) {
+                                                "$normalizedUrl/api/v1/books/${book.id}/thumbnail"
+                                            } else {
+                                                "$normalizedUrl/api/v1/media/book/${book.id}/cover$queryParam"
+                                            }
+                                            
                                             EBook(
                                                 id = book.id,
-                                                title = book.title ?: book.name ?: "Unknown",
+                                                title = book.metadata?.title ?: book.title ?: book.name ?: "Unknown",
                                                 author = authorName,
-                                                coverUrl = book.coverUrl ?: if (endpoint.contains("books") || endpoint == "") "$normalizedUrl/api/v1/books/${book.id}/thumbnail" else "",
+                                                coverUrl = cover,
                                                 serverId = serverId,
                                                 genre = genreName,
                                                 description = book.metadata?.description ?: book.description ?: book.summary ?: "",
