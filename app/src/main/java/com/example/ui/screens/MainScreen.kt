@@ -309,7 +309,13 @@ fun MainScreen(
                         onOpenComic = { comic ->
                             activeComic = comic
                         },
-                        onNavigateToSettings = { navController.navigate(Routes.Settings) }
+                        onNavigateToSettings = { navController.navigate(Routes.Settings) },
+                        onNavigateToDetails = { title, creator, type ->
+                            navController.navigate(Routes.MediaDetail(title, creator, type))
+                        },
+                        onNavigateToCreator = { name ->
+                            navController.navigate(Routes.CreatorDetail(name))
+                        }
                     )
                 }
                 composable(Routes.Player) {
