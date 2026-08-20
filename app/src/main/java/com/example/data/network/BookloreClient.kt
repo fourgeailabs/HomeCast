@@ -23,6 +23,8 @@ data class BookloreBook(
     val id: String,
     val title: String? = null,
     val name: String? = null,
+    val metadata: BookloreMetadata? = null,
+    
     val author: String? = null,
     val writer: String? = null,
     val coverUrl: String? = null,
@@ -32,6 +34,14 @@ data class BookloreBook(
     val totalPages: Int? = null,
     val isComic: Boolean? = null,
     val media: KomgaMedia? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class BookloreMetadata(
+    val authors: List<String>? = null,
+    val description: String? = null,
+    val pageCount: Int? = null,
+    val categories: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -129,16 +139,21 @@ object BookloreClient {
                                     val bookList = bookloreResponse?.books ?: bookloreResponse?.content
                                     if (bookList != null) {
                                         val ebooks = bookList.map { book ->
+                                            val authorsList = book.metadata?.authors ?: emptyList()
+                                            val authorName = if (authorsList.isNotEmpty()) authorsList.joinToString(", ") else book.author ?: book.writer ?: "Unknown"
+                                            val categoriesList = book.metadata?.categories ?: emptyList()
+                                            val genreName = if (categoriesList.isNotEmpty()) categoriesList.first() else book.genre ?: "Unknown"
+                                            
                                             EBook(
                                                 id = book.id,
                                                 title = book.title ?: book.name ?: "Unknown",
-                                                author = book.author ?: book.writer ?: "Unknown",
-                                                coverUrl = book.coverUrl ?: if (endpoint.contains("books")) "$normalizedUrl/api/v1/books/${book.id}/thumbnail" else "",
+                                                author = authorName,
+                                                coverUrl = book.coverUrl ?: if (endpoint.contains("books") || endpoint == "") "$normalizedUrl/api/v1/books/${book.id}/thumbnail" else "",
                                                 serverId = serverId,
-                                                genre = book.genre ?: "Unknown",
-                                                description = book.description ?: book.summary ?: "",
-                                                totalPages = book.totalPages ?: book.media?.pagesCount ?: 0,
-                                                isComic = book.isComic ?: true
+                                                genre = genreName,
+                                                description = book.metadata?.description ?: book.description ?: book.summary ?: "",
+                                                totalPages = book.metadata?.pageCount ?: book.totalPages ?: book.media?.pagesCount ?: 0,
+                                                isComic = book.isComic ?: (genreName == "Comic" || genreName == "Manga")
                                             )
                                         }
                                         return@withContext Result.success(ebooks)
@@ -150,16 +165,21 @@ object BookloreClient {
                                     val books = adapter.fromJson(bodyString)
                                     if (books != null) {
                                         val ebooks = books.map { book ->
+                                            val authorsList = book.metadata?.authors ?: emptyList()
+                                            val authorName = if (authorsList.isNotEmpty()) authorsList.joinToString(", ") else book.author ?: book.writer ?: "Unknown"
+                                            val categoriesList = book.metadata?.categories ?: emptyList()
+                                            val genreName = if (categoriesList.isNotEmpty()) categoriesList.first() else book.genre ?: "Unknown"
+                                            
                                             EBook(
                                                 id = book.id,
                                                 title = book.title ?: book.name ?: "Unknown",
-                                                author = book.author ?: book.writer ?: "Unknown",
-                                                coverUrl = book.coverUrl ?: if (endpoint.contains("books")) "$normalizedUrl/api/v1/books/${book.id}/thumbnail" else "",
+                                                author = authorName,
+                                                coverUrl = book.coverUrl ?: if (endpoint.contains("books") || endpoint == "") "$normalizedUrl/api/v1/books/${book.id}/thumbnail" else "",
                                                 serverId = serverId,
-                                                genre = book.genre ?: "Unknown",
-                                                description = book.description ?: book.summary ?: "",
-                                                totalPages = book.totalPages ?: book.media?.pagesCount ?: 0,
-                                                isComic = book.isComic ?: true
+                                                genre = genreName,
+                                                description = book.metadata?.description ?: book.description ?: book.summary ?: "",
+                                                totalPages = book.metadata?.pageCount ?: book.totalPages ?: book.media?.pagesCount ?: 0,
+                                                isComic = book.isComic ?: (genreName == "Comic" || genreName == "Manga")
                                             )
                                         }
                                         return@withContext Result.success(ebooks)
