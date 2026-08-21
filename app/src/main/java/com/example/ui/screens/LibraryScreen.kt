@@ -305,7 +305,7 @@ fun LibraryScreen(
                     }
                 } // Ends LazyVerticalGrid
             } // Ends Column
-        } else if (allBooks.isEmpty()) {
+        } else if (currentBooks.isEmpty()) {
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
@@ -329,7 +329,7 @@ fun LibraryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.AutoStories,
+                            if (selectedSource == 0) Icons.Default.AutoStories else Icons.Default.CloudDownload,
                             contentDescription = null,
                             tint = AccentTeal,
                             modifier = Modifier.size(36.dp)
@@ -338,27 +338,33 @@ fun LibraryScreen(
 
                     Spacer(modifier = Modifier.height(18.dp))
                     Text(
-                        "Your Bookshelf is Empty",
+                        if (selectedSource == 0) "Your Bookshelf is Empty" else "No Public Domain Audiobooks",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Connect your personal Audiobookshelf server to sync and stream your full library on sliding shelves.",
+                        if (selectedSource == 0) {
+                            "Connect your personal Audiobookshelf server to sync and stream your full library on sliding shelves."
+                        } else {
+                            "Checking public domain archives. Please ensure you have an active internet connection."
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         lineHeight = 20.sp
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Button(
-                        onClick = onNavigateToSettings,
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Connect Audiobookshelf", fontWeight = FontWeight.SemiBold)
+                    if (selectedSource == 0) {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Button(
+                            onClick = onNavigateToSettings,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Connect Audiobookshelf", fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
@@ -669,6 +675,7 @@ fun AudiobookShelfCard(
                 .shadow(8.dp, RoundedCornerShape(16.dp))
                 .clip(RoundedCornerShape(16.dp))
                 .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
         ) {
             if (book.coverUrl.isNotBlank()) {
                 AsyncImage(
@@ -842,6 +849,7 @@ fun BookShelfRowItem(
             .height(88.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(SurfaceGlass)
+            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(end = 12.dp),
         verticalAlignment = Alignment.CenterVertically

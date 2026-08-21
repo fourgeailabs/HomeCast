@@ -172,8 +172,6 @@ fun EBooksScreen(
     var isGridViewOpen by remember { mutableStateOf(false) }
     var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
 
-    val genres = listOf("All", "Sci-Fi", "Classic", "Comics", "Cyberpunk", "Philosophy")
-
     val allEBooks by viewModel.allEBooks.collectAsState()
     val archiveBooks by viewModel.publicDomainBooks.collectAsState()
     
@@ -217,6 +215,11 @@ fun EBooksScreen(
                 )
             }
         }
+    }
+
+    val genres = remember(currentBookshelfItems) {
+        val extracted = currentBookshelfItems.map { it.genre.trim() }.filter { it.isNotBlank() }.distinct()
+        if (extracted.isNotEmpty()) listOf("All") + extracted else listOf("All", "Sci-Fi", "Classic", "Comics", "Cyberpunk", "Philosophy")
     }
 
     val filteredItems = remember(searchQuery, selectedGenre, currentBookshelfItems) {

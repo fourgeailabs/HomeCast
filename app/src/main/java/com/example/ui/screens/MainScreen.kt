@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -136,17 +137,10 @@ fun MainScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
-                                .shadow(8.dp, RoundedCornerShape(16.dp))
+                                .shadow(12.dp, RoundedCornerShape(16.dp))
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        if (isAudiobook) {
-                                            listOf(AccentTeal.copy(alpha = 0.25f), MaterialTheme.colorScheme.surfaceVariant)
-                                        } else {
-                                            listOf(AccentIndigo.copy(alpha = 0.25f), MaterialTheme.colorScheme.surfaceVariant)
-                                        }
-                                    )
-                                )
+                                .background(SurfaceGlass)
+                                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
                                 .clickable { isPlayerSlidUp = true }
                                 .padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically

@@ -1,11 +1,21 @@
 # HomeCast
 
-**Version:** 4.0.0
+**Version:** 4.1.1
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.0.0)
+## 🚀 Recent Updates (v4.1.1)
+- **Universal Public Domain Access**: Decoupled public domain audiobook and music tabs from personal server connection empty states. Users can now immediately explore and play classic public domain audiobooks and ambient tracks without needing to connect an Audiobookshelf or Plex server first.
+- **Contextual Empty-State Cards**: Redesigned empty-state card components to dynamically adapt to the selected source, showing network guidance for public domain archives and connection prompts for personal servers.
+
+### 🚀 Previous Updates (v4.1.0)
+- **First-Launch Library Auto-Seeding**: Solves empty state issues by preloading highly realistic, slightly messy catalog entities on the very first startup (including classic books, popular audiobooks, and synthwave music tracks). This allows users to experience the AI-powered organizers and cover art locators immediately upon installation.
+- **Dynamic Adaptive Genres**: Rewrote music and eBook category lists to be extracted reactively from active database records. When Google Gemini optimizes categories or genres, tabs and shelves update instantly in real-time.
+- **Frosted Glass Borders & Outlines**: Enhanced the glassmorphic aesthetics by extending `SurfaceGlassBorder` highlights to the persistent mini-player, music album covers, song list rows, and track shelf cards.
+- **Sequential Optimization Pipelines**: Chain-linked category optimizations with the missing cover-art locator, enabling both optimizations to run sequentially during seeding and manual settings refreshes.
+
+### 🚀 Previous Updates (v4.0.0)
 - **AI-Powered Cover Art Locator**: Built a robust system utilizing Google Gemini that scans your media files (audiobooks, music tracks, e-books) for missing or placeholder artwork and contextually sources high-quality, beautiful thematic image covers from public curators.
 - **Daily Dynamic Menu & Category Curation**: Engineered an automated scheduling system. On launch or daily date changes, the app utilizes Gemini to generate fresh, unique daily thematic category sets and automatically groups your media assets contextually based on their titles and contents (avoiding unhelpful or directory-like names).
 - **Intelligent Author & Artist Cleaning**: Integrated AI-powered catalog normalization that processes messy listing structures (e.g. `Smith, Jeff, 1960 Feb...` or `Wells, H. G. (Herbert George), 1866-1946`) into clean, reader-friendly, beautiful human-readable names.

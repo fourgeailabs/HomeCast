@@ -68,8 +68,130 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _publicDomainAudiobooks.value = ArchiveOrgClient.fetchPublicDomain("librivoxaudio")
         }
         viewModelScope.launch {
-            kotlinx.coroutines.delay(2000)
-            checkAndTriggerDailyCleanupIfNeeded()
+            kotlinx.coroutines.delay(1000)
+            
+            // Check if database is empty of seeded items
+            val hasEBooks = database.libraryDao().getAllEBooks().firstOrNull()?.isNotEmpty() ?: false
+            val hasAudiobooks = database.libraryDao().getAllBooks().firstOrNull()?.isNotEmpty() ?: false
+            val hasMusic = database.libraryDao().getAllMusic().firstOrNull()?.isNotEmpty() ?: false
+
+            if (!hasEBooks && !hasAudiobooks && !hasMusic) {
+                // Seed database with messy items that Gemini will beautifully format and locate covers for!
+                val seedEBooks = listOf(
+                    com.example.data.EBook(
+                        id = "ebook_seeded_1",
+                        title = "The Time Machine",
+                        author = "Wells, H. G. (Herbert George), 1866-1946",
+                        coverUrl = "placeholder",
+                        serverId = "demo_server",
+                        genre = "/bonevolume7ghost0000smit_r6d2",
+                        description = "A Victorian scientist constructs a machine that travels through fourth-dimensional spacetime into the far future year 802,701 AD.",
+                        totalPages = 180,
+                        progressPercent = 65
+                    ),
+                    com.example.data.EBook(
+                        id = "ebook_seeded_2",
+                        title = "The Great Gatsby",
+                        author = "Fitzgerald, F. Scott (Francis Scott), 1896-1940",
+                        coverUrl = "placeholder",
+                        serverId = "demo_server",
+                        genre = "/bonevolume7ghost0000smit_r6d2",
+                        description = "A classic novel exploring themes of wealth, love, and the disillusionment of the American Dream.",
+                        totalPages = 190,
+                        progressPercent = 12
+                    ),
+                    com.example.data.EBook(
+                        id = "ebook_seeded_3",
+                        title = "The Art of War",
+                        author = "Sun Tzu, 5th cent. B.C.",
+                        coverUrl = "placeholder",
+                        serverId = "demo_server",
+                        genre = "Various",
+                        description = "Ancient Chinese military treatise attributed to Sun Tzu, devoted to strategic thinking and tactics.",
+                        totalPages = 112,
+                        progressPercent = 100
+                    ),
+                    com.example.data.EBook(
+                        id = "ebook_seeded_4",
+                        title = "Frankenstein",
+                        author = "Shelley, Mary Wollstonecraft, 1797-1851",
+                        coverUrl = "placeholder",
+                        serverId = "demo_server",
+                        genre = "Uncategorized",
+                        description = "Victor Frankenstein creates a sentient creature in an unorthodox scientific experiment with haunting consequences.",
+                        totalPages = 280,
+                        progressPercent = 30
+                    ),
+                    com.example.data.EBook(
+                        id = "ebook_seeded_5",
+                        title = "Metamorphosis",
+                        author = "Kafka, Franz, 1883-1924",
+                        coverUrl = "placeholder",
+                        serverId = "demo_server",
+                        genre = "/bonevolume7ghost0000smit_r6d2",
+                        description = "Gregor Samsa awakens one morning to find himself transformed into a monstrous insect.",
+                        totalPages = 128,
+                        progressPercent = 50
+                    )
+                )
+
+                val seedAudiobooks = listOf(
+                    com.example.data.Audiobook(
+                        id = "audiobook_seeded_1",
+                        title = "The Adventures of Sherlock Holmes",
+                        author = "Doyle, Arthur Conan, Sir, 1859-1930",
+                        coverUrl = "placeholder",
+                        duration = 3600000L,
+                        serverId = "demo_server",
+                        genre = "/bonevolume7ghost0000smit_r6d2",
+                        narrator = "LibriVox Narrator",
+                        streamUrl = "https://archive.org/download/sherlock_holmes_adventures_64kb_librivox/sherlock_holmes_adventures_01_doyle_64kb.mp3"
+                    ),
+                    com.example.data.Audiobook(
+                        id = "audiobook_seeded_2",
+                        title = "Dracula",
+                        author = "Stoker, Bram, 1847-1912",
+                        coverUrl = "placeholder",
+                        duration = 5400000L,
+                        serverId = "demo_server",
+                        genre = "Various",
+                        narrator = "LibriVox Narrator",
+                        streamUrl = "https://archive.org/download/dracula_librivox/dracula_01_stoker_64kb.mp3"
+                    )
+                )
+
+                val seedMusic = listOf(
+                    com.example.data.MusicTrack(
+                        id = "music_seeded_1",
+                        title = "Synthwave Sunset",
+                        artist = "Retro Synth Waves",
+                        album = "Neon Horizon",
+                        coverUrl = "placeholder",
+                        duration = 180000L,
+                        serverId = "demo_server",
+                        streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
+                        genre = "https://some-url.com/.txt"
+                    ),
+                    com.example.data.MusicTrack(
+                        id = "music_seeded_2",
+                        title = "Acoustic Reflection",
+                        artist = "Warm Acoustic Guitar Trio",
+                        album = "Reflections",
+                        coverUrl = "placeholder",
+                        duration = 240000L,
+                        serverId = "demo_server",
+                        streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
+                        genre = "Various"
+                    )
+                )
+
+                database.libraryDao().insertEBooks(seedEBooks)
+                database.libraryDao().insertBooks(seedAudiobooks)
+                database.libraryDao().insertMusicTracks(seedMusic)
+            }
+            
+            // Automatically clean authors/genres and locate beautiful cover-art URLs immediately!
+            performDailyDynamicMenuAndCategoryCleanup()
         }
     }
 
@@ -281,6 +403,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (updatedEbooks.isNotEmpty()) database.libraryDao().insertEBooks(updatedEbooks)
                 if (updatedAudiobooks.isNotEmpty()) database.libraryDao().insertBooks(updatedAudiobooks)
                 if (updatedMusic.isNotEmpty()) database.libraryDao().insertMusicTracks(updatedMusic)
+
+                // Trigger cover art location for newly seeded/inserted items
+                viewModelScope.launch {
+                    locateMissingCoverArtWithAI()
+                }
 
                 true
             } catch (e: Exception) {

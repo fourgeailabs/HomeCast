@@ -136,8 +136,8 @@ fun MusicScreen(
             }.sortedBy { it.name }
     }
 
-    val genreList = remember {
-        listOf(
+    val genreList = remember(currentMusic) {
+        val standardGenres = listOf(
             GenreItem(
                 name = "Rock & Alternative",
                 gradient = listOf(Color(0xFFE53935), Color(0xFF8E24AA)),
@@ -187,6 +187,18 @@ fun MusicScreen(
                 description = "Calm Textures & Focus"
             )
         )
+        val databaseGenres = currentMusic.map { it.genre.trim() }.filter { it.isNotBlank() }.distinct()
+        val extraGenres = databaseGenres.filter { dbGenre ->
+            standardGenres.none { it.name.equals(dbGenre, ignoreCase = true) }
+        }.map { dbGenre ->
+            GenreItem(
+                name = dbGenre,
+                gradient = listOf(Color(0xFF3F51B5), Color(0xFF00BCD4)),
+                icon = Icons.Default.Audiotrack,
+                description = "AI Curated Rhythm Blend"
+            )
+        }
+        standardGenres + extraGenres
     }
 
     // Filtered tracks for global search
@@ -308,7 +320,7 @@ fun MusicScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Empty Server State
-        if (allMusic.isEmpty()) {
+        if (currentMusic.isEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 item {
                     Card(
@@ -334,7 +346,7 @@ fun MusicScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.MusicNote,
+                                    if (selectedSource == 0) Icons.Default.MusicNote else Icons.Default.CloudDownload,
                                     contentDescription = null,
                                     tint = AccentIndigo,
                                     modifier = Modifier.size(36.dp)
@@ -342,24 +354,34 @@ fun MusicScreen(
                             }
 
                             Spacer(modifier = Modifier.height(18.dp))
-                            Text("No Music Synced", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (selectedSource == 0) "No Music Synced" else "No Public Domain Music",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Connect your personal Plex server with your URL & Token to stream your library with full genre, artist, and album hierarchy.",
+                                if (selectedSource == 0) {
+                                    "Connect your personal Plex server with your URL & Token to stream your library with full genre, artist, and album hierarchy."
+                                } else {
+                                    "Checking public domain audio tracks. Please ensure you have an active internet connection."
+                                },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center,
                                 lineHeight = 20.sp
                             )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Button(
-                                onClick = onNavigateToSettings,
-                                colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Default.Settings, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Connect Plex Server", fontWeight = FontWeight.SemiBold)
+                            if (selectedSource == 0) {
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Button(
+                                    onClick = onNavigateToSettings,
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) {
+                                    Icon(Icons.Default.Settings, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Connect Plex Server", fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     }
@@ -626,7 +648,8 @@ fun AlbumSongsScreen(
                         .size(200.dp)
                         .shadow(16.dp, RoundedCornerShape(20.dp))
                         .clip(RoundedCornerShape(20.dp))
-                        .background(SurfaceGlass),
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(20.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (album.coverUrl.isNotBlank()) {
@@ -1000,6 +1023,7 @@ fun ArtistGridCard(artist: ArtistGroup, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(SurfaceGlass)
+            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -1067,7 +1091,8 @@ fun AlbumCard(album: AlbumGroup, onClick: () -> Unit) {
                 .size(160.dp)
                 .shadow(6.dp, RoundedCornerShape(16.dp))
                 .clip(RoundedCornerShape(16.dp))
-                .background(SurfaceGlass),
+                .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
             if (album.coverUrl.isNotBlank()) {
@@ -1115,6 +1140,7 @@ fun MusicTrackShelfCard(
                 .shadow(6.dp, RoundedCornerShape(16.dp))
                 .clip(RoundedCornerShape(16.dp))
                 .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
         ) {
             if (track.coverUrl.isNotBlank()) {
                 AsyncImage(
@@ -1174,6 +1200,7 @@ fun AlbumShelfCard(album: AlbumGroup, onClick: () -> Unit) {
                 .shadow(6.dp, RoundedCornerShape(16.dp))
                 .clip(RoundedCornerShape(16.dp))
                 .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
         ) {
             if (album.coverUrl.isNotBlank()) {
                 AsyncImage(
@@ -1260,6 +1287,7 @@ fun MusicTrackRowItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(SurfaceGlass)
+            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
