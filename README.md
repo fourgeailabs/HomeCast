@@ -1,11 +1,14 @@
 # HomeCast
 
-**Version:** 4.3.0
+**Version:** 4.3.1
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.3.0)
+## 🚀 Recent Updates (v4.3.1)
+- **Dual Adaptive Icon Compatibility**: Introduced native adaptive icon layouts with distinct foreground configurations. Devices that prefer round/circular icons (like Google Pixel) load a mathematically perfect circular version of the gradient badge, preventing any forced letterboxing, cutting off of square corners, or double-outline stretching, while maintaining a classic squircle badge on square-preferring launchers.
+
+## 🚀 Previous Updates (v4.3.0)
 - **Clickable Artist/Creator Bio Detail Navigation**: Clicking on the artist/author name inside the sliding audio player now transitions the user directly to the Google Gemini-powered Creator Detail screen.
 - **Dynamic Public Domain Library Matching in Bio**: The Creator Bio details page now cross-references both personal server files and online public domain records, presenting organized shelves of matching E-books, Audiobooks, and Music tracks that can be read or played directly from their detail profiles.
 - **On-Demand Full Public Domain Album Resolution**: Solved the issue where public domain music albums only showed/played a single song. Clicking a public domain album now fetches its entire tracklist from Archive.org's files API, loading all constituent songs with exact titles, correct track numbers, and real-time durations.
