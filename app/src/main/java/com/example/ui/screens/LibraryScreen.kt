@@ -168,20 +168,29 @@ fun LibraryScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = selectedSource == 0,
-                onClick = { selectedSource = 0 },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-            ) {
-                Text("Personal Library")
+        TabRow(
+            selectedTabIndex = selectedSource,
+            containerColor = Color.Transparent,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
+                    color = AccentTeal
+                )
             }
-            SegmentedButton(
-                selected = selectedSource == 1,
-                onClick = { selectedSource = 1 },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-            ) {
-                Text("Public Domain")
+        ) {
+            listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedSource == index,
+                    onClick = { selectedSource = index },
+                    text = {
+                        Text(
+                            text = title,
+                            fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
+                        )
+                    },
+                    selectedContentColor = AccentTeal,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         
@@ -267,8 +276,7 @@ fun LibraryScreen(
                             book = book,
                             isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
                             onClick = {
-                                viewModel.playAudiobookWithResolution(book)
-                                onBookClick(book)
+                                onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                             }
                         )
                     }
@@ -305,8 +313,7 @@ fun LibraryScreen(
                             book = book,
                             isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
                             onClick = {
-                                viewModel.playAudiobookWithResolution(book)
-                                onBookClick(book)
+                                onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                             }
                         )
                     }
@@ -403,8 +410,7 @@ fun LibraryScreen(
                                 showProgress = true,
                                 isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
                                 onClick = {
-                                    viewModel.playAudiobookWithResolution(book)
-                                    onBookClick(book)
+                                    onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
                             )
@@ -433,8 +439,7 @@ fun LibraryScreen(
                                 book = book,
                                 tag = "New",
                                 onClick = {
-                                    viewModel.playAudiobookWithResolution(book)
-                                    onBookClick(book)
+                                    onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
                             )
@@ -462,8 +467,7 @@ fun LibraryScreen(
                                 book = book,
                                 tag = "Popular",
                                 onClick = {
-                                    viewModel.playAudiobookWithResolution(book)
-                                    onBookClick(book)
+                                    onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
                             )
@@ -490,8 +494,7 @@ fun LibraryScreen(
                             AudiobookShelfCard(
                                 book = book,
                                 onClick = {
-                                    viewModel.playAudiobookWithResolution(book)
-                                    onBookClick(book)
+                                    onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
                             )
@@ -519,8 +522,7 @@ fun LibraryScreen(
                                 book = book,
                                 tag = book.seriesName.take(16),
                                 onClick = {
-                                    viewModel.playAudiobookWithResolution(book)
-                                    onBookClick(book)
+                                    onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
                             )
@@ -547,8 +549,7 @@ fun LibraryScreen(
                             AudiobookShelfCard(
                                 book = book,
                                 onClick = {
-                                    viewModel.playAudiobookWithResolution(book)
-                                    onBookClick(book)
+                                    onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
                             )
@@ -574,8 +575,7 @@ fun LibraryScreen(
                         AudiobookShelfCard(
                             book = book,
                             onClick = {
-                                viewModel.playAudiobookWithResolution(book)
-                                onBookClick(book)
+                                onNavigateToDetails(book.title, book.author, "AUDIOBOOK")
                             },
                             onFavoriteToggle = { viewModel.toggleFavorite(book) }
                         )
@@ -680,48 +680,16 @@ fun AudiobookShelfCard(
                 .width(140.dp)
                 .height(210.dp)
                 .shadow(8.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(SurfaceGlass)
-                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
         ) {
-            if (book.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = book.coverUrl,
-                    contentDescription = book.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(AccentTeal.copy(alpha = 0.4f), AccentIndigo.copy(alpha = 0.6f))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Book,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            book.title.take(1),
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
+            com.example.ui.components.MediaCoverArt(
+                title = book.title,
+                authorOrArtist = book.author,
+                coverUrl = book.coverUrl,
+                genre = book.genre,
+                isBookAspectRatio = true,
+                cornerRadius = 16.dp,
+                modifier = Modifier.fillMaxSize()
+            )
 
             // Top overlay: Tag & Favorite heart
             Row(
@@ -828,6 +796,7 @@ fun AudiobookShelfCard(
             book.title,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -861,33 +830,35 @@ fun BookShelfRowItem(
             .padding(end = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (book.coverUrl.isNotBlank()) {
-            AsyncImage(
-                model = book.coverUrl,
-                contentDescription = book.title,
-                modifier = Modifier
-                    .size(88.dp)
-                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
-                contentScale = ContentScale.Crop
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+        ) {
+            com.example.ui.components.MediaCoverArt(
+                title = book.title,
+                authorOrArtist = book.author,
+                coverUrl = book.coverUrl,
+                genre = book.genre,
+                isBookAspectRatio = true,
+                cornerRadius = 0.dp,
+                modifier = Modifier.fillMaxSize()
             )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .background(AccentTeal.copy(alpha = 0.25f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(book.title.take(1), fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurface)
-            }
         }
 
         Spacer(modifier = Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(book.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(book.author, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, maxLines = 1)
+            Text(book.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                book.author, 
+                color = AccentTeal, 
+                fontSize = 13.sp, 
+                maxLines = 1,
+                modifier = Modifier.clickable { onAuthorClick(book.author) }
+            )
             if (book.seriesName.isNotBlank()) {
-                Text(book.seriesName, color = AccentTeal, fontSize = 11.sp, maxLines = 1)
+                Text(book.seriesName, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
             }
         }
 
@@ -910,8 +881,6 @@ fun BookShelfRowItem(
     }
 }
 
-
-
 @Composable
 fun Audiobook3ColumnCard(
     book: Audiobook,
@@ -932,26 +901,17 @@ fun Audiobook3ColumnCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(AccentTeal.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
+                .aspectRatio(0.68f)
         ) {
-            if (book.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = book.coverUrl,
-                    contentDescription = book.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.AutoStories,
-                    contentDescription = null,
-                    tint = AccentTeal,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+            com.example.ui.components.MediaCoverArt(
+                title = book.title,
+                authorOrArtist = book.author,
+                coverUrl = book.coverUrl,
+                genre = book.genre,
+                isBookAspectRatio = true,
+                cornerRadius = 8.dp,
+                modifier = Modifier.fillMaxSize()
+            )
 
             if (isPlaying) {
                 Surface(
@@ -964,7 +924,7 @@ fun Audiobook3ColumnCard(
                     Icon(
                         Icons.Default.GraphicEq,
                         contentDescription = "Playing",
-                        tint = Color.White,
+                        tint = Color.Black,
                         modifier = Modifier.padding(3.dp).size(12.dp)
                     )
                 }
@@ -977,6 +937,7 @@ fun Audiobook3ColumnCard(
             book.title,
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
@@ -984,11 +945,12 @@ fun Audiobook3ColumnCard(
 
         Text(
             book.author,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AccentTeal,
             fontSize = 9.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.clickable { onAuthorClick(book.author) }
         )
     }
 }

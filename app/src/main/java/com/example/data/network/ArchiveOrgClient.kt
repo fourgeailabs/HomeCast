@@ -34,14 +34,20 @@ data class ArchiveFile(
 )
 
 object ArchiveOrgClient {
-    private val client = OkHttpClient.Builder().build()
+    private val client = OkHttpClient.Builder()
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
 
     suspend fun fetchPublicDomain(query: String): List<ArchiveDoc> = withContext(Dispatchers.IO) {
         try {
             val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-            val url = "https://archive.org/advancedsearch.php?q=$encodedQuery&fl[]=identifier,title,creator,description&sort[]=downloads+desc&rows=100&page=1&output=json"
-            val request = Request.Builder().url(url).build()
+            val url = "https://archive.org/advancedsearch.php?q=$encodedQuery&fl[]=identifier,title,creator,description&sort[]=downloads+desc&rows=250&page=1&output=json"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .build()
             val response = client.newCall(request).execute()
             val body = response.body?.string()
             if (response.isSuccessful && body != null) {
@@ -58,7 +64,10 @@ object ArchiveOrgClient {
     suspend fun fetchFilesForIdentifier(identifier: String): List<ArchiveFile> = withContext(Dispatchers.IO) {
         try {
             val url = "https://archive.org/metadata/$identifier/files"
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .build()
             val response = client.newCall(request).execute()
             val body = response.body?.string()
             if (response.isSuccessful && body != null) {

@@ -40,8 +40,14 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
         return if (result.isSuccess) {
             val books = result.getOrNull() ?: emptyList()
             if (books.isNotEmpty()) {
+                val sanitizedBooks = books.map { book ->
+                    book.copy(
+                        author = com.example.utils.sanitizeAuthorName(book.author),
+                        genre = com.example.utils.sanitizeGenreName(book.genre, book.title, "")
+                    )
+                }
                 dao.deleteBooksByServer(server.id)
-                dao.insertBooks(books)
+                dao.insertBooks(sanitizedBooks)
             }
             secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
             Result.success(books.size)
@@ -55,8 +61,14 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
         return if (result.isSuccess) {
             val tracks = result.getOrNull() ?: emptyList()
             if (tracks.isNotEmpty()) {
+                val sanitizedTracks = tracks.map { track ->
+                    track.copy(
+                        artist = com.example.utils.sanitizeAuthorName(track.artist),
+                        genre = com.example.utils.sanitizeGenreName(track.genre, track.title, "")
+                    )
+                }
                 dao.deleteMusicByServer(server.id)
-                dao.insertMusicTracks(tracks)
+                dao.insertMusicTracks(sanitizedTracks)
             }
             secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
             Result.success(tracks.size)
@@ -70,8 +82,14 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
         return if (result.isSuccess) {
             val books = result.getOrNull() ?: emptyList()
             if (books.isNotEmpty()) {
+                val sanitizedBooks = books.map { book ->
+                    book.copy(
+                        author = com.example.utils.sanitizeAuthorName(book.author),
+                        genre = com.example.utils.sanitizeGenreName(book.genre, book.title, book.description)
+                    )
+                }
                 dao.deleteEBooksByServer(server.id)
-                dao.insertEBooks(books)
+                dao.insertEBooks(sanitizedBooks)
             }
             secureConfigManager.saveServer(server.copy(isConnected = true, lastSyncTime = System.currentTimeMillis()))
             Result.success(books.size)

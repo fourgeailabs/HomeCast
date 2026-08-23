@@ -1,11 +1,25 @@
 # HomeCast
 
-**Version:** 4.5.2
+**Version:** 4.6.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.5.2)
+## 🚀 Recent Updates (v4.6.0)
+- **Unified Switcher UI/UX Across Media Tabs**: Replicated the sleek personal library & public domain switcher button tab bar from Books and Music across the Audiobooks screen for seamless visual and interaction consistency.
+- **Relabeled Bookshelf Header**: Renamed "Glass Bookshelf" to "Bookshelf" in the primary e-book reading screen with crisp typography and high contrast.
+- **Resilient Cover Art Engine (MediaCoverArt)**: Replaced fragile image loaders across all shelves with high-contrast, gold-embossed fallback covers. Book covers now load reliably and never display empty or broken boxes.
+- **Massive Public Domain Catalog Expansion**: Preloaded hundreds of curated public domain books, audiobooks, and music masterworks across Sci-Fi, Cyberpunk, Fantasy, Philosophy, Mystery, and Classics.
+- **Instant Zero-Delay Fallbacks for Details & Creators**: Integrated `LocalMediaMetadataProvider` to guarantee instant rendering of media biographies, creator profiles, ratings, and recommendations even when offline or before AI responses arrive.
+- **Comprehensive Dark Mode Contrast Fixes**: Fixed all media titles, album names, and author links across all screens to render in high-contrast white and vibrant accents.
+
+## 🚀 Previous Updates (v4.5.3)
+- **AI-Powered Local Database Sanitization**: Restructured library synchronization pipelines to execute client-side author and genre sanitizers prior to local SQLite database insertions. This ensures clean, folder-free categorization and catalog author names even if the local network is offline or the Gemini API is unavailable.
+- **Contextual Media Details Screen**: Tapping any book, audiobook, or music item now launches a beautiful, information-rich detailed layout. Users can inspect the item's synopsis/biography, publisher details, rating, and launch actions (Reading/Stream Playback).
+- **Personal & Public Domain Cross-Recommendations**: Developed smart horizontal carousels that dynamically query, format, and display matching titles by the same creator or items within the same curated category, cross-linking local personal server catalogs with public domain archives.
+- **Enhanced Ebook Reader Resolution**: Patched the e-reader's routing and resolution mechanisms for personal e-books synced from Booklore, ensuring instant file rendering.
+
+## 🚀 Previous Updates (v4.5.2)
 - **Signature Bypass Settings Migration (Dual-Path)**: Solved the Android package installation/signature collision issue completely! If you are migrating from a previous GitHub version or are forced to do a clean uninstall/reinstall due to conflicting debug keystores, HomeCast now supports an absolute, signature-free, storage-independent backup mechanism.
 - **Offline Storage Access Framework (SAF) Export/Import**: Users can now click "Export Backup" inside the settings menu to save their encrypted server configs, passwords, and playback state into a portable `.json` backup file anywhere (local downloads, Google Drive, SD card). Selecting "Import Backup" restores everything instantly in 1-click.
 - **Automatic Auto-Backup Detection**: On any modification, connection profiles are auto-saved to public Downloads (/sdcard/Download/homecast_backup.json). On fresh reinstalls, if the database is unconfigured, Settings presents a prominent 1-click prompt to auto-restore all connections immediately.

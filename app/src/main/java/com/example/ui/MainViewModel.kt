@@ -145,19 +145,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            // Fetch multiple varied collections for E-Books, Audiobooks, and Music!
+            // 1. Immediately populate from Curated Public Domain Catalog
+            val initialBooks = com.example.data.PublicDomainCatalog.curatedEBooks.map {
+                ArchiveDoc(
+                    identifier = it.id,
+                    title = it.title,
+                    creator = it.authorOrCreator,
+                    description = it.description
+                )
+            }
+            val initialAudiobooks = com.example.data.PublicDomainCatalog.curatedAudiobooks.map {
+                ArchiveDoc(
+                    identifier = it.id,
+                    title = it.title,
+                    creator = it.authorOrCreator,
+                    description = it.description
+                )
+            }
+            val initialMusic = com.example.data.PublicDomainCatalog.curatedMusic.map {
+                ArchiveDoc(
+                    identifier = it.id,
+                    title = it.title,
+                    creator = it.authorOrCreator,
+                    description = it.description
+                )
+            }
+
+            _publicDomainBooks.value = initialBooks
+            _publicDomainAudiobooks.value = initialAudiobooks
+            _publicDomainMusic.value = initialMusic
+
+            // 2. Concurrently fetch massive online collections
             val booksList = mutableListOf<ArchiveDoc>()
+            booksList.addAll(initialBooks)
             booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(gutenberg)"))
             booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(smithsonian) AND mediatype:(texts)"))
             booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(opened_publications) AND mediatype:(texts)"))
+            booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(comicbooklibrary) OR collection:(manga_library)"))
             _publicDomainBooks.value = booksList.distinctBy { it.identifier }
 
             val audiobooksList = mutableListOf<ArchiveDoc>()
+            audiobooksList.addAll(initialAudiobooks)
             audiobooksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(librivoxaudio)"))
             audiobooksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(audio_bookspoetry)"))
+            audiobooksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(oldtimeradio)"))
             _publicDomainAudiobooks.value = audiobooksList.distinctBy { it.identifier }
 
             val musicList = mutableListOf<ArchiveDoc>()
+            musicList.addAll(initialMusic)
             musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(78rpm) AND (subject:(jazz) OR subject:(blues) OR subject:(classic))"))
             musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(etree) AND (subject:(concert) OR subject:(acoustic) OR subject:(live))"))
             musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(netlabels) AND (subject:(electronic) OR subject:(ambient) OR subject:(synth))"))
@@ -1403,7 +1438,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.release()
     }
 
-    suspend fun fetchDetailsWithGemini(title: String, creator: String, type: String): Map<String, String>? {
+    suspend fun fetchDetailsWithGemini(title: String, creator: String, type: String): Map<String, String> {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val prompt = """
@@ -1432,15 +1467,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val moshi = com.squareup.moshi.Moshi.Builder().addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()
                 val mapType = com.squareup.moshi.Types.newParameterizedType(Map::class.java, String::class.java, String::class.java)
                 val adapter = moshi.adapter<Map<String, String>>(mapType)
-                adapter.fromJson(jsonStr)
+                val parsed = adapter.fromJson(jsonStr)
+                if (parsed != null && parsed.isNotEmpty()) {
+                    return@withContext parsed
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                null
             }
+            com.example.data.LocalMediaMetadataProvider.getFallbackDetails(title, creator, type)
         }
     }
 
-    suspend fun fetchCreatorDetailsWithGemini(creatorName: String): Map<String, String>? {
+    suspend fun fetchCreatorDetailsWithGemini(creatorName: String): Map<String, String> {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val prompt = """
@@ -1468,11 +1506,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val moshi = com.squareup.moshi.Moshi.Builder().addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()
                 val mapType = com.squareup.moshi.Types.newParameterizedType(Map::class.java, String::class.java, String::class.java)
                 val adapter = moshi.adapter<Map<String, String>>(mapType)
-                adapter.fromJson(jsonStr)
+                val parsed = adapter.fromJson(jsonStr)
+                if (parsed != null && parsed.isNotEmpty()) {
+                    return@withContext parsed
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                null
             }
+            com.example.data.LocalMediaMetadataProvider.getFallbackCreatorDetails(creatorName)
         }
     }
 }

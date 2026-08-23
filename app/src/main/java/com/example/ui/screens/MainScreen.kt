@@ -359,7 +359,9 @@ fun MainScreen(
                 composable(Routes.Discovery) {
                     DiscoveryScreen(
                         viewModel = viewModel,
-                        onMediaSelected = { isPlayerSlidUp = true }
+                        onNavigateToDetails = { title, creator, type ->
+                            navController.navigate(Routes.MediaDetail(title, creator, type))
+                        }
                     )
                 }
                 composable(Routes.Settings) {
@@ -389,42 +391,56 @@ fun MainScreen(
                         onCreatorClick = { navController.navigate(Routes.CreatorDetail(it)) },
                         onPlayReadClick = {
                             if (type == "BOOK") {
-                                val standardGutenbergUrls = mapOf(
-                                    "The Time Machine" to "https://www.gutenberg.org/cache/epub/35/pg35.txt",
-                                    "Frankenstein" to "https://www.gutenberg.org/cache/epub/84/pg84.txt",
-                                    "The Art of War" to "https://www.gutenberg.org/cache/epub/132/pg132.txt",
-                                    "The Great Gatsby" to "https://www.gutenberg.org/cache/epub/64317/pg64317.txt",
-                                    "Metamorphosis" to "https://www.gutenberg.org/cache/epub/5200/pg5200.txt"
-                                )
-                                val matchedUrl = standardGutenbergUrls[title]
-                                if (matchedUrl != null) {
+                                // 1. Check if this is a personal/local e-book
+                                val localEBook = viewModel.allEBooks.value.firstOrNull { it.title.equals(title, ignoreCase = true) }
+                                if (localEBook != null && localEBook.serverId != "demo_server" && localEBook.serverId != "pd_server") {
                                     activeEBook = EBookData(
-                                        id = title.lowercase().replace(" ", "_"),
-                                        title = title,
-                                        author = creator,
+                                        id = localEBook.id,
+                                        title = localEBook.title,
+                                        author = localEBook.author,
                                         totalChapters = 0,
                                         chapters = emptyList(),
-                                        publicDomainUrl = matchedUrl
+                                        publicDomainUrl = "" // will trigger high-quality local/AI reading generation
                                     )
                                 } else {
-                                    val doc = viewModel.publicDomainBooks.value.firstOrNull { (it.title ?: "").contains(title, ignoreCase = true) }
-                                    val identifier = doc?.identifier ?: title.lowercase().replace(" ", "_")
-                                    scope.launch {
-                                        val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(identifier)
-                                        val matchingTxt = files.firstOrNull { it.name.endsWith("_djvu.txt", ignoreCase = true) || it.name.endsWith(".txt", ignoreCase = true) }?.name
-                                        val txtUrl = if (matchingTxt != null) {
-                                            "https://archive.org/download/$identifier/$matchingTxt"
-                                        } else {
-                                            "https://archive.org/download/$identifier/${identifier}_djvu.txt"
-                                        }
+                                    // 2. Fall back to standard/public domain content
+                                    val standardGutenbergUrls = mapOf(
+                                        "The Time Machine" to "https://www.gutenberg.org/cache/epub/35/pg35.txt",
+                                        "Frankenstein" to "https://www.gutenberg.org/cache/epub/84/pg84.txt",
+                                        "The Art of War" to "https://www.gutenberg.org/cache/epub/132/pg132.txt",
+                                        "The Great Gatsby" to "https://www.gutenberg.org/cache/epub/64317/pg64317.txt",
+                                        "Metamorphosis" to "https://www.gutenberg.org/cache/epub/5200/pg5200.txt"
+                                    )
+                                    val matchedUrl = standardGutenbergUrls[title]
+                                    if (matchedUrl != null) {
                                         activeEBook = EBookData(
-                                            id = identifier,
+                                            id = title.lowercase().replace(" ", "_"),
                                             title = title,
                                             author = creator,
                                             totalChapters = 0,
                                             chapters = emptyList(),
-                                            publicDomainUrl = txtUrl
+                                            publicDomainUrl = matchedUrl
                                         )
+                                    } else {
+                                        val doc = viewModel.publicDomainBooks.value.firstOrNull { (it.title ?: "").contains(title, ignoreCase = true) }
+                                        val identifier = doc?.identifier ?: title.lowercase().replace(" ", "_")
+                                        scope.launch {
+                                            val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(identifier)
+                                            val matchingTxt = files.firstOrNull { it.name.endsWith("_djvu.txt", ignoreCase = true) || it.name.endsWith(".txt", ignoreCase = true) }?.name
+                                            val txtUrl = if (matchingTxt != null) {
+                                                "https://archive.org/download/$identifier/$matchingTxt"
+                                            } else {
+                                                "https://archive.org/download/$identifier/${identifier}_djvu.txt"
+                                            }
+                                            activeEBook = EBookData(
+                                                id = identifier,
+                                                title = title,
+                                                author = creator,
+                                                totalChapters = 0,
+                                                chapters = emptyList(),
+                                                publicDomainUrl = txtUrl
+                                            )
+                                        }
                                     }
                                 }
                             } else if (type == "AUDIOBOOK") {
@@ -469,6 +485,9 @@ fun MainScreen(
                                     isPlayerSlidUp = true
                                 }
                             }
+                        },
+                        onNavigateToDetails = { newTitle, newCreator, newType ->
+                            navController.navigate(Routes.MediaDetail(newTitle, newCreator, newType))
                         }
                     )
                 }

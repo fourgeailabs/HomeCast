@@ -28,12 +28,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.Audiobook
+import com.example.data.LocalMediaMetadataProvider
+import com.example.data.MusicTrack
 import com.example.ui.MainViewModel
+import com.example.ui.components.MediaCoverArt
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
-import com.example.data.Audiobook
-import com.example.data.MusicTrack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,8 +48,9 @@ fun CreatorDetailScreen(
     onPlayMusicTrack: (MusicTrack) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var details by remember { mutableStateOf<Map<String, String>?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var details by remember(creatorName) {
+        mutableStateOf(LocalMediaMetadataProvider.getFallbackCreatorDetails(creatorName))
+    }
 
     val allMusic by viewModel.allMusic.collectAsState()
     val pdMusic by viewModel.publicDomainMusic.collectAsState()
@@ -58,10 +61,14 @@ fun CreatorDetailScreen(
     val resolvedDurations by viewModel.resolvedDurations.collectAsState()
 
     LaunchedEffect(creatorName) {
-        isLoading = true
-        val result = viewModel.fetchCreatorDetailsWithGemini(creatorName)
-        details = result
-        isLoading = false
+        try {
+            val result = viewModel.fetchCreatorDetailsWithGemini(creatorName)
+            if (result.isNotEmpty()) {
+                details = result
+            }
+        } catch (e: Exception) {
+            // Keep fallback
+        }
     }
 
     // Filter matching E-Books
@@ -154,9 +161,11 @@ fun CreatorDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("About Creator", fontWeight = FontWeight.Bold) },
+                title = { Text("About Creator", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = onBack) { 
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White) 
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -164,113 +173,189 @@ fun CreatorDetailScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = AccentTeal)
-            } else if (details != null) {
-                val data = details!!
-                Column(
+            val data = details
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .size(110.dp)
+                        .clip(CircleShape)
+                        .background(AccentTeal.copy(alpha = 0.2f))
+                        .border(2.dp, AccentTeal, CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = data["imageUrl"] ?: "",
-                        contentDescription = creatorName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(140.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceGlass)
-                            .border(1.5.dp, SurfaceGlassBorder, CircleShape)
+                    Icon(
+                        Icons.Default.Person, 
+                        contentDescription = null, 
+                        tint = AccentTeal, 
+                        modifier = Modifier.size(54.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(creatorName, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(data["roles"] ?: "", fontSize = 13.sp, color = AccentTeal, fontWeight = FontWeight.Bold)
-                    
-                    Spacer(modifier = Modifier.height(20.dp))
-                    
-                    Text(
-                        data["bio"] ?: "No biography available.", 
-                        fontSize = 15.sp, 
-                        lineHeight = 22.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        data["wikiLink"]?.takeIf { it.isNotBlank() && it != "N/A" }?.let { url ->
-                            OutlinedButton(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Wikipedia", fontSize = 12.sp)
-                            }
-                        }
-                        
-                        data["website"]?.takeIf { it.isNotBlank() && it != "N/A" }?.let { url ->
-                            OutlinedButton(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Website", fontSize = 12.sp)
-                            }
-                        }
-                    }
-
-                    // E-Books Shelf
-                    CreatorItemShelf(
-                        title = "E-Books in Public Domain",
-                        items = combinedEBooks,
-                        icon = Icons.Default.Book,
-                        onItemClick = onReadEBook
-                    ) { item ->
-                        CreatorCard(title = item.title, coverUrl = "")
-                    }
-
-                    // Audiobooks Shelf
-                    CreatorItemShelf(
-                        title = "Audiobooks in Public Domain",
-                        items = combinedAudiobooks,
-                        icon = Icons.Default.Headphones,
-                        onItemClick = onPlayAudiobook
-                    ) { item ->
-                        CreatorCard(title = item.title, coverUrl = item.coverUrl)
-                    }
-
-                    // Music Tracks Shelf
-                    CreatorItemShelf(
-                        title = "Music in Public Domain",
-                        items = combinedMusic,
-                        icon = Icons.Default.MusicNote,
-                        onItemClick = onPlayMusicTrack
-                    ) { item ->
-                        CreatorCard(title = item.title, coverUrl = item.coverUrl)
-                    }
-
-                    Spacer(modifier = Modifier.height(32.dp))
                 }
-            } else {
-                Text("Failed to load details.", modifier = Modifier.align(Alignment.Center))
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = creatorName, 
+                    fontSize = 24.sp, 
+                    fontWeight = FontWeight.ExtraBold, 
+                    textAlign = TextAlign.Center,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = data["roles"] ?: "Master Creator", 
+                    fontSize = 13.sp, 
+                    color = AccentTeal, 
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            "Biography", 
+                            fontSize = 16.sp, 
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            data["bio"] ?: "No biography available.", 
+                            fontSize = 14.sp, 
+                            lineHeight = 22.sp,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    data["wikiLink"]?.takeIf { it.isNotBlank() && it != "N/A" }?.let { url ->
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Wikipedia", fontSize = 12.sp, color = AccentTeal)
+                        }
+                    }
+                    
+                    data["website"]?.takeIf { it.isNotBlank() && it != "N/A" }?.let { url ->
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Archive", fontSize = 12.sp, color = AccentTeal)
+                        }
+                    }
+                }
+
+                // E-Books Shelf
+                CreatorItemShelf(
+                    title = "E-Books & Literature",
+                    items = combinedEBooks,
+                    icon = Icons.Default.Book,
+                    onItemClick = onReadEBook
+                ) { item ->
+                    Column(modifier = Modifier.width(115.dp)) {
+                        MediaCoverArt(
+                            title = item.title,
+                            authorOrArtist = creatorName,
+                            coverUrl = null,
+                            isBookAspectRatio = true,
+                            cornerRadius = 8.dp,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(0.68f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = item.title,
+                            maxLines = 1,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Audiobooks Shelf
+                CreatorItemShelf(
+                    title = "Audiobooks",
+                    items = combinedAudiobooks,
+                    icon = Icons.Default.Headphones,
+                    onItemClick = onPlayAudiobook
+                ) { item ->
+                    Column(modifier = Modifier.width(115.dp)) {
+                        MediaCoverArt(
+                            title = item.title,
+                            authorOrArtist = creatorName,
+                            coverUrl = item.coverUrl,
+                            isBookAspectRatio = true,
+                            cornerRadius = 8.dp,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(0.68f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = item.title,
+                            maxLines = 1,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Music Tracks Shelf
+                CreatorItemShelf(
+                    title = "Music Tracks",
+                    items = combinedMusic,
+                    icon = Icons.Default.MusicNote,
+                    onItemClick = onPlayMusicTrack
+                ) { item ->
+                    Column(modifier = Modifier.width(115.dp)) {
+                        MediaCoverArt(
+                            title = item.title,
+                            authorOrArtist = creatorName,
+                            coverUrl = item.coverUrl,
+                            isBookAspectRatio = false,
+                            cornerRadius = 8.dp,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = item.title,
+                            maxLines = 1,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -292,7 +377,7 @@ fun <T> CreatorItemShelf(
         ) {
             Icon(icon, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
         Spacer(modifier = Modifier.height(10.dp))
         LazyRow(
@@ -304,53 +389,6 @@ fun <T> CreatorItemShelf(
                     cardContent(item)
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun CreatorCard(title: String, coverUrl: String) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-        modifier = Modifier
-            .width(130.dp)
-            .height(180.dp)
-            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(12.dp))
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            if (coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = coverUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(AccentTeal.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Book, contentDescription = null, tint = AccentTeal.copy(alpha = 0.5f), modifier = Modifier.size(36.dp))
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = title,
-                maxLines = 2,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface
-            )
         }
     }
 }

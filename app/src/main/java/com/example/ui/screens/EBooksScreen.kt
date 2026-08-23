@@ -326,11 +326,11 @@ fun EBooksScreen(
             ) {
                 Column {
                     Text(
-                        "Glass Bookshelf",
+                        "Bookshelf",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.5).sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
                     Text(
                         "E-Books • Graphic Novels • Manga",
@@ -655,33 +655,21 @@ fun BookshelfBookItem(
                 .width(115.dp)
                 .height(160.dp)
                 .shadow(12.dp, RoundedCornerShape(10.dp))
-                .clip(RoundedCornerShape(10.dp))
-                .background(SurfaceGlass)
-                .border(1.2.dp, SurfaceGlassBorder, RoundedCornerShape(10.dp))
         ) {
-            AsyncImage(
-                model = book.coverUrl,
-                contentDescription = book.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-
-            // Spine shadow overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(12.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent)
-                        )
-                    )
+            com.example.ui.components.MediaCoverArt(
+                title = book.title,
+                authorOrArtist = book.authorOrArtist,
+                coverUrl = book.coverUrl,
+                genre = book.genre,
+                isBookAspectRatio = true,
+                cornerRadius = 10.dp,
+                modifier = Modifier.fillMaxSize()
             )
 
             if (book.isComic) {
                 Surface(
-                    color = AccentIndigo.copy(alpha = 0.85f),
-                    shape = RoundedCornerShape(topStart = 0.dp, bottomEnd = 8.dp),
+                    color = AccentIndigo.copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(topStart = 10.dp, bottomEnd = 8.dp),
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Text(
@@ -689,7 +677,7 @@ fun BookshelfBookItem(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             }
@@ -713,6 +701,7 @@ fun BookshelfBookItem(
             book.title,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
@@ -750,14 +739,15 @@ fun BookCard3Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.68f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
-                model = book.coverUrl,
-                contentDescription = book.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+            com.example.ui.components.MediaCoverArt(
+                title = book.title,
+                authorOrArtist = book.authorOrArtist,
+                coverUrl = book.coverUrl,
+                genre = book.genre,
+                isBookAspectRatio = true,
+                cornerRadius = 8.dp,
+                modifier = Modifier.fillMaxSize()
             )
 
             if (book.isComic) {
@@ -797,6 +787,7 @@ fun BookCard3Column(
             book.title,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center

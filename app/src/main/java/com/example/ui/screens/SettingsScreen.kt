@@ -1656,6 +1656,28 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "4.6.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "Unified TabRow Switcher UI/UX: Replicated the sleek personal library & public domain switcher button tab bar from Books and Music across the Audiobooks screen for seamless visual and behavioral consistency.",
+                    "Relabeled Bookshelf Header: Renamed 'Glass Bookshelf' to 'Bookshelf' with crisp display typography and enhanced contrast.",
+                    "Resilient Cover Art Engine (MediaCoverArt): Replaced raw image loaders across all shelves with high-contrast, gold-embossed fallback covers. Book covers now load reliably and never display empty or broken boxes.",
+                    "Massive Public Domain Catalog Expansion: Preloaded hundreds of iconic public domain books, audiobooks, and music masterworks across Sci-Fi, Cyberpunk, Fantasy, Philosophy, Mystery, and Classics.",
+                    "Instant Zero-Delay Fallbacks for Details & Creators: LocalMediaMetadataProvider guarantees instant rendering of media biographies, creator profiles, ratings, and recommendations even when offline or before AI responses arrive.",
+                    "Comprehensive Dark Mode Contrast Fixes: Fixed all media titles, album names, and author links across all screens to render in high-contrast white and vibrant accents."
+                )
+            ),
+            UpdateNotice(
+                version = "4.5.3",
+                date = "August 2026",
+                highlights = listOf(
+                    "AI Personal Library Categorization: Rewrote synchronization pipelines to automatically run client-side author and genre sanitizers before insertion into the local database. This guarantees elegant, folder-free categories (e.g. cleaning folder directories and raw formats into English classics) even if the server is offline or the Gemini API is unavailable.",
+                    "Interactive Media Details Screen: Tapping any audiobook or ebook from any shelf now opens a fully-fledged, contextual details pane featuring the media synopsis/biography, author description, publisher info, rating, and dynamic horizontal carousels.",
+                    "Personal & Public Domain Cross-Recommendations: The new details screen dynamically computes other matching books or tracks on your personal servers, alongside classic recommended matches from public domain archives, creating a unified browsing experience.",
+                    "Resolved Ebook Loading & Playback: Corrected the media resolution triggers inside the main e-reader for local server e-books, ensuring personal Booklore files load instantly and smoothly."
+                )
+            ),
+            UpdateNotice(
                 version = "4.5.2",
                 date = "August 2026",
                 highlights = listOf(

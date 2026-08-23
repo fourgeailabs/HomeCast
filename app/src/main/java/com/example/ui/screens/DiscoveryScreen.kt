@@ -48,7 +48,7 @@ data class DiscoveryItem(
 @Composable
 fun DiscoveryScreen(
     viewModel: MainViewModel,
-    onMediaSelected: () -> Unit = {}
+    onNavigateToDetails: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
@@ -134,7 +134,14 @@ fun DiscoveryScreen(
                     Card(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-                        modifier = Modifier.fillMaxWidth().clickable { }
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            val detailType = when (item.mediaType) {
+                                DiscoveryMediaType.BOOK -> "BOOK"
+                                DiscoveryMediaType.AUDIOBOOK -> "AUDIOBOOK"
+                                DiscoveryMediaType.MUSIC -> "MUSIC"
+                            }
+                            onNavigateToDetails(item.title, item.creator, detailType)
+                        }
                     ) {
                         Column {
                             AsyncImage(
