@@ -52,6 +52,7 @@ fun LibraryScreen(
 ) {
     val allBooks by viewModel.allBooks.collectAsState()
     val archiveAudiobooks by viewModel.publicDomainAudiobooks.collectAsState()
+    val resolvedDurations by viewModel.resolvedDurations.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val recents by viewModel.recents.collectAsState()
     val servers by viewModel.servers.collectAsState()
@@ -63,7 +64,7 @@ fun LibraryScreen(
     var selectedCollection by remember { mutableStateOf<Pair<String, List<com.example.data.Audiobook>>?>(null) }
     var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
 
-    val publicDomainAudiobooks = remember(archiveAudiobooks) {
+    val publicDomainAudiobooks = remember(archiveAudiobooks, resolvedDurations) {
         archiveAudiobooks.map { doc ->
             val coverUrl = "https://archive.org/services/img/${doc.identifier}"
             val title = doc.title ?: "Unknown Title"
@@ -76,7 +77,7 @@ fun LibraryScreen(
                 id = doc.identifier,
                 title = title,
                 author = author,
-                duration = 3600L,
+                duration = resolvedDurations[doc.identifier] ?: 3600L,
                 coverUrl = coverUrl,
                 serverId = "pd_server",
                 streamUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_64kb.mp3", // best effort

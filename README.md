@@ -1,11 +1,18 @@
 # HomeCast
 
-**Version:** 4.2.1
+**Version:** 4.3.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.2.1)
+## 🚀 Recent Updates (v4.3.0)
+- **Clickable Artist/Creator Bio Detail Navigation**: Clicking on the artist/author name inside the sliding audio player now transitions the user directly to the Google Gemini-powered Creator Detail screen.
+- **Dynamic Public Domain Library Matching in Bio**: The Creator Bio details page now cross-references both personal server files and online public domain records, presenting organized shelves of matching E-books, Audiobooks, and Music tracks that can be read or played directly from their detail profiles.
+- **On-Demand Full Public Domain Album Resolution**: Solved the issue where public domain music albums only showed/played a single song. Clicking a public domain album now fetches its entire tracklist from Archive.org's files API, loading all constituent songs with exact titles, correct track numbers, and real-time durations.
+- **Reactive Background Audiobook Durations**: Solved the inaccurate duration calculations for public domain audiobooks. On discovery, the app triggers a reactive background worker that queries the Archive.org files catalog, sums all chapter/track durations in seconds, and updates the UI shelf cards instantly.
+- **User-Agent Gutenberg Request Headers**: Resolved E-book loading failures by appending a standard browser `User-Agent` header to all Project Gutenberg and Archive.org queries, bypassing security scrapers and filters to ensure texts load successfully.
+
+## 🚀 Previous Updates (v4.2.1)
 - **Resolved Audiobook Playback & Stream Resolution**: Solved the issue where public domain audiobooks and music tracks failed to play. The app now queries the Archive.org files metadata API in real-time, dynamically resolving actual `.mp3` and `.txt` file paths rather than relying on standard filename assumptions.
 - **Fixed Audiobook Duration Calculations**: Corrected the duration scaling bug by normalizing data units. Seeded audiobooks and dynamic metadata items are now consistently declared in seconds, allowing the media player's formatting engine to calculate and display exact durations perfectly (fixing the 1,000+ hour display bug).
 - **Expanded Public Domain Collections & Shelves**: Dramatically enriched the public domain discovery experience. By fetching multiple popular Archive.org collections in parallel (such as 78rpm Golden Era recordings, netlabels electronic/ambient, live concert archives, LibriVox, Gutenberg texts, and Smithsonian catalogs) and automatically mapping them into distinct, beautifully structured genre shelves, the app now provides endless hours of free media.

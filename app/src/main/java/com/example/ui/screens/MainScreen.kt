@@ -320,7 +320,10 @@ fun MainScreen(
                     PlayerScreen(
                         viewModel = viewModel,
                         onNavigateToLibrary = { navController.navigate(Routes.Library) },
-                        onCollapse = { isPlayerSlidUp = false }
+                        onCollapse = { isPlayerSlidUp = false },
+                        onArtistClick = { artistName ->
+                            navController.navigate(Routes.CreatorDetail(artistName))
+                        }
                     )
                 }
                 composable(Routes.Discovery) {
@@ -378,7 +381,7 @@ fun MainScreen(
                                     val identifier = doc?.identifier ?: title.lowercase().replace(" ", "_")
                                     scope.launch {
                                         val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(identifier)
-                                        val matchingTxt = files.firstOrNull { it.endsWith("_djvu.txt", ignoreCase = true) || it.endsWith(".txt", ignoreCase = true) }
+                                        val matchingTxt = files.firstOrNull { it.name.endsWith("_djvu.txt", ignoreCase = true) || it.name.endsWith(".txt", ignoreCase = true) }?.name
                                         val txtUrl = if (matchingTxt != null) {
                                             "https://archive.org/download/$identifier/$matchingTxt"
                                         } else {
@@ -449,7 +452,16 @@ fun MainScreen(
                     CreatorDetailScreen(
                         viewModel = viewModel,
                         creatorName = name,
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onReadEBook = { activeEBook = it },
+                        onPlayAudiobook = { book ->
+                            viewModel.playAudiobookWithResolution(book)
+                            isPlayerSlidUp = true
+                        },
+                        onPlayMusicTrack = { track ->
+                            viewModel.playMusicTrackWithResolution(track)
+                            isPlayerSlidUp = true
+                        }
                     )
                 }
             }
@@ -465,7 +477,10 @@ fun MainScreen(
             PlayerScreen(
                 viewModel = viewModel,
                 onNavigateToLibrary = { isPlayerSlidUp = false },
-                onCollapse = { isPlayerSlidUp = false }
+                onCollapse = { isPlayerSlidUp = false },
+                onArtistClick = { artistName ->
+                    navController.navigate(Routes.CreatorDetail(artistName))
+                }
             )
         }
 

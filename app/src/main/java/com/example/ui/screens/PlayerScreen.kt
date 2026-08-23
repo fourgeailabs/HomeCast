@@ -47,7 +47,8 @@ import kotlin.math.roundToInt
 fun PlayerScreen(
     viewModel: MainViewModel,
     onNavigateToLibrary: () -> Unit = {},
-    onCollapse: (() -> Unit)? = null
+    onCollapse: (() -> Unit)? = null,
+    onArtistClick: (String) -> Unit = {}
 ) {
     val playbackState by viewModel.playbackState.collectAsState()
     val book = playbackState.currentAudiobook
@@ -287,7 +288,7 @@ fun PlayerScreen(
                         modifier = Modifier.align(Alignment.CenterEnd)
                     ) {
                         Text(
-                            if (isAudiobook) "AUDIOBOOK" else "PLEX MUSIC",
+                            if (isAudiobook) "AUDIOBOOK" else "MUSIC",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 0.5.sp,
@@ -380,14 +381,36 @@ fun PlayerScreen(
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    subtitle,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
+                val artistText = book?.author ?: track?.artist ?: "Unknown Artist"
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            if (artistText.isNotBlank() && artistText != "Unknown Artist") {
+                                onCollapse?.invoke()
+                                onArtistClick(artistText)
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 14.sp,
+                        color = AccentIndigo,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.OpenInNew,
+                        contentDescription = "View Artist Info",
+                        tint = AccentIndigo,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

@@ -17,6 +17,7 @@ import com.example.data.*
 import com.example.data.network.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -59,6 +60,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _publicDomainMusic = MutableStateFlow<List<ArchiveDoc>>(emptyList())
     val publicDomainMusic = _publicDomainMusic.asStateFlow()
 
+    private val _resolvedDurations = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val resolvedDurations = _resolvedDurations.asStateFlow()
+
     private val _isCleaningUp = MutableStateFlow(false)
     val isCleaningUp = _isCleaningUp.asStateFlow()
 
@@ -84,6 +88,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(etree) AND (subject:(concert) OR subject:(acoustic) OR subject:(live))"))
             musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(netlabels) AND (subject:(electronic) OR subject:(ambient) OR subject:(synth))"))
             _publicDomainMusic.value = musicList.distinctBy { it.identifier }
+
+            // Launch background resolution for audiobooks duration
+            launch(Dispatchers.IO) {
+                try {
+                    _publicDomainAudiobooks.collect { docs ->
+                        if (docs.isNotEmpty()) {
+                            kotlinx.coroutines.delay(2000)
+                            docs.forEach { doc ->
+                                launch {
+                                    try {
+                                        val files = ArchiveOrgClient.fetchFilesForIdentifier(doc.identifier)
+                                        val mp3Files = files.filter { it.name.endsWith(".mp3", ignoreCase = true) }
+                                        val totalLength = mp3Files.sumOf { it.length }
+                                        if (totalLength > 0) {
+                                            _resolvedDurations.value = _resolvedDurations.value + (doc.identifier to totalLength.toLong())
+                                        }
+                                    } catch (e: Exception) {
+                                        // ignore
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
         }
         viewModelScope.launch {
             kotlinx.coroutines.delay(1000)
@@ -1114,9 +1145,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun resolveArchiveOrgStreamUrl(identifier: String, extension: String): String {
         val files = ArchiveOrgClient.fetchFilesForIdentifier(identifier)
-        val matchingFile = files.firstOrNull { it.endsWith(extension, ignoreCase = true) }
+        val matchingFile = files.firstOrNull { it.name.endsWith(extension, ignoreCase = true) }?.name
         return if (matchingFile != null) {
-            "https://archive.org/download/$identifier/$matchingFile"
+            val encodedFile = java.net.URLEncoder.encode(matchingFile, "UTF-8")
+                .replace("+", "%20")
+                .replace("%2F", "/")
+                .replace("%3A", ":")
+            "https://archive.org/download/$identifier/$encodedFile"
         } else {
             ""
         }

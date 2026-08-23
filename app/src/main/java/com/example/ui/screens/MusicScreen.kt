@@ -137,6 +137,59 @@ fun MusicScreen(
     var selectedArtist by remember { mutableStateOf<ArtistGroup?>(null) }
     var selectedAlbum by remember { mutableStateOf<AlbumGroup?>(null) }
 
+    var isFetchingAlbumTracks by remember { mutableStateOf(false) }
+    var resolvedAlbumTracks by remember { mutableStateOf<List<MusicTrack>>(emptyList()) }
+
+    LaunchedEffect(selectedAlbum) {
+        val album = selectedAlbum
+        if (album != null && album.tracks.any { it.serverId == "pd_server" }) {
+            isFetchingAlbumTracks = true
+            try {
+                val firstTrack = album.tracks.first()
+                val identifier = firstTrack.id.split("___").first()
+                val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(identifier)
+                val mp3Files = files.filter { it.name.endsWith(".mp3", ignoreCase = true) }.sortedBy { it.name }
+                if (mp3Files.isNotEmpty()) {
+                    resolvedAlbumTracks = mp3Files.mapIndexed { index, fileInfo ->
+                        val fileName = fileInfo.name
+                        val cleanTitle = fileName
+                            .replace(".mp3", "", ignoreCase = true)
+                            .replace(Regex("^\\d+\\s*-\\s*"), "")
+                            .replace("_", " ")
+                            .trim()
+
+                        val encodedFile = java.net.URLEncoder.encode(fileName, "UTF-8")
+                            .replace("+", "%20")
+                            .replace("%2F", "/")
+                            .replace("%3A", ":")
+
+                        MusicTrack(
+                            id = "${identifier}___${fileName}",
+                            title = cleanTitle,
+                            artist = album.artist,
+                            album = album.title,
+                            coverUrl = album.coverUrl,
+                            duration = (fileInfo.length * 1000).toLong().takeIf { it > 0 } ?: 180000L,
+                            serverId = "pd_server",
+                            streamUrl = "https://archive.org/download/$identifier/$encodedFile",
+                            genre = album.genre,
+                            trackNumber = index + 1
+                        )
+                    }
+                } else {
+                    resolvedAlbumTracks = album.tracks
+                }
+            } catch (e: Exception) {
+                resolvedAlbumTracks = album.tracks
+            } finally {
+                isFetchingAlbumTracks = false
+            }
+        } else {
+            resolvedAlbumTracks = album?.tracks ?: emptyList()
+            isFetchingAlbumTracks = false
+        }
+    }
+
     // Pre-calculated groupings
     val albumGroups = remember(currentMusic) {
         currentMusic.groupBy { "${it.artist}___${it.album}" }
@@ -424,17 +477,19 @@ fun MusicScreen(
         if (selectedAlbum != null) {
             AlbumSongsScreen(
                 album = selectedAlbum!!,
+                tracks = resolvedAlbumTracks,
+                isFetching = isFetchingAlbumTracks,
                 isPlaying = playbackState.isPlaying,
                 currentTrackId = playbackState.currentMusicTrack?.id,
                 onBack = { selectedAlbum = null },
                 onTrackSelected = { track ->
-                    viewModel.playMusicTrackWithResolution(track)
+                    viewModel.playMusicTrackWithResolution(track, resolvedAlbumTracks)
                     onTrackClick(track)
                 },
                 onPlayAll = {
-                    val first = selectedAlbum!!.tracks.firstOrNull()
+                    val first = resolvedAlbumTracks.firstOrNull()
                     if (first != null) {
-                        viewModel.playMusicTrackWithResolution(first)
+                        viewModel.playMusicTrackWithResolution(first, resolvedAlbumTracks)
                         onTrackClick(first)
                     }
                 }
@@ -635,6 +690,8 @@ fun MusicScreen(
 @Composable
 fun AlbumSongsScreen(
     album: AlbumGroup,
+    tracks: List<MusicTrack>,
+    isFetching: Boolean,
     isPlaying: Boolean,
     currentTrackId: String?,
     onBack: () -> Unit,
@@ -730,7 +787,7 @@ fun AlbumSongsScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "${album.tracks.size} Songs • ${album.genre}",
+                    "${tracks.size} Songs • ${album.genre}",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -745,6 +802,7 @@ fun AlbumSongsScreen(
                 ) {
                     Button(
                         onClick = onPlayAll,
+                        enabled = tracks.isNotEmpty(),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.height(44.dp)
@@ -756,9 +814,10 @@ fun AlbumSongsScreen(
 
                     OutlinedButton(
                         onClick = {
-                            val shuffled = album.tracks.shuffled().firstOrNull()
+                            val shuffled = tracks.shuffled().firstOrNull()
                             if (shuffled != null) onTrackSelected(shuffled)
                         },
+                        enabled = tracks.isNotEmpty(),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.height(44.dp)
                     ) {
@@ -778,8 +837,21 @@ fun AlbumSongsScreen(
             )
         }
 
+        if (isFetching) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = AccentTeal)
+                }
+            }
+        }
+
         // Tracklist
-        items(album.tracks) { track ->
+        items(tracks) { track ->
             val isCurrent = currentTrackId == track.id
             Row(
                 modifier = Modifier

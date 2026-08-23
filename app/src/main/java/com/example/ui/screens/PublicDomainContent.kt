@@ -15,7 +15,10 @@ object PublicDomainContentFetcher {
             if (url.isBlank()) return@withContext emptyList()
             
             var fullText: String? = null
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+                .build()
             val response = client.newCall(request).execute()
             if (response.isSuccessful) {
                 fullText = response.body?.string()
@@ -24,7 +27,10 @@ object PublicDomainContentFetcher {
             // Auto fallback for Archive.org text format variations
             if (fullText == null && url.contains("_djvu.txt")) {
                 val fallbackUrl = url.replace("_djvu.txt", ".txt")
-                val fallbackReq = Request.Builder().url(fallbackUrl).build()
+                val fallbackReq = Request.Builder()
+                    .url(fallbackUrl)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+                    .build()
                 val fallbackResp = client.newCall(fallbackReq).execute()
                 if (fallbackResp.isSuccessful) {
                     fullText = fallbackResp.body?.string()
@@ -33,7 +39,10 @@ object PublicDomainContentFetcher {
 
             if (fullText == null && url.contains(".txt")) {
                 val fallbackUrl = url.replace(".txt", "_djvu.txt")
-                val fallbackReq = Request.Builder().url(fallbackUrl).build()
+                val fallbackReq = Request.Builder()
+                    .url(fallbackUrl)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+                    .build()
                 val fallbackResp = client.newCall(fallbackReq).execute()
                 if (fallbackResp.isSuccessful) {
                     fullText = fallbackResp.body?.string()

@@ -27,6 +27,12 @@ data class ArchiveDoc(
     val description: Any? = null // can be string or list of strings
 )
 
+@JsonClass(generateAdapter = true)
+data class ArchiveFile(
+    val name: String,
+    val length: Double = 0.0
+)
+
 object ArchiveOrgClient {
     private val client = OkHttpClient.Builder().build()
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
@@ -34,7 +40,7 @@ object ArchiveOrgClient {
     suspend fun fetchPublicDomain(query: String): List<ArchiveDoc> = withContext(Dispatchers.IO) {
         try {
             val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-            val url = "https://archive.org/advancedsearch.php?q=$encodedQuery&fl[]=identifier,title,creator,description&sort[]=downloads+desc&rows=40&page=1&output=json"
+            val url = "https://archive.org/advancedsearch.php?q=$encodedQuery&fl[]=identifier,title,creator,description&sort[]=downloads+desc&rows=100&page=1&output=json"
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val body = response.body?.string()
@@ -49,7 +55,7 @@ object ArchiveOrgClient {
         emptyList()
     }
 
-    suspend fun fetchFilesForIdentifier(identifier: String): List<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchFilesForIdentifier(identifier: String): List<ArchiveFile> = withContext(Dispatchers.IO) {
         try {
             val url = "https://archive.org/metadata/$identifier/files"
             val request = Request.Builder().url(url).build()
@@ -58,12 +64,14 @@ object ArchiveOrgClient {
             if (response.isSuccessful && body != null) {
                 val jsonObject = org.json.JSONObject(body)
                 val filesArray = jsonObject.optJSONArray("result") ?: return@withContext emptyList()
-                val list = mutableListOf<String>()
+                val list = mutableListOf<ArchiveFile>()
                 for (i in 0 until filesArray.length()) {
                     val fileObj = filesArray.optJSONObject(i)
                     val name = fileObj?.optString("name") ?: ""
+                    val lengthStr = fileObj?.optString("length") ?: "0.0"
+                    val length = lengthStr.toDoubleOrNull() ?: 0.0
                     if (name.isNotBlank()) {
-                        list.add(name)
+                        list.add(ArchiveFile(name, length))
                     }
                 }
                 return@withContext list
