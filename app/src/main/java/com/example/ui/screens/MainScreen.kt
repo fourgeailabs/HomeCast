@@ -559,7 +559,8 @@ fun MainScreen(
             activeEBook?.let { book ->
                 EReaderScreen(
                     eBook = book,
-                    onClose = { activeEBook = null }
+                    onClose = { activeEBook = null },
+                    viewModel = viewModel
                 )
             }
         }
@@ -574,7 +575,8 @@ fun MainScreen(
             activeComic?.let { comic ->
                 ComicReaderScreen(
                     comic = comic,
-                    onClose = { activeComic = null }
+                    onClose = { activeComic = null },
+                    viewModel = viewModel
                 )
             }
         }

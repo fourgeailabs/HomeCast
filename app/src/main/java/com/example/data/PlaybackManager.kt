@@ -30,11 +30,15 @@ class PlaybackManager(private val context: Context) {
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
+    var onProgressUpdate: ((audiobook: Audiobook?, musicTrack: MusicTrack?, positionMs: Long, durationMs: Long) -> Unit)? = null
+
     private var currentPlaylist: List<MusicTrack> = emptyList()
     private var currentAudiobookList: List<Audiobook> = emptyList()
 
     private var isPrepared = false
     private val handler = Handler(Looper.getMainLooper())
+
+    private var lastSavedPos = 0L
 
     private val updateProgressRunnable = object : Runnable {
         override fun run() {
@@ -48,6 +52,17 @@ class PlaybackManager(private val context: Context) {
                         duration = if (dur > 0L) dur else _playbackState.value.duration,
                         isPlaying = p.isPlaying
                     )
+                    
+                    // Throttle saving progress to every 2 seconds or significant seek
+                    if (Math.abs(pos - lastSavedPos) > 2000L || !p.isPlaying) {
+                        lastSavedPos = pos
+                        onProgressUpdate?.invoke(
+                            _playbackState.value.currentAudiobook,
+                            _playbackState.value.currentMusicTrack,
+                            pos,
+                            dur
+                        )
+                    }
                 }
             }
             handler.postDelayed(this, 500)

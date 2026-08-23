@@ -50,11 +50,20 @@ interface LibraryDao {
     @Query("SELECT * FROM ebooks ORDER BY lastRead DESC, title ASC")
     fun getAllEBooks(): Flow<List<EBook>>
 
+    @Query("SELECT * FROM ebooks WHERE id = :id LIMIT 1")
+    suspend fun getEBookById(id: String): EBook?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEBooks(ebooks: List<EBook>)
 
     @Query("DELETE FROM ebooks WHERE serverId = :serverId")
     suspend fun deleteEBooksByServer(serverId: String)
+
+    @Query("UPDATE ebooks SET progressPercent = :progressPercent, lastRead = :timestamp WHERE id = :id")
+    suspend fun updateEBookProgress(id: String, progressPercent: Int, timestamp: Long)
+
+    @Query("UPDATE ebooks SET progressPercent = :progressPercent, totalPages = :totalPages, lastRead = :timestamp WHERE id = :id")
+    suspend fun updateEBookProgressAndPages(id: String, progressPercent: Int, totalPages: Int, timestamp: Long)
 
     // Public Domain Sources
     @Query("SELECT * FROM public_domain_sources ORDER BY isDefault DESC, dateAdded ASC")

@@ -161,6 +161,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
+            // Setup automatic progress saving callback from PlaybackManager
+            playbackManager.onProgressUpdate = { book, track, pos, dur ->
+                if (book != null) {
+                    saveAudiobookProgress(book.id, book.title, book.author, pos, dur)
+                } else if (track != null) {
+                    saveMusicProgress(track.id, track.title, track.artist, pos, dur)
+                }
+            }
+            
             // 1. Immediately populate from Curated Public Domain Catalog
             val initialBooks = com.example.data.PublicDomainCatalog.curatedEBooks.map {
                 ArchiveDoc(
@@ -1792,5 +1801,167 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _isEnrichingLocalMedia.value = false
             }
         }
+    }
+
+    // --- Media Progress & JSON Backup Persistence ---
+
+    fun saveEBookProgress(
+        id: String,
+        title: String,
+        author: String,
+        chapterIndex: Int,
+        pageIndex: Int,
+        totalPages: Int,
+        progressPercent: Int
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                database.libraryDao().updateEBookProgressAndPages(
+                    id = id,
+                    progressPercent = progressPercent,
+                    totalPages = totalPages,
+                    timestamp = System.currentTimeMillis()
+                )
+            } catch (e: Exception) {
+                // Not in database or custom public domain
+            }
+
+            val progress = MediaProgress(
+                id = id,
+                type = "EBOOK",
+                title = title,
+                creator = author,
+                currentChapter = chapterIndex,
+                currentPage = pageIndex,
+                totalPages = totalPages,
+                progressPercent = progressPercent,
+                lastUpdated = System.currentTimeMillis()
+            )
+            backupManager.saveMediaProgress(progress, servers = servers.value)
+        }
+    }
+
+    fun loadEBookProgress(id: String): MediaProgress? {
+        return backupManager.getMediaProgress(id)
+    }
+
+    fun saveComicProgress(
+        id: String,
+        title: String,
+        writer: String,
+        pageIndex: Int,
+        totalPages: Int
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val progressPercent = if (totalPages > 0) {
+                (((pageIndex + 1).toFloat() / totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else 0
+
+            try {
+                database.libraryDao().updateEBookProgressAndPages(
+                    id = id,
+                    progressPercent = progressPercent,
+                    totalPages = totalPages,
+                    timestamp = System.currentTimeMillis()
+                )
+            } catch (e: Exception) {
+                // Not in database
+            }
+
+            val progress = MediaProgress(
+                id = id,
+                type = "COMIC",
+                title = title,
+                creator = writer,
+                currentPage = pageIndex,
+                totalPages = totalPages,
+                progressPercent = progressPercent,
+                lastUpdated = System.currentTimeMillis()
+            )
+            backupManager.saveMediaProgress(progress, servers = servers.value)
+        }
+    }
+
+    fun loadComicProgress(id: String): MediaProgress? {
+        return backupManager.getMediaProgress(id)
+    }
+
+    fun saveAudiobookProgress(
+        id: String,
+        title: String,
+        author: String,
+        positionMs: Long,
+        durationMs: Long
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                database.libraryDao().updateProgress(
+                    id = id,
+                    progress = positionMs,
+                    timestamp = System.currentTimeMillis()
+                )
+            } catch (e: Exception) {
+                // Not in database
+            }
+
+            val progressPercent = if (durationMs > 0) {
+                ((positionMs.toFloat() / durationMs.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else 0
+
+            val progress = MediaProgress(
+                id = id,
+                type = "AUDIOBOOK",
+                title = title,
+                creator = author,
+                currentPosition = positionMs,
+                totalPages = (durationMs / 1000).toInt(),
+                progressPercent = progressPercent,
+                lastUpdated = System.currentTimeMillis()
+            )
+            backupManager.saveMediaProgress(progress, servers = servers.value)
+        }
+    }
+
+    fun loadAudiobookProgress(id: String): MediaProgress? {
+        return backupManager.getMediaProgress(id)
+    }
+
+    fun saveMusicProgress(
+        id: String,
+        title: String,
+        artist: String,
+        positionMs: Long,
+        durationMs: Long
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                database.libraryDao().updateMusicLastPlayed(
+                    id = id,
+                    timestamp = System.currentTimeMillis()
+                )
+            } catch (e: Exception) {
+                // Not in database
+            }
+
+            val progressPercent = if (durationMs > 0) {
+                ((positionMs.toFloat() / durationMs.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else 0
+
+            val progress = MediaProgress(
+                id = id,
+                type = "MUSIC",
+                title = title,
+                creator = artist,
+                currentPosition = positionMs,
+                totalPages = (durationMs / 1000).toInt(),
+                progressPercent = progressPercent,
+                lastUpdated = System.currentTimeMillis()
+            )
+            backupManager.saveMediaProgress(progress, servers = servers.value)
+        }
+    }
+
+    fun loadMusicProgress(id: String): MediaProgress? {
+        return backupManager.getMediaProgress(id)
     }
 }

@@ -80,7 +80,8 @@ enum class ComicScaleMode {
 fun ComicReaderScreen(
     comic: ComicData,
     onClose: () -> Unit,
-    onSwitchToNovel: (() -> Unit)? = null
+    onSwitchToNovel: (() -> Unit)? = null,
+    viewModel: com.example.ui.MainViewModel? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -92,6 +93,52 @@ fun ComicReaderScreen(
     var scaleMode by remember { mutableStateOf(ComicScaleMode.FIT_SCREEN) }
     var showHud by remember { mutableStateOf(true) }
     var showThumbnails by remember { mutableStateOf(false) }
+
+    // Load saved reading progress from JSON backup / database
+    LaunchedEffect(comic.id) {
+        val saved = viewModel?.loadComicProgress(comic.id)
+            ?: com.example.data.SettingsBackupManager(context).getMediaProgress(comic.id)
+        if (saved != null && saved.currentPage >= 0) {
+            currentPageIndex = saved.currentPage
+        }
+    }
+
+    // Helper to persist current comic reading progress
+    fun persistComicProgress(pageIdx: Int) {
+        val total = pages.size.coerceAtLeast(1)
+        val safeIdx = pageIdx.coerceIn(0, total - 1)
+        if (viewModel != null) {
+            viewModel.saveComicProgress(
+                id = comic.id,
+                title = comic.title,
+                writer = comic.writer,
+                pageIndex = safeIdx,
+                totalPages = total
+            )
+        } else {
+            val progressPercent = (((safeIdx + 1).toFloat() / total.toFloat()) * 100).toInt().coerceIn(0, 100)
+            val backupManager = com.example.data.SettingsBackupManager(context)
+            backupManager.saveMediaProgress(
+                com.example.data.MediaProgress(
+                    id = comic.id,
+                    type = "COMIC",
+                    title = comic.title,
+                    creator = comic.writer,
+                    currentPage = safeIdx,
+                    totalPages = total,
+                    progressPercent = progressPercent,
+                    lastUpdated = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    // Save reading progress on exit / back / screen disposal
+    DisposableEffect(currentPageIndex, pages.size) {
+        onDispose {
+            persistComicProgress(currentPageIndex)
+        }
+    }
 
     // Fetch real comic pages if none provided
     LaunchedEffect(comic) {
@@ -177,7 +224,9 @@ fun ComicReaderScreen(
                 manualScale = 1f
                 manualOffset = Offset.Zero
                 slideAnim.snapTo(if (readingMode == ComicReadingMode.MANGA_RTL) -150f else 150f)
-                currentPageIndex++
+                val newPage = currentPageIndex + 1
+                currentPageIndex = newPage
+                persistComicProgress(newPage)
                 slideAnim.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
             }
         }
@@ -189,7 +238,9 @@ fun ComicReaderScreen(
                 manualScale = 1f
                 manualOffset = Offset.Zero
                 slideAnim.snapTo(if (readingMode == ComicReadingMode.MANGA_RTL) 150f else -150f)
-                currentPageIndex--
+                val newPage = currentPageIndex - 1
+                currentPageIndex = newPage
+                persistComicProgress(newPage)
                 slideAnim.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
             }
         }

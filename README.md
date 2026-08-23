@@ -1,11 +1,17 @@
 # HomeCast
 
-**Version:** 4.7.0
+**Version:** 4.8.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.7.0)
+## 🚀 Recent Updates (v4.8.0)
+- **Granular Page-by-Page E-Reader Navigation**: Transformed the e-reader experience so every swipe or tap turns one individual page rather than advancing entire chapters. Chapters seamlessly transition only when the reader reaches the final page of a chapter.
+- **Automatic Reading Progress Preservation**: The e-reader automatically records and saves the exact chapter and page upon every page turn, screen navigation, or app exit, instantly restoring your position when reopened.
+- **Universal Media Progress in JSON Backup**: All reading progress (E-Books and Comics) and playback progress (Audiobooks and Music) are persisted directly into the portable `homecast_backup.json` offline file alongside server configurations and settings.
+- **Cross-Session Comic Page Memory**: Comic and Manga reader now saves and restores the exact page index across app launches.
+
+## 🚀 Previous Updates (v4.7.0)
 - **Dedicated Server Connections Submenu**: Re-architected personal media server settings into a streamlined, dedicated sub-screen supporting Audiobookshelf, Plex, Booklore, Komga, Kavita, and Jellyfin with real-time status diagnostics and synchronization triggers.
 - **Public Domain Media Sources Manager**: Added a dedicated sub-menu to change, add, or customize public domain repositories. Users can type or paste any catalog website URL (e.g. Project Gutenberg, LibriVox, Standard Ebooks, Internet Archive). Google Gemini inspects and validates the endpoint, repairs broken protocols or subpaths, detects supported media types (Audiobook, E-Book/Comic, Music), and presents an interactive confirmation dialog with detailed explanations before activating.
 - **Local Device Storage Folders Submenu**: Added a dedicated sub-menu to import and manage storage directories for each of the three media types (Audiobooks, E-Books/Comics, Music). Supports both system directory browsing (SAF) and direct storage path entry. Discovered offline files automatically import into the user's Personal Library tabs.

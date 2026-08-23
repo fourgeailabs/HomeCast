@@ -1863,6 +1863,16 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "4.8.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "Granular Page-by-Page E-Reader Navigation: Transformed the e-reader experience so every swipe or tap turns one individual page rather than advancing entire chapters. Chapters seamlessly transition only when the reader reaches the final page of a chapter.",
+                    "Automatic Reading Progress Preservation: The e-reader automatically records and saves the exact chapter and page upon every page turn, screen navigation, or app exit, instantly restoring your position when reopened.",
+                    "Universal Media Progress in JSON Backup: All reading progress (E-Books and Comics) and playback progress (Audiobooks and Music) are persisted directly into the portable homecast_backup.json offline file alongside server configurations and settings.",
+                    "Cross-Session Comic Page Memory: Comic and Manga reader now saves and restores the exact page index across app launches."
+                )
+            ),
+            UpdateNotice(
                 version = "4.7.0",
                 date = "August 2026",
                 highlights = listOf(

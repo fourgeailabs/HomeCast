@@ -123,10 +123,42 @@ data class EBookData(
 fun EReaderScreen(
     eBook: EBookData,
     onClose: () -> Unit,
-    onSwitchToComic: (() -> Unit)? = null
+    onSwitchToComic: (() -> Unit)? = null,
+    viewModel: com.example.ui.MainViewModel? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var chapters by remember { mutableStateOf(eBook.chapters) }
     var isLoading by remember { mutableStateOf(true) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    // Reader Settings State
+    var currentTheme by remember { mutableStateOf(ReaderTheme.SEPIA) }
+    var currentFont by remember { mutableStateOf(ReaderFont.SERIF) }
+    var fontSizeSp by remember { mutableStateOf(17f) }
+    var lineSpacingMultiplier by remember { mutableStateOf(1.5f) }
+    var marginPaddingDp by remember { mutableStateOf(24f) }
+    var textAlignJustified by remember { mutableStateOf(true) }
+
+    // Navigation / Page State
+    var currentChapterIndex by remember { mutableIntStateOf(0) }
+    var currentPageInChapter by remember { mutableIntStateOf(0) }
+    var isImmersiveMode by remember { mutableStateOf(false) }
+    var showFontMenu by remember { mutableStateOf(false) }
+    var showTocDrawer by remember { mutableStateOf(false) }
+    var showBookmarksDrawer by remember { mutableStateOf(false) }
+
+    val bookmarks = remember { mutableStateListOf<Pair<Int, Int>>() } // (chapter, page)
+
+    // Load saved progress from JSON / Room on initial launch
+    LaunchedEffect(eBook.id) {
+        val saved = viewModel?.loadEBookProgress(eBook.id)
+            ?: com.example.data.SettingsBackupManager(context).getMediaProgress(eBook.id)
+        if (saved != null) {
+            currentChapterIndex = saved.currentChapter.coerceAtLeast(0)
+            currentPageInChapter = saved.currentPage.coerceAtLeast(0)
+        }
+    }
 
     LaunchedEffect(eBook) {
         if (eBook.chapters.isNotEmpty()) {
@@ -153,41 +185,38 @@ fun EReaderScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(color = AccentTeal)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Downloading book from Public Domain archive...", color = Color.Black)
+                Text("Loading book content...", color = Color.Black)
             }
         }
         return
     }
 
-    val coroutineScope = rememberCoroutineScope()
-
-    // Reader Settings State
-    var currentTheme by remember { mutableStateOf(ReaderTheme.SEPIA) }
-    var currentFont by remember { mutableStateOf(ReaderFont.SERIF) }
-    var fontSizeSp by remember { mutableStateOf(17f) }
-    var lineSpacingMultiplier by remember { mutableStateOf(1.5f) }
-    var marginPaddingDp by remember { mutableStateOf(24f) }
-    var textAlignJustified by remember { mutableStateOf(true) }
-
-    // Navigation / Page State
-    var currentChapterIndex by remember { mutableStateOf(0) }
-    var currentPageInChapter by remember { mutableStateOf(0) }
-    var isImmersiveMode by remember { mutableStateOf(false) }
-    var showFontMenu by remember { mutableStateOf(false) }
-    var showTocDrawer by remember { mutableStateOf(false) }
-    var showBookmarksDrawer by remember { mutableStateOf(false) }
-
-    val bookmarks = remember { mutableStateListOf<Pair<Int, Int>>() } // (chapter, page)
-
-    // Compute active chapter and content
+    // Dynamic paragraph pagination (2 paragraphs per page for clean, natural reading)
+    val paragraphsPerPage = 2
     val activeChapter = if (chapters.isNotEmpty()) {
-        chapters.getOrElse(currentChapterIndex) { chapters.first() }
+        chapters.getOrElse(currentChapterIndex.coerceIn(0, chapters.size - 1)) { chapters.first() }
     } else {
-        BookChapter("Loading...", 0, listOf("Please wait, the book content is being generated..."))
+        BookChapter("Loading...", 0, listOf("Please wait, the book content is loading..."))
     }
-    val paragraphsPerPage = 3
-    val totalPagesInChapter = (activeChapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage
-    val safePage = currentPageInChapter.coerceIn(0, (totalPagesInChapter - 1).coerceAtLeast(0))
+    val totalPagesInChapter = ((activeChapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage).coerceAtLeast(1)
+    val safePage = currentPageInChapter.coerceIn(0, totalPagesInChapter - 1)
+
+    // Precalculate page counts for all chapters
+    val chapterPageCounts = remember(chapters, paragraphsPerPage) {
+        chapters.map { chapter ->
+            ((chapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage).coerceAtLeast(1)
+        }
+    }
+    val totalBookPages = remember(chapterPageCounts) {
+        chapterPageCounts.sum().coerceAtLeast(1)
+    }
+    val absolutePageNumber = remember(currentChapterIndex, safePage, chapterPageCounts) {
+        val prevPages = chapterPageCounts.take(currentChapterIndex.coerceIn(0, chapterPageCounts.size)).sum()
+        (prevPages + safePage + 1).coerceIn(1, totalBookPages)
+    }
+    val overallProgressPercent = remember(absolutePageNumber, totalBookPages) {
+        ((absolutePageNumber.toFloat() / totalBookPages.toFloat()) * 100).toInt().coerceIn(0, 100)
+    }
 
     val displayedParagraphs = remember(currentChapterIndex, safePage, activeChapter) {
         val start = safePage * paragraphsPerPage
@@ -196,6 +225,52 @@ fun EReaderScreen(
             activeChapter.paragraphs.subList(start, end)
         } else {
             emptyList()
+        }
+    }
+
+    // Helper to persist current reading progress to Room, SharedPreferences, and JSON backup file
+    fun persistReadingProgress(chap: Int, page: Int) {
+        val safeChap = chap.coerceIn(0, (chapters.size - 1).coerceAtLeast(0))
+        val totalChapPages = if (chapters.isNotEmpty() && safeChap < chapters.size) {
+            ((chapters[safeChap].paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage).coerceAtLeast(1)
+        } else 1
+        val safePg = page.coerceIn(0, totalChapPages - 1)
+        val prevPages = chapterPageCounts.take(safeChap).sum()
+        val absPg = (prevPages + safePg + 1).coerceIn(1, totalBookPages)
+        val pct = ((absPg.toFloat() / totalBookPages.toFloat()) * 100).toInt().coerceIn(0, 100)
+
+        if (viewModel != null) {
+            viewModel.saveEBookProgress(
+                id = eBook.id,
+                title = eBook.title,
+                author = eBook.author,
+                chapterIndex = safeChap,
+                pageIndex = safePg,
+                totalPages = totalBookPages,
+                progressPercent = pct
+            )
+        } else {
+            val backupManager = com.example.data.SettingsBackupManager(context)
+            backupManager.saveMediaProgress(
+                com.example.data.MediaProgress(
+                    id = eBook.id,
+                    type = "EBOOK",
+                    title = eBook.title,
+                    creator = eBook.author,
+                    currentChapter = safeChap,
+                    currentPage = safePg,
+                    totalPages = totalBookPages,
+                    progressPercent = pct,
+                    lastUpdated = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    // Save reading progress on exit / back / screen disposal
+    DisposableEffect(currentChapterIndex, safePage) {
+        onDispose {
+            persistReadingProgress(currentChapterIndex, safePage)
         }
     }
 
@@ -210,24 +285,36 @@ fun EReaderScreen(
                 pageTurnAnim.snapTo(0f)
                 pageTurnAnim.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
                 )
             }
             if (forward) {
+                // If there are more pages in this chapter, turn to the NEXT PAGE
                 if (safePage < totalPagesInChapter - 1) {
-                    currentPageInChapter = safePage + 1
+                    val nextPg = safePage + 1
+                    currentPageInChapter = nextPg
+                    persistReadingProgress(currentChapterIndex, nextPg)
                 } else if (currentChapterIndex < chapters.size - 1) {
-                    currentChapterIndex++
+                    // Only advance to the NEXT CHAPTER once all pages in the current chapter are turned
+                    val nextChap = currentChapterIndex + 1
+                    currentChapterIndex = nextChap
                     currentPageInChapter = 0
+                    persistReadingProgress(nextChap, 0)
                 }
             } else {
+                // If not at the first page of this chapter, turn to PREVIOUS PAGE
                 if (safePage > 0) {
-                    currentPageInChapter = safePage - 1
+                    val prevPg = safePage - 1
+                    currentPageInChapter = prevPg
+                    persistReadingProgress(currentChapterIndex, prevPg)
                 } else if (currentChapterIndex > 0) {
-                    currentChapterIndex--
-                    val prevChapter = chapters[currentChapterIndex]
-                    val prevTotalPages = (prevChapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage
-                    currentPageInChapter = (prevTotalPages - 1).coerceAtLeast(0)
+                    // Move to previous chapter's last page
+                    val prevChap = currentChapterIndex - 1
+                    currentChapterIndex = prevChap
+                    val prevPages = chapterPageCounts.getOrElse(prevChap) { 1 }
+                    val prevLastPg = (prevPages - 1).coerceAtLeast(0)
+                    currentPageInChapter = prevLastPg
+                    persistReadingProgress(prevChap, prevLastPg)
                 }
             }
             pageTurnAnim.snapTo(0f)
