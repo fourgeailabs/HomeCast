@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,15 +24,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.border
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.data.MusicTrack
+import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
@@ -40,14 +41,14 @@ import com.example.ui.theme.SurfaceGlassBorder
 import java.util.Locale
 
 enum class MusicNavTab {
-    SHELVES, GENRES, ARTISTS, ALBUMS, SONGS
+    SHELVES, MOODS, GENRES, ARTISTS, ALBUMS, SONGS
 }
 
 data class GenreItem(
     val name: String,
     val imageUrl: String = "",
     val gradient: List<Color>,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val icon: ImageVector,
     val description: String
 )
 
@@ -66,6 +67,16 @@ data class ArtistGroup(
     val tracks: List<MusicTrack>
 )
 
+data class CategoryViewData(
+    val title: String,
+    val subtitle: String,
+    val description: String = "",
+    val gradient: List<Color> = listOf(AccentIndigo, AccentTeal),
+    val icon: ImageVector? = null,
+    val coverUrl: String = "",
+    val tracks: List<MusicTrack>
+)
+
 @Composable
 fun MusicScreen(
     viewModel: MainViewModel,
@@ -75,6 +86,7 @@ fun MusicScreen(
     val allMusic by viewModel.allMusic.collectAsState()
     val recentMusic by viewModel.recentMusic.collectAsState()
     val servers by viewModel.servers.collectAsState()
+    val isSyncing by viewModel.isSyncingPersonalMedia.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
@@ -104,7 +116,7 @@ fun MusicScreen(
                 desc.contains("electronic") || desc.contains("ambient") || desc.contains("synth") -> "Electronic & Dance"
                 desc.contains("rock") || desc.contains("metal") || desc.contains("guitar") -> "Rock & Alternative"
                 desc.contains("hip hop") || desc.contains("rap") || desc.contains("r&b") -> "Hip Hop & R&B"
-                else -> "Jazz & Blues" // Fallback to fit nicely
+                else -> "Jazz & Blues"
             }
 
             MusicTrack(
@@ -115,16 +127,21 @@ fun MusicScreen(
                 coverUrl = coverUrl.takeIf { doc.identifier.isNotBlank() } ?: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
                 duration = 180000L,
                 serverId = "pd_server",
-                streamUrl = "", // Dynamically resolved on play click!
+                streamUrl = "",
                 genre = assignedGenre,
                 trackNumber = 1
             )
         }
     }
 
-    val currentMusic = remember(allMusic, publicDomainMusic, selectedSource) {
+    val currentMusic = remember(allMusic, publicDomainMusic, selectedSource, servers) {
         if (selectedSource == 0) {
-            allMusic.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+            val serverOrLocal = allMusic.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+            if (serverOrLocal.isNotEmpty() || servers.isNotEmpty()) {
+                serverOrLocal
+            } else {
+                allMusic.filter { it.serverId != "pd_server" }
+            }
         } else {
             val localPD = allMusic.filter { it.serverId == "demo_server" || it.serverId == "pd_server" }
             val fetched = publicDomainMusic.filter { f -> localPD.none { l -> l.title.equals(f.title, ignoreCase = true) } }
@@ -132,10 +149,19 @@ fun MusicScreen(
         }
     }
 
-    // Navigation Stack for File Structure Drilldown
+    // Dynamic AI category shuffle state
+    var shuffleSeed by remember { mutableIntStateOf(0) }
+    val dynamicMixes = remember(currentMusic, recentMusic, shuffleSeed) {
+        MusicMixGenerator.generateDynamicMixes(currentMusic, recentMusic, shuffleSeed)
+    }
+
+    // Navigation Stack for File Structure & Category Drilldown
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var selectedArtist by remember { mutableStateOf<ArtistGroup?>(null) }
     var selectedAlbum by remember { mutableStateOf<AlbumGroup?>(null) }
+    var selectedMood by remember { mutableStateOf<MoodItem?>(null) }
+    var selectedMix by remember { mutableStateOf<MusicMix?>(null) }
+    var selectedCategoryView by remember { mutableStateOf<CategoryViewData?>(null) }
 
     var isFetchingAlbumTracks by remember { mutableStateOf(false) }
     var resolvedAlbumTracks by remember { mutableStateOf<List<MusicTrack>>(emptyList()) }
@@ -328,38 +354,71 @@ fun MusicScreen(
                     color = Color.White
                 )
                 Text(
-                    if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums" else "Your Personal Music Cloud",
+                    if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • 100+ moods" else "Your Personal Music Cloud",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            IconButton(
-                onClick = onNavigateToSettings,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(SurfaceGlass)
-                    .border(1.dp, SurfaceGlassBorder, CircleShape)
-            ) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentIndigo)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Quick Remix AI Categories Button
+                IconButton(
+                    onClick = { shuffleSeed++ },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                ) {
+                    Icon(Icons.Default.Shuffle, contentDescription = "Remix AI Categories", tint = AccentIndigo)
+                }
+
+                IconButton(
+                    onClick = { viewModel.refreshPersonalMedia() },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = AccentIndigo,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh & Sync", tint = AccentIndigo)
+                    }
+                }
+
+                IconButton(
+                    onClick = onNavigateToSettings,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentIndigo)
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        androidx.compose.material3.TabRow(
+        TabRow(
             selectedTabIndex = selectedSource,
             containerColor = Color.Transparent,
             indicator = { tabPositions ->
-                androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
+                TabRowDefaults.SecondaryIndicator(
                     Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
                     color = AccentIndigo
                 )
             }
         ) {
             listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
-                androidx.compose.material3.Tab(
+                Tab(
                     selected = selectedSource == index,
                     onClick = { selectedSource = index },
                     text = {
@@ -473,7 +532,121 @@ fun MusicScreen(
             return
         }
 
-        // Active Drill-Down Check: If an album is selected, display the Songs Screen with square album art at top center!
+        // Active Drill-Down Check: If a specific category view is open (No single row restriction!)
+        if (selectedCategoryView != null) {
+            val catData = selectedCategoryView!!
+            MusicCategoryDetailScreen(
+                title = catData.title,
+                subtitle = catData.subtitle,
+                description = catData.description,
+                gradient = catData.gradient,
+                icon = catData.icon,
+                coverUrl = catData.coverUrl,
+                tracks = catData.tracks,
+                currentTrackId = playbackState.currentMusicTrack?.id,
+                isPlaying = playbackState.isPlaying,
+                onBack = { selectedCategoryView = null },
+                onTrackClick = { track ->
+                    viewModel.playMusicTrackWithResolution(track, catData.tracks)
+                    onTrackClick(track)
+                },
+                onPlayAll = {
+                    val first = catData.tracks.firstOrNull()
+                    if (first != null) {
+                        viewModel.playMusicTrackWithResolution(first, catData.tracks)
+                        onTrackClick(first)
+                    }
+                },
+                onShuffle = {
+                    val shuffled = catData.tracks.shuffled()
+                    val first = shuffled.firstOrNull()
+                    if (first != null) {
+                        viewModel.playMusicTrackWithResolution(first, shuffled)
+                        onTrackClick(first)
+                    }
+                }
+            )
+            return
+        }
+
+        // Active Drill-Down Check: If an AI Mix is selected
+        if (selectedMix != null) {
+            val mix = selectedMix!!
+            MusicCategoryDetailScreen(
+                title = mix.title,
+                subtitle = mix.subtitle,
+                description = mix.description,
+                gradient = mix.gradientColors,
+                icon = mix.icon,
+                coverUrl = mix.coverUrl,
+                tracks = mix.tracks,
+                currentTrackId = playbackState.currentMusicTrack?.id,
+                isPlaying = playbackState.isPlaying,
+                onBack = { selectedMix = null },
+                onTrackClick = { track ->
+                    viewModel.playMusicTrackWithResolution(track, mix.tracks)
+                    onTrackClick(track)
+                },
+                onPlayAll = {
+                    val first = mix.tracks.firstOrNull()
+                    if (first != null) {
+                        viewModel.playMusicTrackWithResolution(first, mix.tracks)
+                        onTrackClick(first)
+                    }
+                },
+                onShuffle = {
+                    val shuffled = mix.tracks.shuffled()
+                    val first = shuffled.firstOrNull()
+                    if (first != null) {
+                        viewModel.playMusicTrackWithResolution(first, shuffled)
+                        onTrackClick(first)
+                    }
+                }
+            )
+            return
+        }
+
+        // Active Drill-Down Check: If a Mood is selected
+        if (selectedMood != null) {
+            val mood = selectedMood!!
+            val matchingTracks = remember(mood, currentMusic) {
+                MusicMoodsCatalog.filterTracksForMood(mood, currentMusic)
+            }
+            MusicCategoryDetailScreen(
+                title = mood.name,
+                subtitle = mood.group,
+                description = mood.description,
+                gradient = mood.gradient,
+                icon = mood.icon,
+                coverUrl = matchingTracks.firstOrNull { it.coverUrl.isNotBlank() }?.coverUrl ?: "",
+                tracks = matchingTracks,
+                currentTrackId = playbackState.currentMusicTrack?.id,
+                isPlaying = playbackState.isPlaying,
+                onBack = { selectedMood = null },
+                onTrackClick = { track ->
+                    viewModel.playMusicTrackWithResolution(track, matchingTracks)
+                    onTrackClick(track)
+                },
+                onPlayAll = {
+                    val first = matchingTracks.firstOrNull()
+                    if (first != null) {
+                        viewModel.playMusicTrackWithResolution(first, matchingTracks)
+                        onTrackClick(first)
+                    }
+                },
+                onShuffle = {
+                    val shuffled = matchingTracks.shuffled()
+                    val first = shuffled.firstOrNull()
+                    if (first != null) {
+                        viewModel.playMusicTrackWithResolution(first, shuffled)
+                        onTrackClick(first)
+                    }
+                }
+            )
+            return
+        }
+
+        // Active Drill-Down Check: If an album is selected
         if (selectedAlbum != null) {
             AlbumSongsScreen(
                 album = selectedAlbum!!,
@@ -497,7 +670,7 @@ fun MusicScreen(
             return
         }
 
-        // Active Drill-Down: If an artist is selected
+        // Active Drill-Down Check: If an artist is selected
         if (selectedArtist != null) {
             ArtistDetailScreen(
                 artist = selectedArtist!!,
@@ -511,7 +684,7 @@ fun MusicScreen(
             return
         }
 
-        // Active Drill-Down: If a genre is selected
+        // Active Drill-Down Check: If a genre is selected
         if (selectedGenre != null) {
             GenreDetailScreen(
                 genreName = selectedGenre!!,
@@ -528,39 +701,28 @@ fun MusicScreen(
             return
         }
 
-        // Global Search Active View
-        if (searchQuery.isNotBlank()) {
+        // Global Search View
+        if (searchQuery.isNotEmpty()) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    Text(
-                        "Search Results (${filteredTracks.size} songs, ${filteredAlbums.size} albums)",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
                 if (filteredAlbums.isNotEmpty()) {
                     item {
-                        Text("Albums", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AccentIndigo)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("Albums (${filteredAlbums.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(filteredAlbums) { album ->
-                                AlbumCard(
-                                    album = album,
-                                    onClick = { selectedAlbum = album }
-                                )
+                                AlbumShelfCard(album = album, onClick = { selectedAlbum = album })
                             }
                         }
                     }
                 }
 
                 item {
-                    Text("Songs", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AccentIndigo)
+                    Text("Tracks (${filteredTracks.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
-
                 items(filteredTracks, key = { it.id }) { track ->
                     MusicTrackRowItem(
                         track = track,
@@ -577,7 +739,7 @@ fun MusicScreen(
             return
         }
 
-        // Hierarchy Navigation Tabs: Shelves, Genres, Artists, Albums, Songs
+        // Hierarchy Navigation Tabs: Shelves, Moods, Genres, Artists, Albums, Songs
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(vertical = 4.dp)
@@ -591,6 +753,7 @@ fun MusicScreen(
                         Text(
                             when (tab) {
                                 MusicNavTab.SHELVES -> "Shelves"
+                                MusicNavTab.MOODS -> "Moods (100)"
                                 MusicNavTab.GENRES -> "Genres"
                                 MusicNavTab.ARTISTS -> "Artists"
                                 MusicNavTab.ALBUMS -> "Albums"
@@ -603,6 +766,7 @@ fun MusicScreen(
                         Icon(
                             when (tab) {
                                 MusicNavTab.SHELVES -> Icons.Default.ViewCarousel
+                                MusicNavTab.MOODS -> Icons.Default.Mood
                                 MusicNavTab.GENRES -> Icons.Default.Category
                                 MusicNavTab.ARTISTS -> Icons.Default.Person
                                 MusicNavTab.ALBUMS -> Icons.Default.Album
@@ -630,14 +794,26 @@ fun MusicScreen(
                 MusicShelvesView(
                     allTracks = currentMusic,
                     recentTracks = recentMusic,
+                    dynamicMixes = dynamicMixes,
                     albumGroups = albumGroups,
                     artistGroups = artistGroups,
                     playbackState = playbackState,
+                    onMixClick = { selectedMix = it },
                     onAlbumClick = { selectedAlbum = it },
+                    onArtistClick = { selectedArtist = it },
+                    onOpenCategory = { cat -> selectedCategoryView = cat },
+                    onRemixAI = { shuffleSeed++ },
                     onTrackClick = { track ->
                         viewModel.playMusicTrackWithResolution(track)
                         onTrackClick(track)
                     }
+                )
+            }
+
+            MusicNavTab.MOODS -> {
+                MoodsGridView(
+                    allTracks = currentMusic,
+                    onMoodClick = { mood -> selectedMood = mood }
                 )
             }
 
@@ -680,6 +856,1152 @@ fun MusicScreen(
                     item { Spacer(modifier = Modifier.height(24.dp)) }
                 }
             }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// MUSIC SHELVES VIEW (With Clickable Headers opening to full category view!)
+// -----------------------------------------------------------------------------
+@Composable
+fun MusicShelvesView(
+    allTracks: List<MusicTrack>,
+    recentTracks: List<MusicTrack>,
+    dynamicMixes: List<MusicMix>,
+    albumGroups: List<AlbumGroup>,
+    artistGroups: List<ArtistGroup>,
+    playbackState: PlaybackState,
+    onMixClick: (MusicMix) -> Unit,
+    onAlbumClick: (AlbumGroup) -> Unit,
+    onArtistClick: (ArtistGroup) -> Unit,
+    onOpenCategory: (CategoryViewData) -> Unit,
+    onRemixAI: () -> Unit,
+    onTrackClick: (MusicTrack) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // 1. AI Dynamic Mixes & "For You" Section
+        if (dynamicMixes.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onOpenCategory(
+                                CategoryViewData(
+                                    title = "AI Dynamic Mixes",
+                                    subtitle = "Personalized mixes & time-of-day categories",
+                                    description = "Intelligently updated multiple times a day from your listening history and acoustic algorithms.",
+                                    gradient = listOf(Color(0xFF6366F1), Color(0xFFEC4899)),
+                                    icon = Icons.Default.AutoAwesome,
+                                    tracks = dynamicMixes.flatMap { it.tracks }.distinctBy { it.id }
+                                )
+                            )
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFEC4899), modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Made For You & AI Mixes", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = Color(0xFFEC4899).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        "AI",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color(0xFFEC4899)
+                                    )
+                                }
+                            }
+                            Text("Updated multiple times a day", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("See All", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    items(dynamicMixes, key = { it.id }) { mix ->
+                        MusicMixShelfCard(
+                            mix = mix,
+                            onClick = { onMixClick(mix) },
+                            onPlayClick = {
+                                val first = mix.tracks.firstOrNull()
+                                if (first != null) onTrackClick(first)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. Shelf: Continue Listening / Recent Grooves (CLICKABLE HEADER TO OPEN FULL CATEGORY)
+        if (recentTracks.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onOpenCategory(
+                                CategoryViewData(
+                                    title = "Recent Grooves",
+                                    subtitle = "All recently played tracks",
+                                    description = "Your complete playback history and recent audio spins.",
+                                    gradient = listOf(AccentIndigo, AccentTeal),
+                                    icon = Icons.Default.History,
+                                    tracks = recentTracks
+                                )
+                            )
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.History, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Recent Grooves", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Pick up where you left off", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("See All (${recentTracks.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    items(recentTracks, key = { "recent_${it.id}" }) { track ->
+                        MusicTrackShelfCard(
+                            track = track,
+                            isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
+                            onClick = { onTrackClick(track) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. Shelf: Featured & New Albums (CLICKABLE HEADER TO OPEN FULL CATEGORY)
+        if (albumGroups.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onOpenCategory(
+                                CategoryViewData(
+                                    title = "All Albums & Releases",
+                                    subtitle = "${albumGroups.size} albums in your collection",
+                                    description = "Browse full albums, LPs, EPs and single releases across your entire collection.",
+                                    gradient = listOf(Color(0xFFFF9800), Color(0xFFE91E63)),
+                                    icon = Icons.Default.Album,
+                                    tracks = albumGroups.flatMap { it.tracks }
+                                )
+                            )
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Album, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("New Releases & Albums", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = Color(0xFFFF9800).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        "NEW",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color(0xFFFF9800)
+                                    )
+                                }
+                            }
+                            Text("Slide sideways or tap to view all", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("See All (${albumGroups.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    items(albumGroups, key = { "alb_${it.title}_${it.artist}" }) { album ->
+                        AlbumShelfCard(
+                            album = album,
+                            onClick = { onAlbumClick(album) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 4. Shelf: Top Artists (CLICKABLE HEADER TO OPEN FULL ARTISTS)
+        if (artistGroups.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onOpenCategory(
+                                CategoryViewData(
+                                    title = "Featured Artists",
+                                    subtitle = "${artistGroups.size} artists in your library",
+                                    description = "All standout artists and musical creators in your synced collection.",
+                                    gradient = listOf(AccentTeal, AccentIndigo),
+                                    icon = Icons.Default.Person,
+                                    tracks = artistGroups.flatMap { it.tracks }
+                                )
+                            )
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Standout Artists", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Artists in your personal collection", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("See All (${artistGroups.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    items(artistGroups, key = { "art_${it.name}" }) { artist ->
+                        ArtistShelfCard(
+                            artist = artist,
+                            onClick = { onArtistClick(artist) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 5. Shelf: Curated Mixes & Audio Tracks (CLICKABLE HEADER TO OPEN FULL ALL TRACKS)
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onOpenCategory(
+                            CategoryViewData(
+                                title = "Curated Library Tracks",
+                                subtitle = "${allTracks.size} total audio tracks",
+                                description = "The entire comprehensive track catalogue available in your cloud library.",
+                                gradient = listOf(Color(0xFF8E24AA), Color(0xFF1E88E5)),
+                                icon = Icons.Default.LibraryMusic,
+                                tracks = allTracks
+                            )
+                        )
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LibraryMusic, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Curated Mixes & Audio Tracks", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Popular selections tailored for you", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("See All (${allTracks.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentIndigo)
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) {
+                items(allTracks.take(15), key = { "mix_${it.id}" }) { track ->
+                    MusicTrackShelfCard(
+                        track = track,
+                        isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
+                        onClick = { onTrackClick(track) }
+                    )
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(28.dp)) }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// MUSIC MIX SHELF CARD (AI mixes & For You hero card)
+// -----------------------------------------------------------------------------
+@Composable
+fun MusicMixShelfCard(
+    mix: MusicMix,
+    onClick: () -> Unit,
+    onPlayClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .width(180.dp)
+            .height(140.dp)
+            .shadow(8.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Brush.linearGradient(mix.gradientColors))
+            .clickable { onClick() }
+            .padding(14.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        mix.category.uppercase(),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .clickable { onPlayClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play Mix", tint = Color.White, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                mix.title,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                mix.subtitle,
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "${mix.tracks.size} tracks",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// MOODS GRID VIEW (100 Distinct Stylized Moods matching Genres view design)
+// -----------------------------------------------------------------------------
+@Composable
+fun MoodsGridView(
+    allTracks: List<MusicTrack>,
+    onMoodClick: (MoodItem) -> Unit
+) {
+    var selectedGroup by remember { mutableStateOf("All") }
+    var moodSearchQuery by remember { mutableStateOf("") }
+
+    val filteredMoods = remember(selectedGroup, moodSearchQuery) {
+        MusicMoodsCatalog.allMoods.filter { mood ->
+            val matchesGroup = selectedGroup == "All" || mood.group.equals(selectedGroup, ignoreCase = true)
+            val matchesSearch = moodSearchQuery.isBlank() ||
+                mood.name.contains(moodSearchQuery, ignoreCase = true) ||
+                mood.description.contains(moodSearchQuery, ignoreCase = true) ||
+                mood.keywords.any { it.contains(moodSearchQuery, ignoreCase = true) }
+            matchesGroup && matchesSearch
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Mood Category Filter Chips
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
+        ) {
+            items(MusicMoodsCatalog.moodGroups) { group ->
+                val isSelected = selectedGroup == group
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { selectedGroup = group },
+                    label = { Text(group, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentIndigo
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+
+        // Moods 2-Column Responsive Grid (Styled exactly like Genres Screen)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            items(filteredMoods, key = { it.id }) { mood ->
+                MoodCard(
+                    mood = mood,
+                    trackCount = MusicMoodsCatalog.filterTracksForMood(mood, allTracks).size,
+                    onClick = { onMoodClick(mood) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MoodCard(
+    mood: MoodItem,
+    trackCount: Int,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(115.dp)
+            .shadow(6.dp, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(mood.gradient))
+            .clickable { onClick() }
+            .padding(14.dp)
+    ) {
+        Column(modifier = Modifier.align(Alignment.TopStart)) {
+            Text(
+                mood.name,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 15.sp,
+                color = Color.White,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                mood.description,
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 14.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "$trackCount songs",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
+
+        Icon(
+            mood.icon,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.35f),
+            modifier = Modifier
+                .size(44.dp)
+                .align(Alignment.BottomEnd)
+        )
+    }
+}
+
+// -----------------------------------------------------------------------------
+// MUSIC CATEGORY DETAIL SCREEN (Full grid/list view for any category or mood!)
+// -----------------------------------------------------------------------------
+@Composable
+fun MusicCategoryDetailScreen(
+    title: String,
+    subtitle: String,
+    description: String = "",
+    gradient: List<Color> = listOf(AccentIndigo, AccentTeal),
+    icon: ImageVector? = null,
+    coverUrl: String = "",
+    tracks: List<MusicTrack>,
+    currentTrackId: String?,
+    isPlaying: Boolean,
+    onBack: () -> Unit,
+    onTrackClick: (MusicTrack) -> Unit,
+    onPlayAll: () -> Unit,
+    onShuffle: () -> Unit
+) {
+    var isGridView by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Back Navigation & Controls
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    ) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Category View", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Grid / List toggle
+                IconButton(
+                    onClick = { isGridView = !isGridView },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(SurfaceGlass)
+                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                ) {
+                    Icon(
+                        if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                        contentDescription = "Toggle View",
+                        tint = AccentIndigo
+                    )
+                }
+            }
+        }
+
+        // Hero Category Card
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Brush.linearGradient(gradient))
+                    .padding(20.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (icon != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.3f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                title,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                subtitle,
+                                fontSize = 13.sp,
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    if (description.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            description,
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.9f),
+                            lineHeight = 16.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "${tracks.size} tracks in full category",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.75f)
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = onPlayAll,
+                                enabled = tracks.isNotEmpty(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Play All", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = onShuffle,
+                                enabled = tracks.isNotEmpty(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Shuffle", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Full Tracks Catalog (Scrollable without side-scrolling restrictions)
+        if (tracks.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No tracks available in this category.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else if (isGridView) {
+            item {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 2000.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(tracks, key = { it.id }) { track ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(SurfaceGlass)
+                                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(14.dp))
+                                .clickable { onTrackClick(track) }
+                                .padding(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(AccentIndigo.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (track.coverUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = track.coverUrl,
+                                        contentDescription = track.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(Icons.Default.MusicNote, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(36.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(track.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(track.artist, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        } else {
+            items(tracks, key = { it.id }) { track ->
+                MusicTrackRowItem(
+                    track = track,
+                    isPlaying = currentTrackId == track.id && isPlaying,
+                    onClick = { onTrackClick(track) }
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(28.dp)) }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// GENRES GRID VIEW
+// -----------------------------------------------------------------------------
+@Composable
+fun GenresGridView(
+    genres: List<GenreItem>,
+    onGenreClick: (GenreItem) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        items(genres) { genre ->
+            GenreCard(genre = genre, onClick = { onGenreClick(genre) })
+        }
+    }
+}
+
+@Composable
+fun GenreCard(genre: GenreItem, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(110.dp)
+            .shadow(6.dp, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(genre.gradient))
+            .clickable { onClick() }
+            .padding(14.dp)
+    ) {
+        Column(modifier = Modifier.align(Alignment.TopStart)) {
+            Text(
+                genre.name,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 15.sp,
+                color = Color.White,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                genre.description,
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 2,
+                lineHeight = 14.sp
+            )
+        }
+
+        Icon(
+            genre.icon,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.35f),
+            modifier = Modifier
+                .size(44.dp)
+                .align(Alignment.BottomEnd)
+        )
+    }
+}
+
+// -----------------------------------------------------------------------------
+// ARTISTS GRID VIEW
+// -----------------------------------------------------------------------------
+@Composable
+fun ArtistsGridView(
+    artists: List<ArtistGroup>,
+    onArtistClick: (ArtistGroup) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        items(artists, key = { it.name }) { artist ->
+            ArtistGridCard(artist = artist, onClick = { onArtistClick(artist) })
+        }
+    }
+}
+
+@Composable
+fun ArtistGridCard(artist: ArtistGroup, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(AccentTeal.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (artist.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = artist.coverUrl,
+                    contentDescription = artist.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(artist.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, textAlign = TextAlign.Center)
+        Text(
+            "${artist.albums.size} Albums • ${artist.tracks.size} Songs",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+// -----------------------------------------------------------------------------
+// ALBUMS GRID VIEW
+// -----------------------------------------------------------------------------
+@Composable
+fun AlbumsGridView(
+    albums: List<AlbumGroup>,
+    onAlbumClick: (AlbumGroup) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        items(albums, key = { "${it.title}_${it.artist}" }) { album ->
+            AlbumCard(album = album, onClick = { onAlbumClick(album) })
+        }
+    }
+}
+
+@Composable
+fun AlbumCard(album: AlbumGroup, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(160.dp)
+            .clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(160.dp)
+                .shadow(6.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (album.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = album.coverUrl,
+                    contentDescription = album.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AccentIndigo.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Album, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(48.dp))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(album.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(album.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// SHELF CARDS (Track, Album, Artist)
+// -----------------------------------------------------------------------------
+@Composable
+fun MusicTrackShelfCard(
+    track: MusicTrack,
+    isPlaying: Boolean = false,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .shadow(6.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
+        ) {
+            if (track.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = track.coverUrl,
+                    contentDescription = track.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(listOf(AccentIndigo.copy(alpha = 0.5f), AccentTeal.copy(alpha = 0.3f)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Audiotrack, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
+                }
+            }
+
+            if (isPlaying) {
+                Surface(
+                    color = AccentIndigo,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.GraphicEq, contentDescription = "Playing", tint = Color.White, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("PLAYING", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(track.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+fun AlbumShelfCard(album: AlbumGroup, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .shadow(6.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(SurfaceGlass)
+                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
+        ) {
+            if (album.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = album.coverUrl,
+                    contentDescription = album.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AccentIndigo.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Album, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(44.dp))
+                }
+            }
+
+            Surface(
+                color = Color.Black.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(6.dp)
+            ) {
+                Text(
+                    "${album.tracks.size} tracks",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(album.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(album.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+fun ArtistShelfCard(artist: ArtistGroup, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(110.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(AccentTeal.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (artist.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = artist.coverUrl,
+                    contentDescription = artist.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(Icons.Default.Person, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(44.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(artist.name, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, textAlign = TextAlign.Center)
+        Text("${artist.albums.size} albums", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun MusicTrackRowItem(
+    track: MusicTrack,
+    isPlaying: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (track.coverUrl.isNotBlank()) {
+            AsyncImage(
+                model = track.coverUrl,
+                contentDescription = track.title,
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(10.dp)),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(AccentIndigo.copy(alpha = 0.25f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.MusicNote, contentDescription = null, tint = AccentIndigo)
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(track.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${track.artist} • ${track.album}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        IconButton(onClick = onClick) {
+            Icon(
+                if (isPlaying) Icons.Default.PauseCircleFilled else Icons.Default.PlayCircleFilled,
+                contentDescription = "Play",
+                tint = AccentIndigo,
+                modifier = Modifier.size(36.dp)
+            )
         }
     }
 }
@@ -915,532 +2237,7 @@ fun AlbumSongsScreen(
 }
 
 // -----------------------------------------------------------------------------
-// MUSIC SHELVES VIEW (Slide to the side, scroll up and down for curated options)
-// -----------------------------------------------------------------------------
-@Composable
-fun MusicShelvesView(
-    allTracks: List<MusicTrack>,
-    recentTracks: List<MusicTrack>,
-    albumGroups: List<AlbumGroup>,
-    artistGroups: List<ArtistGroup>,
-    playbackState: com.example.data.PlaybackState,
-    onAlbumClick: (AlbumGroup) -> Unit,
-    onTrackClick: (MusicTrack) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        // 1. Shelf: Continue Listening / Recent Grooves
-        if (recentTracks.isNotEmpty()) {
-            item {
-                ShelfHeader(
-                    title = "Recent Grooves",
-                    subtitle = "Pick up where you left off",
-                    icon = Icons.Default.History,
-                    iconTint = AccentIndigo
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(recentTracks, key = { "recent_${it.id}" }) { track ->
-                        MusicTrackShelfCard(
-                            track = track,
-                            isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
-                            onClick = { onTrackClick(track) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 2. Shelf: Featured & New Albums
-        if (albumGroups.isNotEmpty()) {
-            item {
-                ShelfHeader(
-                    title = "New Releases & Albums",
-                    subtitle = "Slide sideways to explore full albums",
-                    badge = "NEW",
-                    icon = Icons.Default.Album,
-                    iconTint = Color(0xFFFF9800)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(albumGroups, key = { "alb_${it.title}_${it.artist}" }) { album ->
-                        AlbumShelfCard(
-                            album = album,
-                            onClick = { onAlbumClick(album) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 3. Shelf: Top Artists
-        if (artistGroups.isNotEmpty()) {
-            item {
-                ShelfHeader(
-                    title = "Standout Artists",
-                    subtitle = "Artists in your personal Plex collection",
-                    icon = Icons.Default.Person,
-                    iconTint = AccentTeal
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(artistGroups, key = { "art_${it.name}" }) { artist ->
-                        ArtistShelfCard(
-                            artist = artist,
-                            onClick = {
-                                val firstAlb = artist.albums.firstOrNull()
-                                if (firstAlb != null) onAlbumClick(firstAlb)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 4. Shelf: Noteworthy Tracks & Curated Mixes
-        item {
-            ShelfHeader(
-                title = "Curated Mixes & Audio Tracks",
-                subtitle = "Popular selections tailored for you",
-                icon = Icons.Default.LibraryMusic,
-                iconTint = AccentIndigo
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
-            ) {
-                items(allTracks.take(12), key = { "mix_${it.id}" }) { track ->
-                    MusicTrackShelfCard(
-                        track = track,
-                        isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
-                        onClick = { onTrackClick(track) }
-                    )
-                }
-            }
-        }
-
-        item { Spacer(modifier = Modifier.height(28.dp)) }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// GENRES GRID VIEW
-// -----------------------------------------------------------------------------
-@Composable
-fun GenresGridView(
-    genres: List<GenreItem>,
-    onGenreClick: (GenreItem) -> Unit
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        items(genres) { genre ->
-            GenreCard(genre = genre, onClick = { onGenreClick(genre) })
-        }
-    }
-}
-
-@Composable
-fun GenreCard(genre: GenreItem, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(110.dp)
-            .shadow(6.dp, RoundedCornerShape(18.dp))
-            .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(genre.gradient))
-            .clickable { onClick() }
-            .padding(14.dp)
-    ) {
-        Column(modifier = Modifier.align(Alignment.TopStart)) {
-            Text(
-                genre.name,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                genre.description,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                maxLines = 2,
-                lineHeight = 14.sp
-            )
-        }
-
-        Icon(
-            genre.icon,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.35f),
-            modifier = Modifier
-                .size(44.dp)
-                .align(Alignment.BottomEnd)
-        )
-    }
-}
-
-// -----------------------------------------------------------------------------
-// ARTISTS GRID VIEW
-// -----------------------------------------------------------------------------
-@Composable
-fun ArtistsGridView(
-    artists: List<ArtistGroup>,
-    onArtistClick: (ArtistGroup) -> Unit
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        items(artists, key = { it.name }) { artist ->
-            ArtistGridCard(artist = artist, onClick = { onArtistClick(artist) })
-        }
-    }
-}
-
-@Composable
-fun ArtistGridCard(artist: ArtistGroup, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceGlass)
-            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(AccentIndigo.copy(alpha = 0.4f), AccentTeal.copy(alpha = 0.3f)))),
-            contentAlignment = Alignment.Center
-        ) {
-            if (artist.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = artist.coverUrl,
-                    contentDescription = artist.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(artist.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, textAlign = TextAlign.Center)
-        Text(
-            "${artist.albums.size} Albums • ${artist.tracks.size} Songs",
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-// -----------------------------------------------------------------------------
-// ALBUMS GRID VIEW
-// -----------------------------------------------------------------------------
-@Composable
-fun AlbumsGridView(
-    albums: List<AlbumGroup>,
-    onAlbumClick: (AlbumGroup) -> Unit
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        items(albums, key = { "${it.title}_${it.artist}" }) { album ->
-            AlbumCard(album = album, onClick = { onAlbumClick(album) })
-        }
-    }
-}
-
-@Composable
-fun AlbumCard(album: AlbumGroup, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(160.dp)
-            .clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .shadow(6.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(SurfaceGlass)
-                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (album.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = album.coverUrl,
-                    contentDescription = album.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AccentIndigo.copy(alpha = 0.25f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Album, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(48.dp))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(album.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(album.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-// -----------------------------------------------------------------------------
-// SHELF CARDS (Track, Album, Artist)
-// -----------------------------------------------------------------------------
-@Composable
-fun MusicTrackShelfCard(
-    track: MusicTrack,
-    isPlaying: Boolean = false,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .width(140.dp)
-            .clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .shadow(6.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(SurfaceGlass)
-                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
-        ) {
-            if (track.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = track.coverUrl,
-                    contentDescription = track.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Brush.linearGradient(listOf(AccentIndigo.copy(alpha = 0.5f), AccentTeal.copy(alpha = 0.3f)))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Audiotrack, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
-                }
-            }
-
-            // Playing Indicator
-            if (isPlaying) {
-                Surface(
-                    color = AccentIndigo,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.GraphicEq, contentDescription = "Playing", tint = Color.White, modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("PLAYING", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(track.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-fun AlbumShelfCard(album: AlbumGroup, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(140.dp)
-            .clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .shadow(6.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(SurfaceGlass)
-                .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
-        ) {
-            if (album.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = album.coverUrl,
-                    contentDescription = album.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AccentIndigo.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Album, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(44.dp))
-                }
-            }
-
-            Surface(
-                color = Color.Black.copy(alpha = 0.65f),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(6.dp)
-            ) {
-                Text(
-                    "${album.tracks.size} tracks",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(album.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(album.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-fun ArtistShelfCard(artist: ArtistGroup, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(110.dp)
-            .clickable { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .background(AccentTeal.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (artist.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = artist.coverUrl,
-                    contentDescription = artist.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(Icons.Default.Person, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(44.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(artist.name, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, textAlign = TextAlign.Center)
-        Text("${artist.albums.size} albums", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-fun MusicTrackRowItem(
-    track: MusicTrack,
-    isPlaying: Boolean = false,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceGlass)
-            .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (track.coverUrl.isNotBlank()) {
-            AsyncImage(
-                model = track.coverUrl,
-                contentDescription = track.title,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(10.dp)),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(AccentIndigo.copy(alpha = 0.25f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.MusicNote, contentDescription = null, tint = AccentIndigo)
-            }
-        }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(track.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${track.artist} • ${track.album}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        IconButton(onClick = onClick) {
-            Icon(
-                if (isPlaying) Icons.Default.PauseCircleFilled else Icons.Default.PlayCircleFilled,
-                contentDescription = "Play",
-                tint = AccentIndigo,
-                modifier = Modifier.size(36.dp)
-            )
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// DRILLDOWN DETAIL SCREENS
+// DRILLDOWN DETAIL SCREENS (Artist & Genre)
 // -----------------------------------------------------------------------------
 @Composable
 fun ArtistDetailScreen(
@@ -1578,11 +2375,10 @@ fun GenreDetailScreen(
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(genreName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                Text("${albums.size} albums • 3-Column Choices", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${albums.size} albums", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        // 3-in-a-Row Top Down Grid for Genre choices
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             modifier = Modifier.fillMaxSize(),

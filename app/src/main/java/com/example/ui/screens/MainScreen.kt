@@ -361,6 +361,21 @@ fun MainScreen(
                         viewModel = viewModel,
                         onNavigateToDetails = { title, creator, type ->
                             navController.navigate(Routes.MediaDetail(title, creator, type))
+                        },
+                        onOpenEBook = { book ->
+                            activeEBook = book
+                        },
+                        onOpenComic = { comic ->
+                            activeComic = comic
+                        },
+                        onAudiobookClick = {
+                            isPlayerSlidUp = true
+                        },
+                        onMusicClick = {
+                            isPlayerSlidUp = true
+                        },
+                        onNavigateToSettings = {
+                            navController.navigate(Routes.Settings)
                         }
                     )
                 }

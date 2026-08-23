@@ -292,6 +292,7 @@ class SettingsBackupManager(private val context: Context) {
     // Silently save a backup to /sdcard/Download/homecast_backup.json
     fun saveSilentBackup(servers: List<ServerConfig>, prefsMap: Map<String, String> = emptyMap()) {
         try {
+            val currentPayload = loadCurrentPayload()
             val file = getSilentBackupFile()
             file.parentFile?.mkdirs()
 
@@ -308,12 +309,14 @@ class SettingsBackupManager(private val context: Context) {
                 prefsMap
             }
 
-            val payload = BackupPayload(
-                servers = servers,
+            val payload = currentPayload.copy(
+                backupDate = System.currentTimeMillis(),
+                servers = if (servers.isNotEmpty()) servers else currentPayload.servers,
                 lastPlaybackPrefs = actualPrefsMap
             )
             val json = adapter.toJson(payload)
             file.writeText(json, Charsets.UTF_8)
+            getInternalBackupFile().writeText(json, Charsets.UTF_8)
             android.util.Log.d("SettingsBackupManager", "Silent backup auto-saved to ${file.absolutePath}")
         } catch (e: Exception) {
             // Silently skip if write permission is restricted on modern Scoped Storage

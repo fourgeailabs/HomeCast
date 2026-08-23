@@ -1863,6 +1863,40 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "5.1.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "Fully Populated Dual-Side Discovery: Completely resolved the empty Discover tab on both Private Library and Public Domain sides with rich, dynamic feeds and interactive carousels.",
+                    "Public Domain Masterpiece Showcase: Discover timeless classic literature (Frankenstein, Great Gatsby, Dracula, Dorian Gray, Art of War), full LibriVox dramatic audiobooks (Sherlock Holmes, Dracula, Alice in Wonderland), Golden Age vintage comics (Little Nemo, Planet Comics, Krazy Kat, Shazam), and masterwork classical/archive recordings (Beethoven, Debussy, Vivaldi, Chopin, Joplin, Mozart, Bach) with 1-tap reading and playback.",
+                    "Curated Historical Theme Clusters: Dive into thematic eras including Sci-Fi Pioneers, Victorian Mystery, Ancient Philosophy, Roaring 20s Jazz, and High Seas Adventures.",
+                    "Private Library Multi-Media Showcase: Experience the AI 'For You' Daily Blend, 'Continue Your Journey' resume shelf, dynamic time-of-day mixes, top digital e-books, featured audiobooks, and the interactive 100+ moods explorer carousel.",
+                    "Quick Media Type Filter Pills: Easily toggle between All Media, Audiobooks, E-Books & Comics, and Music & Mixes on demand.",
+                    "Direct Action Discovery Cards: AI recommendations and search results now feature immediate 1-tap 'Read Now', 'Comic', 'Listen', and 'Play' buttons with instant playback and reader transitions."
+                )
+            ),
+            UpdateNotice(
+                version = "5.0.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "Clickable Music Category Navigation: Replaced single-row side-scrolling restrictions across all music shelves. Tapping category headers (Recent Grooves, New Releases, Featured Artists, AI Mixes, All Songs) now opens a dedicated full-screen view with full grid/list layout, Play All, and Shuffle controls.",
+                    "100+ Distinct Stylized Moods: Added a new 'Moods' tab to the music hierarchy matching the visual design of the Genres screen. Explore over 100 moods organized into 10 curated vibe categories (Chillout, Lo-Fi, Deep Focus, Cyberpunk, 80s Synth, High Energy, Cinematic, etc.) with custom gradients, vector iconography, and track matching.",
+                    "AI Listening History 'For You' Mix: The AI engine continuously analyzes your playback history and frequently played artists/genres to curate a bespoke 'For You' daily playlist.",
+                    "Dynamic Time-of-Day & Style Mixes: Automatic dynamic mix generation that adapts multiple times a day (Morning Awakening, Midday Focus, Golden Hour, Midnight Low-End, Heavy Rotation, Deep Cuts, and Genre Fusion).",
+                    "Dynamic AI Category Shuffling: Mix up and remix your category shelves on demand or throughout the day with the one-tap remix button.",
+                    "Revamped Discovery & Home Page: Transformed the home explore experience with interactive prompt suggestion chips, live 'For You' music showcase cards, and instant mood exploration carousels."
+                )
+            ),
+            UpdateNotice(
+                version = "4.9.1",
+                date = "August 2026",
+                highlights = listOf(
+                    "Resilient Personal Media Loading: Fixed library filtering so personal Audiobooks, E-Books, and Music always load reliably across connected servers, local storage folders, and starter collections without getting masked.",
+                    "Automated Background Server Sync & Folder Scanning: HomeCast now automatically initiates background sync for all connected Audiobookshelf, Plex, and Booklore servers and scans local media folders upon app launch and state changes.",
+                    "One-Tap Header Sync & Refresh: Added a dedicated Refresh/Sync button to Audiobooks, E-Books, and Music screen headers for immediate manual synchronization with animated feedback.",
+                    "Full Backup Payload Preservation: Enhanced silent and exported JSON backup routines to safeguard local folder profiles, public domain sources, reading bookmarks, and granular playback positions."
+                )
+            ),
+            UpdateNotice(
                 version = "4.9.0",
                 date = "August 2026",
                 highlights = listOf(

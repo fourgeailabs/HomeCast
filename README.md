@@ -1,11 +1,43 @@
 # HomeCast
 
-**Version:** 4.9.0
+**Version:** 5.1.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.9.0)
+## 🚀 Recent Updates (v5.1.0)
+- **Fully Populated Dual-Side Discovery Feeds**: Completely overhauled the Discovery screen so both **Private Library** and **Public Domain** tabs are vibrant, rich, interactive, and never empty or dry.
+- **Public Domain Masterpiece Showcase & Sliding Shelves**:
+  - **Featured Masterpiece Hero Spotlight**: Dynamic spotlight banner for premier classic literature and LibriVox recordings with direct 1-tap playback or reading.
+  - **Immortal Classic E-Books Shelf**: Curated Project Gutenberg & Smithsonian masterworks (*Frankenstein*, *The Great Gatsby*, *Dracula*, *The Picture of Dorian Gray*, *The Art of War*, *Meditations*, *Twenty Thousand Leagues Under the Sea*, *The Metamorphosis*, *Moby Dick*, *The Prince*, *Jane Eyre*, *Wuthering Heights*) with 1-tap reading.
+  - **Dramatic Audiobooks Shelf**: Full LibriVox unabridged voice recordings (*Sherlock Holmes*, *Dracula*, *Frankenstein*, *Art of War*, *The Time Machine*, *Alice in Wonderland*, *Pride and Prejudice*, *The Great Gatsby*) with duration badges and 1-tap audio playback.
+  - **Golden Age Comics & Illustrated Stories Shelf**: Historic vintage comics (*Little Nemo in Slumberland*, *Planet Comics: Cosmic Patrol*, *Krazy Kat*, *Whiz Comics / Captain Marvel*) with 1-tap comic viewing.
+  - **Masterpiece Classical & Archive Recordings Shelf**: Orchestral and piano masterworks (*Beethoven*, *Debussy*, *Vivaldi*, *Chopin*, *Scott Joplin*, *Mozart*, *Bach*) with instant streaming.
+  - **Curated Historical Theme Clusters**: Interactive deep dives into Sci-Fi Pioneers, Victorian Mystery, Ancient Philosophy, Roaring 20s Jazz, and High Seas Adventures.
+- **Private Library Multi-Media Showcase**:
+  - **"Made For You" Daily Media Blend Hero**: Dynamic hero card tailored to the user's listening and reading habits.
+  - **"Continue Your Journey" Resume Shelf**: 1-tap pickup for in-progress audiobooks, e-books, and recent tracks.
+  - **AI Dynamic Time-of-Day Mixes**: Evolving music mixes (Morning Awakening, Midday Focus, Golden Hour, Midnight Low-End, Deep Cuts).
+  - **Top E-Books & Featured Audiobooks**: Direct carousels of synced media from Audiobookshelf, Booklore, and Plex.
+  - **100+ Moods & Vibe Explorer**: Interactive carousel from the 100-mood catalog.
+- **Quick Media Type Filter Pills**: Rapidly toggle feeds between All Media, Audiobooks, E-Books & Comics, and Music & Mixes.
+- **Direct Action Discovery Cards**: AI recommendations now feature immediate 1-tap "Read Now", "Listen", "Play", and "Details" buttons for seamless exploration.
+
+## 🚀 Previous Updates (v5.0.0)
+- **Clickable Music Category Navigation & Full Shelf Views**: Replaced single-row horizontal scrolling restrictions across all music shelves. Tapping any category header (Recent Grooves, New Releases, Featured Artists, AI Dynamic Mixes, All Songs) opens a dedicated, full-screen category drill-down view with full grid/list layouts, Play All, and Shuffle controls.
+- **100+ Distinct Stylized Moods**: Added a brand new "Moods" tab to the music hierarchy matching the visual design and polish of the Genres screen. Browse and play tracks from over 100 moods categorized into 10 vibe clusters (Chillout, Lo-Fi, Deep Focus, Cyberpunk, 80s Synth, High Energy, Cinematic, Coffeehouse, Cosmic, and Party) with custom gradients and vector iconography.
+- **AI Listening History "For You" Mix**: The music engine analyzes playback patterns, frequent artists, and top genres from listening history to create a personalized, dynamically generated "For You" mix with one-tap playback.
+- **Dynamic Time-of-Day & Style Mixes**: Automatic dynamic mix generation that adapts multiple times a day (Morning Awakening, Midday Focus, Golden Hour, Midnight Low-End, Heavy Rotation, Deep Cuts, and Genre Fusion).
+- **Dynamic AI Category Shuffling**: Mix up and remix your category shelves on demand or throughout the day with the one-tap remix button.
+- **Revamped Discovery & Home Page**: Transformed the home explore experience with interactive prompt suggestion chips, live 'For You' music showcase cards, and instant mood exploration carousels.
+
+## 🚀 Previous Updates (v4.9.1)
+- **Resilient Personal Media Loading & Unified Fallback**: Completely fixed library view filtering across Audiobooks, E-Books, and Music screens. Personal media now loads seamlessly from connected servers (Audiobookshelf, Plex, Booklore), configured local device storage folders, and starter collections without getting masked by empty server filters.
+- **Automated Background Server Sync & Local Media Scanning**: HomeCast now automatically executes background synchronization for all configured servers and scans enabled local storage folders upon application launch and configuration restoration.
+- **One-Tap Header Sync & Refresh**: Added dedicated quick-sync buttons to the top header bars on Audiobooks, E-Books, and Music screens with real-time animated loading state indicators.
+- **Full Backup Payload Preservation**: Hardened silent and exported JSON backup routines (`homecast_backup.json`) to guarantee that local folder profiles, public domain source configurations, reading bookmarks, and exact playback timestamps are preserved across sessions and reinstalls.
+
+## 🚀 Previous Updates (v4.9.0)
 - **True Screen-Budget Dynamic Pagination Engine**: Completely solved the multi-page chapter pagination engine in the E-Reader. Long text and chapters are cleanly divided into discrete screen-fitting pages with dynamic word capacity calculation based on typography (font size and line spacing). Swiping or tapping turns one discrete page at a time with smooth 3D page curl physics, eliminating single-page chapter bugs.
 - **Universal Bookmarks for Books, Audiobooks & Music**: Added a comprehensive bookmarking system across all media types. Save multiple custom bookmarks with timestamp/excerpt previews and optional notes.
 - **Interactive Bookmarks & Last Spot Drawer**: Browse all saved bookmarks and instantly resume reading or listening from your last spot with a single tap.

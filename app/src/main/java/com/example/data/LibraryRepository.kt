@@ -53,6 +53,7 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
         secureConfigManager.removeServer(serverId)
         dao.deleteBooksByServer(serverId)
         dao.deleteMusicByServer(serverId)
+        dao.deleteEBooksByServer(serverId)
     }
 
     suspend fun syncAudiobooks(server: ServerConfig): Result<Int> {

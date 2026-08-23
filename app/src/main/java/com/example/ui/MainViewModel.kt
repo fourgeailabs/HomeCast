@@ -447,6 +447,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             // Automatically clean authors/genres and locate beautiful cover-art URLs immediately!
             performDailyDynamicMenuAndCategoryCleanup()
+
+            // Auto sync servers and scan local folders in background on app startup
+            kotlinx.coroutines.delay(1000)
+            refreshPersonalMedia()
         }
 
         viewModelScope.launch {
@@ -455,6 +459,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     backupManager.saveSilentBackup(serverList)
                     _hasSilentBackup.value = backupManager.hasSilentBackup()
                 }
+            }
+        }
+    }
+
+    private val _isSyncingPersonalMedia = MutableStateFlow(false)
+    val isSyncingPersonalMedia = _isSyncingPersonalMedia.asStateFlow()
+
+    fun refreshPersonalMedia() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _isSyncingPersonalMedia.value = true
+            try {
+                // 1. Sync all connected servers
+                val currentServers = servers.value
+                for (server in currentServers) {
+                    if (server.isConnected) {
+                        when (server.type) {
+                            "audiobookshelf" -> repository.syncAudiobooks(server)
+                            "booklore" -> repository.syncBooklore(server)
+                            else -> repository.syncPlex(server)
+                        }
+                    }
+                }
+
+                // 2. Scan all enabled local folders
+                val folders = localFolders.value
+                for (folder in folders) {
+                    if (folder.isEnabled) {
+                        val result = com.example.data.LocalMediaScanner.scanFolder(getApplication(), folder)
+                        when (folder.mediaType.uppercase()) {
+                            "AUDIOBOOK" -> if (result.audiobooks.isNotEmpty()) repository.insertBooks(result.audiobooks)
+                            "EBOOK" -> if (result.ebooks.isNotEmpty()) repository.insertEBooks(result.ebooks)
+                            "MUSIC" -> if (result.musicTracks.isNotEmpty()) repository.insertMusicTracks(result.musicTracks)
+                        }
+                    }
+                }
+
+                // 3. Category cleanup and missing cover art location
+                performDailyDynamicMenuAndCategoryCleanup()
+                locateMissingCoverArtWithAI()
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Refresh personal media failed", e)
+            } finally {
+                _isSyncingPersonalMedia.value = false
             }
         }
     }
@@ -803,6 +850,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun fetchGeminiCategoryItems(category: String, sourceStr: String) {
+        if (category.isBlank()) {
+            _geminiCategoryItems.value = emptyList()
+            return
+        }
         viewModelScope.launch {
             _isDiscoveryLoading.value = true
             try {
@@ -848,7 +899,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val adapter = moshi.adapter(com.example.ui.screens.GeminiDiscoveryResponse::class.java)
                 val geminiRes = adapter.fromJson(jsonStr)
                 
-                if (geminiRes != null) {
+                if (geminiRes != null && geminiRes.items.isNotEmpty()) {
                     val newItems = geminiRes.items.mapIndexed { index, item ->
                         com.example.ui.screens.DiscoveryItem(
                             title = item.title,
@@ -864,13 +915,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     _geminiCategoryItems.value = newItems
+                } else {
+                    generateLocalFallbackDiscoveryItems(category, sourceStr)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                generateLocalFallbackDiscoveryItems(category, sourceStr)
             } finally {
                 _isDiscoveryLoading.value = false
             }
         }
+    }
+
+    private fun generateLocalFallbackDiscoveryItems(category: String, sourceStr: String) {
+        val query = category.lowercase()
+        val list = mutableListOf<com.example.ui.screens.DiscoveryItem>()
+        if (sourceStr.contains("private")) {
+            val matchedBooks = allBooks.value.filter { it.title.lowercase().contains(query) || it.genre.lowercase().contains(query) || it.author.lowercase().contains(query) }
+            val matchedEBooks = allEBooks.value.filter { it.title.lowercase().contains(query) || it.genre.lowercase().contains(query) || it.author.lowercase().contains(query) }
+            val matchedMusic = allMusic.value.filter { it.title.lowercase().contains(query) || it.genre.lowercase().contains(query) || it.artist.lowercase().contains(query) }
+
+            val bookPicks = (matchedBooks.ifEmpty { allBooks.value }).take(4)
+            val ebookPicks = (matchedEBooks.ifEmpty { allEBooks.value }).take(4)
+            val musicPicks = (matchedMusic.ifEmpty { allMusic.value }).take(4)
+
+            bookPicks.forEach {
+                list.add(com.example.ui.screens.DiscoveryItem(it.title, it.author, it.genre, "Curated audiobook from your private collection.", com.example.ui.screens.DiscoveryMediaType.AUDIOBOOK, it.coverUrl, it.streamUrl, it.duration))
+            }
+            ebookPicks.forEach {
+                list.add(com.example.ui.screens.DiscoveryItem(it.title, it.author, it.genre, it.description.ifBlank { "Curated digital book from your library." }, com.example.ui.screens.DiscoveryMediaType.BOOK, it.coverUrl, it.downloadUrl, 0L, it.totalPages))
+            }
+            musicPicks.forEach {
+                list.add(com.example.ui.screens.DiscoveryItem(it.title, it.artist, it.genre, "Curated track from your music collection.", com.example.ui.screens.DiscoveryMediaType.MUSIC, it.coverUrl, it.streamUrl, it.duration))
+            }
+        } else {
+            val allPd = PublicDomainCatalog.curatedEBooks + PublicDomainCatalog.curatedAudiobooks + PublicDomainCatalog.curatedMusic + PublicDomainCatalog.curatedComics
+            val matched = allPd.filter { it.title.lowercase().contains(query) || it.genre.lowercase().contains(query) || it.authorOrCreator.lowercase().contains(query) || it.description.lowercase().contains(query) }
+            val finalPicks = (matched.ifEmpty { allPd.shuffled() }).take(12)
+
+            finalPicks.forEach {
+                val mediaType = when (it.type) {
+                    "AUDIOBOOK" -> com.example.ui.screens.DiscoveryMediaType.AUDIOBOOK
+                    "MUSIC" -> com.example.ui.screens.DiscoveryMediaType.MUSIC
+                    else -> com.example.ui.screens.DiscoveryMediaType.BOOK
+                }
+                list.add(com.example.ui.screens.DiscoveryItem(it.title, it.authorOrCreator, it.genre, it.description, mediaType, it.coverUrl, it.streamOrReadUrl, it.durationSeconds, it.totalPages))
+            }
+        }
+        _geminiCategoryItems.value = list
     }
 
     val discoveryError = _discoveryError.asStateFlow()

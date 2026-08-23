@@ -185,23 +185,35 @@ fun EBooksScreen(
 
     val allEBooks by viewModel.allEBooks.collectAsState()
     val archiveBooks by viewModel.publicDomainBooks.collectAsState()
+    val servers by viewModel.servers.collectAsState()
+    val isSyncing by viewModel.isSyncingPersonalMedia.collectAsState()
     
-    val currentBookshelfItems = remember(allEBooks, archiveBooks, selectedSource) {
+    val currentBookshelfItems = remember(allEBooks, archiveBooks, selectedSource, servers) {
         if (selectedSource == 0) {
-            allEBooks.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }.map { ebook ->
-                BookshelfItem(
-                    id = ebook.id,
-                    title = ebook.title,
-                    authorOrArtist = ebook.author,
-                    downloadUrl = ebook.downloadUrl,
-                    coverUrl = ebook.coverUrl,
-                    genre = ebook.genre,
-                    isComic = ebook.isComic,
-                    progressPercent = ebook.progressPercent,
-                    pageCount = ebook.totalPages,
-                    description = ebook.description,
-                    serverId = ebook.serverId
-                )
+            val serverOrLocal = allEBooks.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+            val baseList = if (serverOrLocal.isNotEmpty() || servers.isNotEmpty()) {
+                serverOrLocal
+            } else {
+                allEBooks.filter { it.serverId != "pd_server" }
+            }
+            if (baseList.isEmpty()) {
+                sampleBookshelfItems
+            } else {
+                baseList.map { ebook ->
+                    BookshelfItem(
+                        id = ebook.id,
+                        title = ebook.title,
+                        authorOrArtist = ebook.author,
+                        downloadUrl = ebook.downloadUrl,
+                        coverUrl = ebook.coverUrl,
+                        genre = ebook.genre,
+                        isComic = ebook.isComic,
+                        progressPercent = ebook.progressPercent,
+                        pageCount = ebook.totalPages,
+                        description = ebook.description,
+                        serverId = ebook.serverId
+                    )
+                }
             }
         } else {
             val localPD = allEBooks.filter { it.serverId == "demo_server" || it.serverId == "pd_server" }.map { ebook ->
@@ -333,6 +345,29 @@ fun EBooksScreen(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = { viewModel.refreshPersonalMedia() },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    ) {
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = AccentTeal,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Refresh & Sync",
+                                tint = AccentTeal
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = { isGridViewOpen = !isGridViewOpen },
                         modifier = Modifier

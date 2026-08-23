@@ -57,6 +57,7 @@ fun LibraryScreen(
     val recents by viewModel.recents.collectAsState()
     val servers by viewModel.servers.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
+    val isSyncing by viewModel.isSyncingPersonalMedia.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
@@ -88,9 +89,14 @@ fun LibraryScreen(
     }
 
 
-    val currentBooks = remember(allBooks, publicDomainAudiobooks, selectedSource) {
+    val currentBooks = remember(allBooks, publicDomainAudiobooks, selectedSource, servers) {
         if (selectedSource == 0) {
-            allBooks.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+            val serverOrLocal = allBooks.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+            if (serverOrLocal.isNotEmpty() || servers.isNotEmpty()) {
+                serverOrLocal
+            } else {
+                allBooks.filter { it.serverId != "pd_server" }
+            }
         } else {
             val localPD = allBooks.filter { it.serverId == "demo_server" || it.serverId == "pd_server" }
             val fetched = publicDomainAudiobooks.filter { f -> localPD.none { l -> l.title.equals(f.title, ignoreCase = true) } }
@@ -143,6 +149,22 @@ fun LibraryScreen(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = { viewModel.refreshPersonalMedia() },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(SurfaceGlass, CircleShape)
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = AccentTeal,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh & Sync", tint = AccentTeal)
+                    }
+                }
                 IconButton(
                     onClick = { isGridView = !isGridView },
                     modifier = Modifier
