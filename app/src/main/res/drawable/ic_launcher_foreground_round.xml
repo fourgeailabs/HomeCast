@@ -1,51 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Glowing soft shadow behind circular badge -->
-    <path
-        android:pathData="M 54,27 A 28,28 0 1,1 53.99,27 Z"
-        android:fillAlpha="0.35">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="26"
-                android:startY="27"
-                android:endX="82"
-                android:endY="83"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#4F46E5" />
-                <item android:offset="1.0" android:color="#0D9488" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Main Gradient Circular Badge (Safe-zone centered 58dp x 58dp) -->
-    <path
-        android:pathData="M 54,25 A 29,29 0 1,1 53.99,25 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="25"
-                android:startY="25"
-                android:endX="83"
-                android:endY="83"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#06B6D4" />
-                <item android:offset="0.4" android:color="#4F46E5" />
-                <item android:offset="0.8" android:color="#7C3AED" />
-                <item android:offset="1.0" android:color="#C026D3" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Top Glass Gloss Highlight Curve (Circular) -->
-    <path
-        android:pathData="M 25,54 A 29,29 0 0,1 83,54 C 75,47 65.5,43.5 54,43.5 C 42.5,43.5 33,47 25,54 Z"
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.22" />
 
     <!-- Headphone Arc over the top of the badge -->
     <path
@@ -70,13 +28,13 @@
     <path
         android:pathData="M52,73.5 C46.5,71.5 41.5,71.8 37,73.5 L37,59.5 C41.5,57.8 46.5,57.5 52,59.5 Z"
         android:fillColor="#F1F5F9"
-        android:fillAlpha="0.9" />
+        android:fillAlpha="0.95" />
 
     <!-- Right Page -->
     <path
         android:pathData="M56,73.5 C61.5,71.5 66.5,71.8 71,73.5 L71,59.5 C66.5,57.8 61.5,57.5 56,59.5 Z"
         android:fillColor="#E2E8F0"
-        android:fillAlpha="0.9" />
+        android:fillAlpha="0.95" />
 
     <!-- Center Book Spine Line -->
     <path
@@ -101,24 +59,10 @@
     <path
         android:pathData="M49,47.5 L62.5,55 L49,62.5 Z"
         android:fillColor="#FFFFFF" />
-    <path
-        android:pathData="M49.5,48.5 L61,55 L49.5,61.5 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="49.5"
-                android:startY="48.5"
-                android:endX="61"
-                android:endY="61.5"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#22D3EE" />
-                <item android:offset="1.0" android:color="#818CF8" />
-            </gradient>
-        </aapt:attr>
-    </path>
 
-    <!-- Center Crisp White Play Triangle Core -->
+    <!-- Center Indigo Play Triangle Core -->
     <path
         android:pathData="M51.5,51 L59,55 L51.5,59 Z"
-        android:fillColor="#FFFFFF" />
+        android:fillColor="#4F46E5" />
 
 </vector>

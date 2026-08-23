@@ -5,7 +5,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Base dark background with deep gradient -->
+    
+    <!-- Beautiful full-bleed adaptive gradient matching HomeCast theme -->
     <path
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
@@ -15,46 +16,17 @@
                 android:endX="108"
                 android:endY="108"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#090D16" />
-                <item android:offset="0.45" android:color="#141829" />
-                <item android:offset="0.85" android:color="#0C1B2B" />
-                <item android:offset="1.0" android:color="#042022" />
+                <item android:offset="0.0" android:color="#06B6D4" />
+                <item android:offset="0.4" android:color="#4F46E5" />
+                <item android:offset="0.8" android:color="#7C3AED" />
+                <item android:offset="1.0" android:color="#C026D3" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Top-left subtle indigo ambient glow -->
+    <!-- Subtle overlays for lighting and depth -->
     <path
-        android:pathData="M15,15m-35,0a35,35 0 1,0 70,0a35,35 0 1,0 -70,0"
-        android:fillAlpha="0.25">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="0"
-                android:startY="0"
-                android:endX="50"
-                android:endY="50"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#6366F1" />
-                <item android:offset="1.0" android:color="#00000000" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Bottom-right subtle teal ambient glow -->
-    <path
-        android:pathData="M95,95m-40,0a40,40 0 1,0 80,0a40,40 0 1,0 -80,0"
-        android:fillAlpha="0.22">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="95"
-                android:startY="95"
-                android:endX="55"
-                android:endY="55"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#14B8A6" />
-                <item android:offset="1.0" android:color="#00000000" />
-            </gradient>
-        </aapt:attr>
-    </path>
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#000000"
+        android:fillAlpha="0.1" />
 </vector>
-

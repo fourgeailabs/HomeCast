@@ -39,20 +39,25 @@ class PlaybackManager(private val context: Context) {
     private val updateProgressRunnable = object : Runnable {
         override fun run() {
             player?.let { p ->
-                if (isPrepared && p.isPlaying) {
+                val state = p.playbackState
+                if (state == Player.STATE_READY || state == Player.STATE_BUFFERING || p.isPlaying) {
+                    val pos = p.currentPosition
+                    val dur = p.duration.coerceAtLeast(0L)
                     _playbackState.value = _playbackState.value.copy(
-                        currentPosition = p.currentPosition,
-                        duration = p.duration.coerceAtLeast(0)
+                        currentPosition = pos,
+                        duration = if (dur > 0L) dur else _playbackState.value.duration,
+                        isPlaying = p.isPlaying
                     )
                 }
             }
-            handler.postDelayed(this, 1000)
+            handler.postDelayed(this, 500)
         }
     }
 
     init {
         val intent = Intent(context, com.example.PlaybackService::class.java)
         context.startService(intent)
+        handler.post(updateProgressRunnable)
         
         // Polling to wait for player
         handler.post(object : Runnable {
@@ -70,18 +75,14 @@ class PlaybackManager(private val context: Context) {
         player?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
-                if (isPlaying) {
-                    handler.post(updateProgressRunnable)
-                } else {
-                    handler.removeCallbacks(updateProgressRunnable)
-                }
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) {
                     isPrepared = true
+                    val dur = player?.duration?.coerceAtLeast(0L) ?: 0L
                     _playbackState.value = _playbackState.value.copy(
-                        duration = player?.duration?.coerceAtLeast(0) ?: 0L,
+                        duration = if (dur > 0L) dur else _playbackState.value.duration,
                         errorMessage = null
                     )
                 } else if (state == Player.STATE_ENDED) {
@@ -234,8 +235,51 @@ class PlaybackManager(private val context: Context) {
 
     fun togglePlayPause() {
         player?.let { p ->
-            if (p.isPlaying) p.pause() else p.play()
+            val state = p.playbackState
+            if (state == Player.STATE_IDLE || p.mediaItemCount == 0) {
+                val book = _playbackState.value.currentAudiobook
+                val track = _playbackState.value.currentMusicTrack
+                if (book != null) {
+                    playAudiobook(book, currentAudiobookList)
+                } else if (track != null) {
+                    playMusicTrack(track, currentPlaylist)
+                }
+            } else {
+                if (p.isPlaying) p.pause() else p.play()
+            }
         }
+    }
+
+    fun stop() {
+        player?.stop()
+        player?.clearMediaItems()
+        _playbackState.value = _playbackState.value.copy(
+            currentAudiobook = null,
+            currentMusicTrack = null,
+            isPlaying = false,
+            currentPosition = 0L,
+            duration = 0L
+        )
+    }
+
+    fun setInitialAudiobook(book: Audiobook) {
+        _playbackState.value = _playbackState.value.copy(
+            currentAudiobook = book,
+            currentMusicTrack = null,
+            isPlaying = false,
+            currentPosition = 0L,
+            duration = book.duration * 1000L
+        )
+    }
+
+    fun setInitialMusicTrack(track: MusicTrack) {
+        _playbackState.value = _playbackState.value.copy(
+            currentMusicTrack = track,
+            currentAudiobook = null,
+            isPlaying = false,
+            currentPosition = 0L,
+            duration = track.duration
+        )
     }
 
     fun seekTo(positionMs: Long) {
@@ -245,7 +289,8 @@ class PlaybackManager(private val context: Context) {
 
     fun skipForward(seconds: Int = 30) {
         player?.let { p ->
-            val newPos = (p.currentPosition + (seconds * 1000L)).coerceAtMost(p.duration)
+            val d = if (p.duration > 0) p.duration else _playbackState.value.duration
+            val newPos = (p.currentPosition + (seconds * 1000L)).coerceAtMost(d)
             seekTo(newPos)
         }
     }

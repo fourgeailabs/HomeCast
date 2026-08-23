@@ -79,7 +79,7 @@ fun MusicScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(MusicNavTab.SHELVES) }
-    var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
+    var selectedSource by remember { mutableIntStateOf(viewModel.initialMusicSource) } // 0 = Personal, 1 = Public Domain
 
     val archiveMusic by viewModel.publicDomainMusic.collectAsState()
 

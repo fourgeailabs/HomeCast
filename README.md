@@ -1,11 +1,24 @@
 # HomeCast
 
-**Version:** 4.3.2
+**Version:** 4.5.1
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.3.2)
+## 🚀 Recent Updates (v4.5.1)
+- **Automatic Settings Preservation & Cloud Backup**: Explicitly configured native Android Auto Backup and modern Cloud Data Extraction rules (`backup_rules.xml` and `data_extraction_rules.xml`). This guarantees that all configuration files (including EncryptedSharedPreferences for servers and general playback preferences) and Room SQLite database assets are preserved during updates, reinstalls, or device-to-device transfers.
+- **Fragile Data Retention Support**: Fully integrated `android:hasFragileUserData="true"`, ensuring that if a user manually uninstalls the app on modern Android versions, they are offered an OS-level checkbox to seamlessly preserve their settings, configurations, and reading history for subsequent reinstalls.
+
+## 🚀 Previous Updates (v4.5.0)
+- **Unified Mini-Player and Custom Stop Controls**: Added a direct "Stop" button to the sliding player controls. This halts ExoPlayer playback, collapses the player screen, and dismisses the mini-player completely. The mini-player now incorporates a sleek, non-interactive visual seek bar overlay that utilizes theme-matching gradients to reflect real-time playback progress.
+- **Dynamic Startup Navigation & Tab Presets**: The app now dynamically saves and restores the last played media item. On launch, HomeCast loads the exact media section (Library, Music, or Ebooks) and initializes the view's data source filter (Personal Server vs. Public Domain) according to the media's origin.
+- **Premium Adaptive Icon Compatibility**: Re-architected launcher icon vector drawables to move the multi-stop gradient (Cyan to Magenta) into a full-bleed background layer. This ensures the launcher icon is 100% compliant with native Android adaptive masking, delivering a perfect crop on circular devices (like Google Pixel) and squircles alike without double-outline clipping or shape clashing.
+- **AI-Powered Personal Server Categorization**: Expanded the Gemini-backed automated dynamic categorization and curation engines to process personal server files (Plex music, Audiobookshelf titles, Booklore books), organizing them into gorgeous dynamic shelves alongside public domain media.
+- **Keyboard Password Input Auto-Spacing Fix**: Integrated dedicated `KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrect = false)` to prevent mobile keyboards (like Gboard) from inserting automatic spaces when typing special characters in Server Settings password fields.
+- **Enhanced E-Book Loading Resilience**: Resolved text parsing and file loading crashes across public domain Project Gutenberg collections, ensuring stable page rendering.
+- **Seamless Update Integration**: Incremented the platform build configuration to `versionCode 37` and `versionName "4.5.0"` to eliminate installer downgrade conflicts during uninstalls where users preserve existing app databases and shared preferences.
+
+## 🚀 Previous Updates (v4.3.2)
 - **Resolved Audiobook Duration Display**: Solved the pervasive 1-hour default duration display bug on public domain audiobook cards. Fallbacks are now set to `0L` (hiding the duration badge until resolved) and the reactive background metadata worker is throttled using a Coroutine Semaphore (`Semaphore(3)`). This prevents network flooding/rate-limiting and ensures actual audio durations are resolved successfully and displayed beautifully.
 - **Fixed Password Input Auto-Spacing**: Discovered that standard input fields without explicit password configurations trigger predictive text, causing mobile keyboards (like Gboard/SwiftKey) to automatically insert spaces when typing special characters (like `.`, `@`, `#`). Adding dedicated `KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrect = false)` to the Server Settings fields disables auto-spacing and predictive suggestions entirely.
 - **Embedded Keystore Restoration**: Resolved installation failures that occurred when users uninstalled previous app versions while choosing to "Keep app data" (which retains signature records). By configuring `app/build.gradle.kts` to dynamically decode and restore the identical, secure `debug.keystore` from `debug.keystore.base64` prior to compilation, we guarantee perfectly consistent signing certificates across all environments (browser builds, local development, and GitHub Actions CI/CD workflows).

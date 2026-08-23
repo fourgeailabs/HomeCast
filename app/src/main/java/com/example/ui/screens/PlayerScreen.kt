@@ -492,6 +492,26 @@ fun PlayerScreen(
                         )
                     }
 
+                    // Stop Button
+                    IconButton(
+                        onClick = {
+                            viewModel.playbackManager.stop()
+                            onCollapse?.invoke()
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Stop,
+                            contentDescription = "Stop Playback",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
                     // Main Glowing Play/Pause Action Button
                     Box(
                         modifier = Modifier

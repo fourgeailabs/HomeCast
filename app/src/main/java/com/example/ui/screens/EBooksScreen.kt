@@ -170,7 +170,7 @@ fun EBooksScreen(
     var selectedCollection by remember { mutableStateOf<Pair<String, List<BookshelfItem>>?>(null) }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var isGridViewOpen by remember { mutableStateOf(false) }
-    var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
+    var selectedSource by remember { mutableIntStateOf(viewModel.initialEbooksSource) } // 0 = Personal, 1 = Public Domain
 
     val allEBooks by viewModel.allEBooks.collectAsState()
     val archiveBooks by viewModel.publicDomainBooks.collectAsState()

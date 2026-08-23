@@ -62,7 +62,7 @@ fun LibraryScreen(
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var isGridView by remember { mutableStateOf(false) }
     var selectedCollection by remember { mutableStateOf<Pair<String, List<com.example.data.Audiobook>>?>(null) }
-    var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
+    var selectedSource by remember { mutableIntStateOf(viewModel.initialAudiobooksSource) } // 0 = Personal, 1 = Public Domain
 
     val publicDomainAudiobooks = remember(archiveAudiobooks, resolvedDurations) {
         archiveAudiobooks.map { doc ->

@@ -134,8 +134,13 @@ fun MainScreen(
                         val mediaSubtitle = activeBook?.author ?: activeTrack?.artist ?: ""
                         val mediaCover = activeBook?.coverUrl ?: activeTrack?.coverUrl ?: ""
                         val isAudiobook = activeBook != null
+                        val progressFraction = if (playbackState.duration > 0) {
+                            (playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
 
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -144,9 +149,33 @@ fun MainScreen(
                                 .background(SurfaceGlass)
                                 .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
                                 .clickable { isPlayerSlidUp = true }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Elegant gradient seek bar attached to the top
+                            val gradientColors = if (isAudiobook) {
+                                listOf(AccentTeal, AccentIndigo)
+                            } else {
+                                listOf(AccentIndigo, AccentTeal)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .background(Color.White.copy(alpha = 0.1f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(progressFraction)
+                                        .fillMaxHeight()
+                                        .background(Brush.horizontalGradient(gradientColors))
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                             if (mediaCover.isNotBlank()) {
                                 AsyncImage(
                                     model = mediaCover,
@@ -197,8 +226,9 @@ fun MainScreen(
                             }
                         }
                     }
+                }
 
-                    NavigationBar(
+                NavigationBar(
                         containerColor = SurfaceGlass,
                         modifier = Modifier.drawBehind {
                             drawLine(
@@ -271,7 +301,7 @@ fun MainScreen(
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = Routes.Library,
+                startDestination = viewModel.initialRoute,
                 modifier = Modifier.padding(innerPadding)
             ) {
                 composable(Routes.Library) {

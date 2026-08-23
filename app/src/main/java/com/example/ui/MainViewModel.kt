@@ -71,7 +71,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLocatingCovers = MutableStateFlow(false)
     val isLocatingCovers = _isLocatingCovers.asStateFlow()
 
+    val initialRoute: String
+    val initialEbooksSource: Int
+    val initialAudiobooksSource: Int
+    val initialMusicSource: Int
+
     init {
+        val sharedPrefs = application.getSharedPreferences("playback_prefs", android.content.Context.MODE_PRIVATE)
+        val lastType = sharedPrefs.getString("last_media_type", null)
+        val lastId = sharedPrefs.getString("last_media_id", null)
+        val lastTitle = sharedPrefs.getString("last_media_title", null)
+        val lastCreator = sharedPrefs.getString("last_media_creator", null)
+        val lastCover = sharedPrefs.getString("last_media_cover", "") ?: ""
+        val lastSource = sharedPrefs.getInt("last_media_source", 0)
+
+        if (lastType != null && lastId != null && lastTitle != null && lastCreator != null) {
+            when (lastType) {
+                "AUDIOBOOK" -> {
+                    initialRoute = "library"
+                    initialAudiobooksSource = lastSource
+                    initialEbooksSource = 0
+                    initialMusicSource = 0
+                    val book = Audiobook(
+                        id = lastId,
+                        title = lastTitle,
+                        author = lastCreator,
+                        coverUrl = lastCover,
+                        duration = 3600L,
+                        serverId = if (lastSource == 1) "pd_server" else "personal",
+                        streamUrl = ""
+                    )
+                    playbackManager.setInitialAudiobook(book)
+                }
+                "MUSIC" -> {
+                    initialRoute = "music"
+                    initialAudiobooksSource = 0
+                    initialEbooksSource = 0
+                    initialMusicSource = lastSource
+                    val track = MusicTrack(
+                        id = lastId,
+                        title = lastTitle,
+                        artist = lastCreator,
+                        album = "Last Played",
+                        coverUrl = lastCover,
+                        duration = 180000L,
+                        serverId = if (lastSource == 1) "pd_server" else "personal",
+                        streamUrl = ""
+                    )
+                    playbackManager.setInitialMusicTrack(track)
+                }
+                "BOOK" -> {
+                    initialRoute = "ebooks"
+                    initialEbooksSource = lastSource
+                    initialAudiobooksSource = 0
+                    initialMusicSource = 0
+                }
+                else -> {
+                    initialRoute = "library"
+                    initialEbooksSource = 0
+                    initialAudiobooksSource = 0
+                    initialMusicSource = 0
+                }
+            }
+        } else {
+            initialRoute = "library"
+            initialEbooksSource = 0
+            initialAudiobooksSource = 0
+            initialMusicSource = 0
+        }
+
         viewModelScope.launch {
             // Fetch multiple varied collections for E-Books, Audiobooks, and Music!
             val booksList = mutableListOf<ArchiveDoc>()
@@ -104,9 +172,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                         semaphore.withPermit {
                                             val files = ArchiveOrgClient.fetchFilesForIdentifier(doc.identifier)
                                             val mp3Files = files.filter { it.name.endsWith(".mp3", ignoreCase = true) }
-                                            val totalLength = mp3Files.sumOf { it.length }
+                                            val totalLength = mp3Files.sumOf { it.length }.toLong()
                                             if (totalLength > 0) {
-                                                _resolvedDurations.value = _resolvedDurations.value + (doc.identifier to totalLength.toLong())
+                                                val estimatedDurationSeconds = (totalLength / 10000L).coerceAtLeast(300L)
+                                                _resolvedDurations.value = _resolvedDurations.value + (doc.identifier to estimatedDurationSeconds)
                                             }
                                         }
                                     } catch (e: Exception) {
@@ -1082,6 +1151,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (res.isSuccess) {
                 _serverOpState.value = ServerOperationState.Success("Synced ${res.getOrNull()} items successfully.")
+                // Run AI dynamic cleanup and category optimization on the new items!
+                launch {
+                    try {
+                        performDailyDynamicMenuAndCategoryCleanup()
+                        locateMissingCoverArtWithAI()
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainViewModel", "AI post-sync cleanup failed", e)
+                    }
+                }
             } else {
                 _serverOpState.value = ServerOperationState.Error("Sync failed: ${res.exceptionOrNull()?.message}")
             }
@@ -1100,11 +1178,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Playback Controls ---
+    fun saveLastMediaPlayed(type: String, id: String, title: String, creator: String, coverUrl: String, source: Int) {
+        val sharedPrefs = getApplication<android.app.Application>().getSharedPreferences("playback_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit()
+            .putString("last_media_type", type)
+            .putString("last_media_id", id)
+            .putString("last_media_title", title)
+            .putString("last_media_creator", creator)
+            .putString("last_media_cover", coverUrl)
+            .putInt("last_media_source", source)
+            .apply()
+    }
+
+    fun saveLastEBookRead(id: String, title: String, author: String, coverUrl: String) {
+        val source = if (id.startsWith("ebook_seeded") || id.contains("pd_") || id.startsWith("txt_") || id.startsWith("guten_")) 1 else 0
+        saveLastMediaPlayed("BOOK", id, title, author, coverUrl, source)
+    }
+
     fun playAudiobook(book: Audiobook, playlist: List<Audiobook>? = null) {
         playbackManager.playAudiobook(book, playlist ?: allBooks.value)
         viewModelScope.launch {
             repository.updateProgress(book.id, book.progress)
         }
+        val source = if (book.serverId == "demo_server" || book.serverId == "pd_server") 1 else 0
+        saveLastMediaPlayed("AUDIOBOOK", book.id, book.title, book.author, book.coverUrl, source)
     }
 
     fun playAudiobookWithResolution(book: Audiobook, playlist: List<Audiobook>? = null) {
@@ -1129,6 +1226,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.updateMusicLastPlayed(track.id)
         }
+        val source = if (track.serverId == "demo_server" || track.serverId == "pd_server") 1 else 0
+        saveLastMediaPlayed("MUSIC", track.id, track.title, track.artist, track.coverUrl, source)
     }
 
     fun playMusicTrackWithResolution(track: MusicTrack, playlist: List<MusicTrack>? = null) {
