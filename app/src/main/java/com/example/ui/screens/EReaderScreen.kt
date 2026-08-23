@@ -4,11 +4,13 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,10 +26,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -36,69 +37,89 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookContentFetcher
+import com.example.data.MediaBookmark
+import com.example.data.MediaProgress
+import com.example.data.SettingsBackupManager
+import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.SurfaceGlass
+import com.example.ui.theme.SurfaceGlassBorder
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 
 enum class ReaderTheme(
     val title: String,
     val bg: Color,
-    val text: Color,
     val surface: Color,
+    val text: Color,
     val accent: Color
 ) {
-    REAL_PAPER(
-        title = "Real Paper (Warm Amber)",
-        bg = Color(0xFFF5E8D2),
-        text = Color(0xFF2A1F16),
-        surface = Color(0xFFEAD8BA),
-        accent = Color(0xFFB45309)
-    ),
     SEPIA(
         title = "Classic Sepia",
-        bg = Color(0xFFFBF0D9),
-        text = Color(0xFF2D241E),
-        surface = Color(0xFFF2E3C6),
-        accent = Color(0xFF9A5B28)
+        bg = Color(0xFFF7F1E5),
+        surface = Color(0xFFEFE8D8),
+        text = Color(0xFF2C2416),
+        accent = Color(0xFF9E6B38)
+    ),
+    REAL_PAPER(
+        title = "Warm Amber Paper",
+        bg = Color(0xFFF5E8D2),
+        surface = Color(0xFFEAD8BA),
+        text = Color(0xFF2A1F16),
+        accent = Color(0xFFB45309)
     ),
     PAPER_WHITE(
         title = "Paper White",
-        bg = Color(0xFFFDFCFA),
-        text = Color(0xFF1E293B),
-        surface = Color(0xFFF1F5F9),
-        accent = Color(0xFF3B82F6)
+        bg = Color(0xFFFCFAF2),
+        surface = Color(0xFFF4EFE6),
+        text = Color(0xFF1E1E1E),
+        accent = Color(0xFF4A6B82)
     ),
-    OLED_DARK(
-        title = "True Black",
-        bg = Color(0xFF000000),
-        text = Color(0xFFE2E8F0),
-        surface = Color(0xFF18181B),
-        accent = Color(0xFF14B8A6)
+    DARK(
+        title = "OLED Slate",
+        bg = Color(0xFF121418),
+        surface = Color(0xFF1B1F26),
+        text = Color(0xFFE2E4E9),
+        accent = Color(0xFF4FD1C5)
     ),
-    MIDNIGHT(
-        title = "Midnight",
-        bg = Color(0xFF0F172A),
-        text = Color(0xFFCBD5E1),
-        surface = Color(0xFF1E293B),
-        accent = Color(0xFF6366F1)
+    NIGHT_WARM(
+        title = "Amber Night",
+        bg = Color(0xFF1A1512),
+        surface = Color(0xFF261E1A),
+        text = Color(0xFFE8D7C8),
+        accent = Color(0xFFE09F67)
     ),
     SOLAR_MINT(
         title = "Solar Mint",
         bg = Color(0xFFEBF7EE),
-        text = Color(0xFF1B4332),
         surface = Color(0xFFD8F3DC),
+        text = Color(0xFF1B4332),
         accent = Color(0xFF2D6A4F)
     )
 }
 
 enum class ReaderFont(val title: String, val fontFamily: FontFamily) {
     SERIF("Literata Serif", FontFamily.Serif),
-    SANS("Modern Sans", FontFamily.SansSerif),
-    MONO("Monospace", FontFamily.Monospace),
+    SANS("Sans Clean", FontFamily.SansSerif),
+    MONOSPACE("Typewriter", FontFamily.Monospace),
     CURSIVE("Script Classic", FontFamily.Cursive)
 }
+
+data class EBookData(
+    val id: String,
+    val title: String,
+    val author: String,
+    val totalChapters: Int = 12,
+    val chapters: List<BookChapter> = emptyList(),
+    val downloadUrl: String? = null,
+    val publicDomainUrl: String? = null,
+    val serverHostUrl: String = "",
+    val serverApiKey: String = ""
+)
 
 data class BookChapter(
     val title: String,
@@ -106,16 +127,13 @@ data class BookChapter(
     val paragraphs: List<String>
 )
 
-data class EBookData(
-    val id: String,
-    val title: String,
-    val author: String,
-    val totalChapters: Int = 0,
-    val chapters: List<BookChapter> = emptyList(),
-    val downloadUrl: String? = null,
-    val publicDomainUrl: String? = null,
-    val serverHostUrl: String = "",
-    val serverApiKey: String = ""
+data class FormattedPage(
+    val chapterIndex: Int,
+    val chapterTitle: String,
+    val pageIndexInChapter: Int,
+    val totalPagesInChapter: Int,
+    val textBlocks: List<String>,
+    val excerpt: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,13 +142,14 @@ fun EReaderScreen(
     eBook: EBookData,
     onClose: () -> Unit,
     onSwitchToComic: (() -> Unit)? = null,
-    viewModel: com.example.ui.MainViewModel? = null
+    viewModel: MainViewModel? = null
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val backupManager = remember { SettingsBackupManager(context) }
+
     var chapters by remember { mutableStateOf(eBook.chapters) }
     var isLoading by remember { mutableStateOf(true) }
-
-    val coroutineScope = rememberCoroutineScope()
 
     // Reader Settings State
     var currentTheme by remember { mutableStateOf(ReaderTheme.SEPIA) }
@@ -147,17 +166,28 @@ fun EReaderScreen(
     var showFontMenu by remember { mutableStateOf(false) }
     var showTocDrawer by remember { mutableStateOf(false) }
     var showBookmarksDrawer by remember { mutableStateOf(false) }
+    var lastSavedProgress by remember { mutableStateOf<MediaProgress?>(null) }
 
-    val bookmarks = remember { mutableStateListOf<Pair<Int, Int>>() } // (chapter, page)
+    // Bookmarks list for this specific book
+    var bookBookmarks by remember { mutableStateOf<List<MediaBookmark>>(emptyList()) }
 
-    // Load saved progress from JSON / Room on initial launch
+    fun refreshBookmarks() {
+        bookBookmarks = if (viewModel != null) {
+            viewModel.getBookmarks(eBook.id)
+        } else {
+            backupManager.getBookmarks(eBook.id)
+        }
+    }
+
+    // Load saved progress and bookmarks from JSON / Room on initial launch
     LaunchedEffect(eBook.id) {
-        val saved = viewModel?.loadEBookProgress(eBook.id)
-            ?: com.example.data.SettingsBackupManager(context).getMediaProgress(eBook.id)
+        val saved = viewModel?.loadEBookProgress(eBook.id) ?: backupManager.getMediaProgress(eBook.id)
+        lastSavedProgress = saved
         if (saved != null) {
             currentChapterIndex = saved.currentChapter.coerceAtLeast(0)
             currentPageInChapter = saved.currentPage.coerceAtLeast(0)
         }
+        refreshBookmarks()
     }
 
     LaunchedEffect(eBook) {
@@ -185,56 +215,140 @@ fun EReaderScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(color = AccentTeal)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Loading book content...", color = Color.Black)
+                Text("Loading book chapters...", color = Color.Black, fontWeight = FontWeight.SemiBold)
             }
         }
         return
     }
 
-    // Dynamic paragraph pagination (2 paragraphs per page for clean, natural reading)
-    val paragraphsPerPage = 2
-    val activeChapter = if (chapters.isNotEmpty()) {
-        chapters.getOrElse(currentChapterIndex.coerceIn(0, chapters.size - 1)) { chapters.first() }
-    } else {
-        BookChapter("Loading...", 0, listOf("Please wait, the book content is loading..."))
+    // === GRANULAR SCREEN-SIZED PAGE PAGINATION ENGINE ===
+    // Calculate target word capacity per page dynamically based on typography
+    val wordsPerPage = remember(fontSizeSp, lineSpacingMultiplier) {
+        (130 * (17f / fontSizeSp) * (1.5f / lineSpacingMultiplier)).toInt().coerceIn(60, 200)
     }
-    val totalPagesInChapter = ((activeChapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage).coerceAtLeast(1)
-    val safePage = currentPageInChapter.coerceIn(0, totalPagesInChapter - 1)
 
-    // Precalculate page counts for all chapters
-    val chapterPageCounts = remember(chapters, paragraphsPerPage) {
-        chapters.map { chapter ->
-            ((chapter.paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage).coerceAtLeast(1)
+    // Paginate each chapter into discrete, screen-fitting FormattedPages
+    val paginatedChapters: List<List<FormattedPage>> = remember(chapters, wordsPerPage) {
+        if (chapters.isEmpty()) {
+            listOf(
+                listOf(
+                    FormattedPage(
+                        chapterIndex = 0,
+                        chapterTitle = "Chapter 1",
+                        pageIndexInChapter = 0,
+                        totalPagesInChapter = 1,
+                        textBlocks = listOf("No content available for this book."),
+                        excerpt = "No content available."
+                    )
+                )
+            )
+        } else {
+            chapters.mapIndexed { chapIdx, chapter ->
+                val allRawBlocks = mutableListOf<String>()
+                chapter.paragraphs.forEach { para ->
+                    val trimmed = para.trim()
+                    if (trimmed.isNotBlank()) {
+                        val wordCount = trimmed.split(Regex("\\s+")).size
+                        if (wordCount > 75) {
+                            // Split long paragraphs into sentence chunks
+                            val sentences = trimmed.split(Regex("(?<=[.!?])\\s+"))
+                            var curChunk = StringBuilder()
+                            var curWords = 0
+                            for (s in sentences) {
+                                val sWords = s.split(Regex("\\s+")).size
+                                if (curWords + sWords > 65 && curChunk.isNotEmpty()) {
+                                    allRawBlocks.add(curChunk.toString().trim())
+                                    curChunk = StringBuilder(s).append(" ")
+                                    curWords = sWords
+                                } else {
+                                    curChunk.append(s).append(" ")
+                                    curWords += sWords
+                                }
+                            }
+                            if (curChunk.isNotEmpty()) {
+                                allRawBlocks.add(curChunk.toString().trim())
+                            }
+                        } else {
+                            allRawBlocks.add(trimmed)
+                        }
+                    }
+                }
+
+                if (allRawBlocks.isEmpty()) {
+                    allRawBlocks.add("Chapter begins...")
+                }
+
+                // Group text blocks into pages based on word budget
+                val pagesForChapter = mutableListOf<List<String>>()
+                var curPageBlocks = mutableListOf<String>()
+                var curPageWords = 0
+
+                for (block in allRawBlocks) {
+                    val bWords = block.split(Regex("\\s+")).size
+                    if (curPageWords + bWords > wordsPerPage && curPageBlocks.isNotEmpty()) {
+                        pagesForChapter.add(curPageBlocks.toList())
+                        curPageBlocks = mutableListOf(block)
+                        curPageWords = bWords
+                    } else {
+                        curPageBlocks.add(block)
+                        curPageWords += bWords
+                    }
+                }
+                if (curPageBlocks.isNotEmpty()) {
+                    pagesForChapter.add(curPageBlocks.toList())
+                }
+
+                val totalPgs = pagesForChapter.size.coerceAtLeast(1)
+                pagesForChapter.mapIndexed { pIdx, blocks ->
+                    val excerptSnippet = blocks.firstOrNull()?.take(90)?.plus("...") ?: "Page ${pIdx + 1}"
+                    FormattedPage(
+                        chapterIndex = chapIdx,
+                        chapterTitle = chapter.title,
+                        pageIndexInChapter = pIdx,
+                        totalPagesInChapter = totalPgs,
+                        textBlocks = blocks,
+                        excerpt = excerptSnippet
+                    )
+                }
+            }
         }
+    }
+
+    val safeChapterIdx = currentChapterIndex.coerceIn(0, (paginatedChapters.size - 1).coerceAtLeast(0))
+    val currentChapterPages = paginatedChapters.getOrElse(safeChapterIdx) { emptyList() }
+    val totalPagesInCurrentChapter = currentChapterPages.size.coerceAtLeast(1)
+    val safePageIdx = currentPageInChapter.coerceIn(0, totalPagesInCurrentChapter - 1)
+    val activePage = currentChapterPages.getOrElse(safePageIdx) {
+        FormattedPage(
+            chapterIndex = safeChapterIdx,
+            chapterTitle = chapters.getOrNull(safeChapterIdx)?.title ?: "Chapter ${safeChapterIdx + 1}",
+            pageIndexInChapter = 0,
+            totalPagesInChapter = 1,
+            textBlocks = listOf("Loading page content..."),
+            excerpt = "Loading..."
+        )
+    }
+
+    // Precalculate total book pages across all chapters
+    val chapterPageCounts = remember(paginatedChapters) {
+        paginatedChapters.map { it.size.coerceAtLeast(1) }
     }
     val totalBookPages = remember(chapterPageCounts) {
         chapterPageCounts.sum().coerceAtLeast(1)
     }
-    val absolutePageNumber = remember(currentChapterIndex, safePage, chapterPageCounts) {
-        val prevPages = chapterPageCounts.take(currentChapterIndex.coerceIn(0, chapterPageCounts.size)).sum()
-        (prevPages + safePage + 1).coerceIn(1, totalBookPages)
+    val absolutePageNumber = remember(safeChapterIdx, safePageIdx, chapterPageCounts) {
+        val prevPages = chapterPageCounts.take(safeChapterIdx).sum()
+        (prevPages + safePageIdx + 1).coerceIn(1, totalBookPages)
     }
     val overallProgressPercent = remember(absolutePageNumber, totalBookPages) {
         ((absolutePageNumber.toFloat() / totalBookPages.toFloat()) * 100).toInt().coerceIn(0, 100)
     }
 
-    val displayedParagraphs = remember(currentChapterIndex, safePage, activeChapter) {
-        val start = safePage * paragraphsPerPage
-        val end = (start + paragraphsPerPage).coerceAtMost(activeChapter.paragraphs.size)
-        if (start < activeChapter.paragraphs.size) {
-            activeChapter.paragraphs.subList(start, end)
-        } else {
-            emptyList()
-        }
-    }
-
     // Helper to persist current reading progress to Room, SharedPreferences, and JSON backup file
     fun persistReadingProgress(chap: Int, page: Int) {
-        val safeChap = chap.coerceIn(0, (chapters.size - 1).coerceAtLeast(0))
-        val totalChapPages = if (chapters.isNotEmpty() && safeChap < chapters.size) {
-            ((chapters[safeChap].paragraphs.size + paragraphsPerPage - 1) / paragraphsPerPage).coerceAtLeast(1)
-        } else 1
-        val safePg = page.coerceIn(0, totalChapPages - 1)
+        val safeChap = chap.coerceIn(0, (paginatedChapters.size - 1).coerceAtLeast(0))
+        val chapPages = paginatedChapters.getOrElse(safeChap) { emptyList() }.size.coerceAtLeast(1)
+        val safePg = page.coerceIn(0, chapPages - 1)
         val prevPages = chapterPageCounts.take(safeChap).sum()
         val absPg = (prevPages + safePg + 1).coerceIn(1, totalBookPages)
         val pct = ((absPg.toFloat() / totalBookPages.toFloat()) * 100).toInt().coerceIn(0, 100)
@@ -250,9 +364,8 @@ fun EReaderScreen(
                 progressPercent = pct
             )
         } else {
-            val backupManager = com.example.data.SettingsBackupManager(context)
             backupManager.saveMediaProgress(
-                com.example.data.MediaProgress(
+                MediaProgress(
                     id = eBook.id,
                     type = "EBOOK",
                     title = eBook.title,
@@ -268,13 +381,13 @@ fun EReaderScreen(
     }
 
     // Save reading progress on exit / back / screen disposal
-    DisposableEffect(currentChapterIndex, safePage) {
+    DisposableEffect(safeChapterIdx, safePageIdx) {
         onDispose {
-            persistReadingProgress(currentChapterIndex, safePage)
+            persistReadingProgress(safeChapterIdx, safePageIdx)
         }
     }
 
-    // Realistic Page Flip Animation (Animatable rotation and curl shadow)
+    // Realistic Page Flip Animation
     val pageTurnAnim = remember { Animatable(0f) }
     var isTurningForward by remember { mutableStateOf(true) }
 
@@ -285,34 +398,34 @@ fun EReaderScreen(
                 pageTurnAnim.snapTo(0f)
                 pageTurnAnim.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
                 )
             }
             if (forward) {
-                // If there are more pages in this chapter, turn to the NEXT PAGE
-                if (safePage < totalPagesInChapter - 1) {
-                    val nextPg = safePage + 1
+                // If there are more pages in this chapter, turn to NEXT PAGE
+                if (safePageIdx < totalPagesInCurrentChapter - 1) {
+                    val nextPg = safePageIdx + 1
                     currentPageInChapter = nextPg
-                    persistReadingProgress(currentChapterIndex, nextPg)
-                } else if (currentChapterIndex < chapters.size - 1) {
-                    // Only advance to the NEXT CHAPTER once all pages in the current chapter are turned
-                    val nextChap = currentChapterIndex + 1
+                    persistReadingProgress(safeChapterIdx, nextPg)
+                } else if (safeChapterIdx < paginatedChapters.size - 1) {
+                    // Only advance to NEXT CHAPTER once all constituent pages are read
+                    val nextChap = safeChapterIdx + 1
                     currentChapterIndex = nextChap
                     currentPageInChapter = 0
                     persistReadingProgress(nextChap, 0)
                 }
             } else {
                 // If not at the first page of this chapter, turn to PREVIOUS PAGE
-                if (safePage > 0) {
-                    val prevPg = safePage - 1
+                if (safePageIdx > 0) {
+                    val prevPg = safePageIdx - 1
                     currentPageInChapter = prevPg
-                    persistReadingProgress(currentChapterIndex, prevPg)
-                } else if (currentChapterIndex > 0) {
+                    persistReadingProgress(safeChapterIdx, prevPg)
+                } else if (safeChapterIdx > 0) {
                     // Move to previous chapter's last page
-                    val prevChap = currentChapterIndex - 1
+                    val prevChap = safeChapterIdx - 1
                     currentChapterIndex = prevChap
-                    val prevPages = chapterPageCounts.getOrElse(prevChap) { 1 }
-                    val prevLastPg = (prevPages - 1).coerceAtLeast(0)
+                    val prevPagesCount = paginatedChapters.getOrElse(prevChap) { emptyList() }.size.coerceAtLeast(1)
+                    val prevLastPg = (prevPagesCount - 1).coerceAtLeast(0)
                     currentPageInChapter = prevLastPg
                     persistReadingProgress(prevChap, prevLastPg)
                 }
@@ -321,10 +434,10 @@ fun EReaderScreen(
         }
     }
 
-    val isBookmarked = bookmarks.contains(currentChapterIndex to safePage)
-    val wordsInChapter = remember(activeChapter) { activeChapter.paragraphs.sumOf { it.split(" ").size } }
+    val isCurrentSpotBookmarked = bookBookmarks.any { it.chapterIndex == safeChapterIdx && it.pageIndex == safePageIdx }
+    val wordsInCurrentPage = remember(activePage) { activePage.textBlocks.sumOf { it.split(" ").size } }
     val readingSpeedWpm = 230
-    val minutesLeftInChapter = ((wordsInChapter * (1f - (safePage.toFloat() / totalPagesInChapter.coerceAtLeast(1)))) / readingSpeedWpm).toInt().coerceAtLeast(1)
+    val minutesLeftInChapter = (((totalPagesInCurrentChapter - safePageIdx) * wordsPerPage) / readingSpeedWpm).coerceAtLeast(1)
 
     Box(
         modifier = Modifier
@@ -361,7 +474,7 @@ fun EReaderScreen(
                 size = Size(24.dp.toPx(), size.height)
             )
 
-            // Realistic Paper Fiber & Micro-Grain Noise (warm subtle paper grain)
+            // Paper grain
             if (currentTheme == ReaderTheme.REAL_PAPER || currentTheme == ReaderTheme.SEPIA) {
                 val step = 32f
                 var y = 0f
@@ -382,7 +495,7 @@ fun EReaderScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(safePage, currentChapterIndex) {
+                .pointerInput(safePageIdx, safeChapterIdx) {
                     detectTapGestures(
                         onTap = { offset ->
                             val width = size.width
@@ -394,22 +507,20 @@ fun EReaderScreen(
                         }
                     )
                 }
-                .pointerInput(safePage, currentChapterIndex) {
+                .pointerInput(safePageIdx, safeChapterIdx) {
                     var totalDragX = 0f
                     val width = size.width.toFloat()
                     detectHorizontalDragGestures(
-                        onDragStart = {
-                            totalDragX = 0f
-                        },
+                        onDragStart = { totalDragX = 0f },
                         onDragEnd = {
                             coroutineScope.launch {
-                                if (totalDragX < -60f) {
+                                if (totalDragX < -50f) {
                                     isTurningForward = true
-                                    pageTurnAnim.animateTo(1f, tween(150, easing = LinearOutSlowInEasing))
+                                    pageTurnAnim.animateTo(1f, tween(140, easing = LinearOutSlowInEasing))
                                     triggerPageTurn(forward = true, animate = false)
-                                } else if (totalDragX > 60f) {
+                                } else if (totalDragX > 50f) {
                                     isTurningForward = false
-                                    pageTurnAnim.animateTo(1f, tween(150, easing = LinearOutSlowInEasing))
+                                    pageTurnAnim.animateTo(1f, tween(140, easing = LinearOutSlowInEasing))
                                     triggerPageTurn(forward = false, animate = false)
                                 } else {
                                     pageTurnAnim.animateTo(0f, tween(200))
@@ -424,15 +535,13 @@ fun EReaderScreen(
                         onHorizontalDrag = { _, dragAmount ->
                             totalDragX += dragAmount
                             isTurningForward = totalDragX < 0
-                            val progress = (kotlin.math.abs(totalDragX) / width).coerceIn(0f, 1f)
-                            coroutineScope.launch {
-                                pageTurnAnim.snapTo(progress)
-                            }
+                            val progress = (abs(totalDragX) / width).coerceIn(0f, 1f)
+                            coroutineScope.launch { pageTurnAnim.snapTo(progress) }
                         }
                     )
                 }
         ) {
-            // Main Text Content Container with Realistic Paper Margin & Shadows
+            // Main Text Content Container with Realistic Paper Margin & Typography
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -440,18 +549,14 @@ fun EReaderScreen(
                     .graphicsLayer {
                         if (pageTurnAnim.value > 0f) {
                             val progress = pageTurnAnim.value
-                            // Set pivot to the spine (left edge)
                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                            
                             if (isTurningForward) {
-                                // Peel from right to left
-                                rotationY = -progress * 90f // fold over to the left
+                                rotationY = -progress * 90f
                                 translationX = -progress * 100f
                                 scaleX = 1f - (progress * 0.1f)
-                                scaleY = 1f + (Math.sin(progress.toDouble() * Math.PI).toFloat() * 0.05f) // bend vertically
+                                scaleY = 1f + (Math.sin(progress.toDouble() * Math.PI).toFloat() * 0.05f)
                                 alpha = 1f - progress
                             } else {
-                                // Bring from left to right
                                 val invProgress = 1f - progress
                                 rotationY = -invProgress * 90f
                                 translationX = -invProgress * 100f
@@ -463,11 +568,11 @@ fun EReaderScreen(
                         }
                     }
             ) {
-                // Header (Book Title & Chapter)
+                // Header (Book Title & Chapter Title)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -482,41 +587,42 @@ fun EReaderScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        activeChapter.title,
+                        activePage.chapterTitle,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = currentTheme.text.copy(alpha = 0.5f),
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Divider(
+                HorizontalDivider(
                     color = currentTheme.text.copy(alpha = 0.12f),
                     thickness = 0.8.dp,
-                    modifier = Modifier.padding(bottom = 20.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
                 // Chapter Head banner on page 0
-                if (safePage == 0) {
+                if (safePageIdx == 0) {
                     Text(
-                        activeChapter.title,
+                        activePage.chapterTitle,
                         fontFamily = currentFont.fontFamily,
                         fontSize = (fontSizeSp + 6f).sp,
                         fontWeight = FontWeight.Bold,
                         color = currentTheme.text,
                         lineHeight = ((fontSizeSp + 6f) * 1.3f).sp,
-                        modifier = Modifier.padding(bottom = 18.dp)
+                        modifier = Modifier.padding(bottom = 14.dp)
                     )
                 }
 
-                // Body Paragraphs with Drop-Cap on initial paragraph
+                // Body Text Blocks
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy((fontSizeSp * 0.8f).dp)
+                    verticalArrangement = Arrangement.spacedBy((fontSizeSp * 0.75f).dp)
                 ) {
-                    displayedParagraphs.forEachIndexed { idx, paragraph ->
+                    activePage.textBlocks.forEach { block ->
                         Text(
-                            text = paragraph,
+                            text = block,
                             fontFamily = currentFont.fontFamily,
                             fontSize = fontSizeSp.sp,
                             color = currentTheme.text,
@@ -527,33 +633,31 @@ fun EReaderScreen(
                     }
                 }
 
-                // Footer (Kindle Style Page counter & time left)
+                // Footer (Granular Page Counter & Remaining Time)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
+                        .padding(top = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Page ${safePage + 1} of $totalPagesInChapter • $minutesLeftInChapter mins left in chapter",
+                        "Page ${safePageIdx + 1} of $totalPagesInCurrentChapter in Ch. ${safeChapterIdx + 1} • $minutesLeftInChapter min left",
                         fontSize = 11.sp,
-                        color = currentTheme.text.copy(alpha = 0.55f),
+                        color = currentTheme.text.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Medium
                     )
 
-                    val overallProgressPercent = (((currentChapterIndex.toFloat() / chapters.size.coerceAtLeast(1)) +
-                            ((safePage.toFloat() / totalPagesInChapter.coerceAtLeast(1)) / chapters.size.coerceAtLeast(1))) * 100).toInt()
                     Text(
-                        "$overallProgressPercent%",
+                        "Book Page $absolutePageNumber / $totalBookPages ($overallProgressPercent%)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = currentTheme.text.copy(alpha = 0.65f)
+                        color = currentTheme.text.copy(alpha = 0.7f)
                     )
                 }
             }
 
-            // Realistic Page Edge Shadow Overlay during page curl
+            // Page curl shadow
             if (pageTurnAnim.value > 0f) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val curlProgress = pageTurnAnim.value
@@ -576,7 +680,7 @@ fun EReaderScreen(
             }
         }
 
-        // --- KINDLE IMMERSION APP BARS (Slide in/out on center tap) ---
+        // --- KINDLE IMMERSION TOP APP BAR ---
         AnimatedVisibility(
             visible = !isImmersiveMode,
             enter = slideInVertically { -it } + fadeIn(),
@@ -584,7 +688,7 @@ fun EReaderScreen(
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             Surface(
-                color = currentTheme.surface.copy(alpha = 0.95f),
+                color = currentTheme.surface.copy(alpha = 0.96f),
                 shadowElevation = 8.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -596,7 +700,7 @@ fun EReaderScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         IconButton(onClick = onClose) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Close Reader", tint = currentTheme.text)
                         }
@@ -611,7 +715,7 @@ fun EReaderScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                eBook.author,
+                                "${eBook.author} • Ch. ${safeChapterIdx + 1}, Pg. ${safePageIdx + 1}/$totalPagesInCurrentChapter",
                                 fontSize = 11.sp,
                                 color = currentTheme.text.copy(alpha = 0.7f),
                                 maxLines = 1
@@ -633,26 +737,52 @@ fun EReaderScreen(
                             ) {
                                 Icon(Icons.Default.AutoStories, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Comics Mode", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Comics", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.width(6.dp))
                         }
 
+                        // Bookmark Toggle Button
                         IconButton(onClick = {
-                            val pair = currentChapterIndex to safePage
-                            if (isBookmarked) bookmarks.remove(pair) else bookmarks.add(pair)
+                            val existing = bookBookmarks.firstOrNull { it.chapterIndex == safeChapterIdx && it.pageIndex == safePageIdx }
+                            if (existing != null) {
+                                if (viewModel != null) viewModel.deleteBookmark(existing.id) else backupManager.deleteBookmark(existing.id)
+                            } else {
+                                val newBookmark = MediaBookmark(
+                                    mediaId = eBook.id,
+                                    mediaType = "EBOOK",
+                                    title = eBook.title,
+                                    chapterIndex = safeChapterIdx,
+                                    chapterTitle = activePage.chapterTitle,
+                                    pageIndex = safePageIdx,
+                                    excerpt = activePage.excerpt,
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                if (viewModel != null) viewModel.saveBookmark(newBookmark) else backupManager.saveBookmark(newBookmark)
+                            }
+                            refreshBookmarks()
                         }) {
                             Icon(
-                                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Bookmark",
-                                tint = if (isBookmarked) currentTheme.accent else currentTheme.text
+                                if (isCurrentSpotBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = if (isCurrentSpotBookmarked) "Remove Bookmark" else "Add Bookmark",
+                                tint = if (isCurrentSpotBookmarked) currentTheme.accent else currentTheme.text
                             )
                         }
 
+                        // Bookmarks Drawer Button
+                        IconButton(onClick = {
+                            refreshBookmarks()
+                            showBookmarksDrawer = true
+                        }) {
+                            Icon(Icons.Default.Bookmarks, contentDescription = "Saved Bookmarks", tint = currentTheme.text)
+                        }
+
+                        // Typography / Fonts Menu Button
                         IconButton(onClick = { showFontMenu = true }) {
                             Icon(Icons.Default.FormatSize, contentDescription = "Typography", tint = currentTheme.text)
                         }
 
+                        // Table of Contents Button
                         IconButton(onClick = { showTocDrawer = true }) {
                             Icon(Icons.Default.List, contentDescription = "Table of Contents", tint = currentTheme.text)
                         }
@@ -661,7 +791,7 @@ fun EReaderScreen(
             }
         }
 
-        // Bottom Progress & Chapter Scrubber Bar
+        // --- BOTTOM PROGRESS & CHAPTER NAVIGATION BAR ---
         AnimatedVisibility(
             visible = !isImmersiveMode,
             enter = slideInVertically { it } + fadeIn(),
@@ -669,7 +799,7 @@ fun EReaderScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             Surface(
-                color = currentTheme.surface.copy(alpha = 0.95f),
+                color = currentTheme.surface.copy(alpha = 0.96f),
                 shadowElevation = 8.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -686,25 +816,26 @@ fun EReaderScreen(
                     ) {
                         IconButton(
                             onClick = {
-                                if (currentChapterIndex > 0) {
-                                    currentChapterIndex--
+                                if (safeChapterIdx > 0) {
+                                    currentChapterIndex = safeChapterIdx - 1
                                     currentPageInChapter = 0
+                                    persistReadingProgress(safeChapterIdx - 1, 0)
                                 }
                             },
-                            enabled = currentChapterIndex > 0
+                            enabled = safeChapterIdx > 0
                         ) {
                             Icon(Icons.Default.SkipPrevious, contentDescription = "Previous Chapter", tint = currentTheme.text)
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                "Chapter ${currentChapterIndex + 1} of ${chapters.size}",
+                                "Chapter ${safeChapterIdx + 1} of ${paginatedChapters.size}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = currentTheme.text
                             )
                             Text(
-                                "${activeChapter.title} • Page ${safePage + 1}/$totalPagesInChapter",
+                                "${activePage.chapterTitle} • Page ${safePageIdx + 1}/$totalPagesInCurrentChapter",
                                 fontSize = 11.sp,
                                 color = currentTheme.text.copy(alpha = 0.7f)
                             )
@@ -712,23 +843,28 @@ fun EReaderScreen(
 
                         IconButton(
                             onClick = {
-                                if (currentChapterIndex < chapters.size - 1) {
-                                    currentChapterIndex++
+                                if (safeChapterIdx < paginatedChapters.size - 1) {
+                                    currentChapterIndex = safeChapterIdx + 1
                                     currentPageInChapter = 0
+                                    persistReadingProgress(safeChapterIdx + 1, 0)
                                 }
                             },
-                            enabled = currentChapterIndex < chapters.size - 1
+                            enabled = safeChapterIdx < paginatedChapters.size - 1
                         ) {
                             Icon(Icons.Default.SkipNext, contentDescription = "Next Chapter", tint = currentTheme.text)
                         }
                     }
 
-                    // Chapter Progress Slider
+                    // Granular Page Scrubber Slider within current chapter
                     Slider(
-                        value = safePage.toFloat(),
-                        onValueChange = { currentPageInChapter = it.toInt() },
-                        valueRange = 0f..(totalPagesInChapter - 1).coerceAtLeast(1).toFloat(),
-                        steps = (totalPagesInChapter - 2).coerceAtLeast(0),
+                        value = safePageIdx.toFloat(),
+                        onValueChange = {
+                            val newPg = it.toInt()
+                            currentPageInChapter = newPg
+                            persistReadingProgress(safeChapterIdx, newPg)
+                        },
+                        valueRange = 0f..(totalPagesInCurrentChapter - 1).coerceAtLeast(1).toFloat(),
+                        steps = (totalPagesInCurrentChapter - 2).coerceAtLeast(0),
                         colors = SliderDefaults.colors(
                             thumbColor = currentTheme.accent,
                             activeTrackColor = currentTheme.accent,
@@ -857,7 +993,7 @@ fun EReaderScreen(
                             IconButton(onClick = { lineSpacingMultiplier = (lineSpacingMultiplier - 0.2f).coerceAtLeast(1.2f) }) {
                                 Icon(Icons.Default.FormatLineSpacing, contentDescription = "Decrease Spacing", tint = currentTheme.text)
                             }
-                            Text(String.format("%.1fx", lineSpacingMultiplier), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = currentTheme.accent)
+                            Text(String.format(Locale.getDefault(), "%.1fx", lineSpacingMultiplier), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = currentTheme.accent)
                             IconButton(onClick = { lineSpacingMultiplier = (lineSpacingMultiplier + 0.2f).coerceAtMost(2.2f) }) {
                                 Icon(Icons.Default.FormatLineSpacing, contentDescription = "Increase Spacing", tint = currentTheme.text)
                             }
@@ -885,7 +1021,8 @@ fun EReaderScreen(
 
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         itemsIndexed(chapters) { idx, chapter ->
-                            val isCurrent = idx == currentChapterIndex
+                            val isCurrent = idx == safeChapterIdx
+                            val pgsCount = paginatedChapters.getOrElse(idx) { emptyList() }.size.coerceAtLeast(1)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -894,6 +1031,7 @@ fun EReaderScreen(
                                     .clickable {
                                         currentChapterIndex = idx
                                         currentPageInChapter = 0
+                                        persistReadingProgress(idx, 0)
                                         showTocDrawer = false
                                     }
                                     .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -904,10 +1042,11 @@ fun EReaderScreen(
                                     chapter.title,
                                     fontSize = 14.sp,
                                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isCurrent) currentTheme.accent else currentTheme.text
+                                    color = if (isCurrent) currentTheme.accent else currentTheme.text,
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    "Ch. ${idx + 1}",
+                                    "$pgsCount pgs",
                                     fontSize = 12.sp,
                                     color = currentTheme.text.copy(alpha = 0.5f)
                                 )
@@ -915,6 +1054,209 @@ fun EReaderScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+
+        // --- BOOKMARKS & LAST SPOT READ BOTTOM SHEET ---
+        if (showBookmarksDrawer) {
+            ModalBottomSheet(
+                onDismissRequest = { showBookmarksDrawer = false },
+                containerColor = currentTheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Bookmarks & Last Spot",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 19.sp,
+                            color = currentTheme.text
+                        )
+                        IconButton(onClick = {
+                            val newBookmark = MediaBookmark(
+                                mediaId = eBook.id,
+                                mediaType = "EBOOK",
+                                title = eBook.title,
+                                chapterIndex = safeChapterIdx,
+                                chapterTitle = activePage.chapterTitle,
+                                pageIndex = safePageIdx,
+                                excerpt = activePage.excerpt,
+                                createdAt = System.currentTimeMillis()
+                            )
+                            if (viewModel != null) viewModel.saveBookmark(newBookmark) else backupManager.saveBookmark(newBookmark)
+                            refreshBookmarks()
+                        }) {
+                            Icon(Icons.Default.BookmarkAdd, contentDescription = "Add Current Page Bookmark", tint = currentTheme.accent)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 1. Last Spot Read Quick Resume Card
+                    val lastSpot = lastSavedProgress
+                    if (lastSpot != null) {
+                        Card(
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = currentTheme.accent.copy(alpha = 0.15f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, currentTheme.accent.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    currentChapterIndex = lastSpot.currentChapter.coerceIn(0, paginatedChapters.size - 1)
+                                    val totalChapPgs = paginatedChapters.getOrElse(currentChapterIndex) { emptyList() }.size.coerceAtLeast(1)
+                                    currentPageInChapter = lastSpot.currentPage.coerceIn(0, totalChapPgs - 1)
+                                    showBookmarksDrawer = false
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(currentTheme.accent.copy(alpha = 0.25f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.History, contentDescription = null, tint = currentTheme.accent, modifier = Modifier.size(20.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            "Last Spot Read (${lastSpot.progressPercent}%)",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = currentTheme.text
+                                        )
+                                        Text(
+                                            "Chapter ${lastSpot.currentChapter + 1} • Page ${lastSpot.currentPage + 1}",
+                                            fontSize = 11.sp,
+                                            color = currentTheme.text.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                                Button(
+                                    onClick = {
+                                        currentChapterIndex = lastSpot.currentChapter.coerceIn(0, paginatedChapters.size - 1)
+                                        val totalChapPgs = paginatedChapters.getOrElse(currentChapterIndex) { emptyList() }.size.coerceAtLeast(1)
+                                        currentPageInChapter = lastSpot.currentPage.coerceIn(0, totalChapPgs - 1)
+                                        showBookmarksDrawer = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = currentTheme.accent),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Resume", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    // 2. Saved Bookmarks List
+                    Text(
+                        "Saved Bookmarks (${bookBookmarks.size})",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = currentTheme.text.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (bookBookmarks.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No bookmarks saved for this book yet.\nTap the bookmark icon above to save your favorite spots.",
+                                textAlign = TextAlign.Center,
+                                fontSize = 13.sp,
+                                color = currentTheme.text.copy(alpha = 0.5f),
+                                lineHeight = 18.sp
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(bookBookmarks) { bookmark ->
+                                val dateStr = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(bookmark.createdAt))
+                                Surface(
+                                    color = currentTheme.surface,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, currentTheme.text.copy(alpha = 0.12f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                currentChapterIndex = bookmark.chapterIndex.coerceIn(0, paginatedChapters.size - 1)
+                                                val totalChapPgs = paginatedChapters.getOrElse(currentChapterIndex) { emptyList() }.size.coerceAtLeast(1)
+                                                currentPageInChapter = bookmark.pageIndex.coerceIn(0, totalChapPgs - 1)
+                                                persistReadingProgress(currentChapterIndex, currentPageInChapter)
+                                                showBookmarksDrawer = false
+                                            }
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Bookmark, contentDescription = null, tint = currentTheme.accent, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    "Chapter ${bookmark.chapterIndex + 1} • Page ${bookmark.pageIndex + 1}",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    color = currentTheme.text
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    dateStr,
+                                                    fontSize = 10.sp,
+                                                    color = currentTheme.text.copy(alpha = 0.5f)
+                                                )
+                                            }
+                                            if (bookmark.excerpt.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    "\"${bookmark.excerpt}\"",
+                                                    fontSize = 11.sp,
+                                                    fontStyle = FontStyle.Italic,
+                                                    color = currentTheme.text.copy(alpha = 0.7f),
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(onClick = {
+                                            if (viewModel != null) viewModel.deleteBookmark(bookmark.id) else backupManager.deleteBookmark(bookmark.id)
+                                            refreshBookmarks()
+                                        }) {
+                                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Bookmark", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }

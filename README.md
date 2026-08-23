@@ -1,11 +1,17 @@
 # HomeCast
 
-**Version:** 4.8.0
+**Version:** 4.9.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.8.0)
+## 🚀 Recent Updates (v4.9.0)
+- **True Screen-Budget Dynamic Pagination Engine**: Completely solved the multi-page chapter pagination engine in the E-Reader. Long text and chapters are cleanly divided into discrete screen-fitting pages with dynamic word capacity calculation based on typography (font size and line spacing). Swiping or tapping turns one discrete page at a time with smooth 3D page curl physics, eliminating single-page chapter bugs.
+- **Universal Bookmarks for Books, Audiobooks & Music**: Added a comprehensive bookmarking system across all media types. Save multiple custom bookmarks with timestamp/excerpt previews and optional notes.
+- **Interactive Bookmarks & Last Spot Drawer**: Browse all saved bookmarks and instantly resume reading or listening from your last spot with a single tap.
+- **Instant JSON & Room Synchronization**: Every page turn, scrubber seek, and bookmark is immediately written to local Room storage and exported into the portable `homecast_backup.json` backup file.
+
+## 🚀 Previous Updates (v4.8.0)
 - **Granular Page-by-Page E-Reader Navigation**: Transformed the e-reader experience so every swipe or tap turns one individual page rather than advancing entire chapters. Chapters seamlessly transition only when the reader reaches the final page of a chapter.
 - **Automatic Reading Progress Preservation**: The e-reader automatically records and saves the exact chapter and page upon every page turn, screen navigation, or app exit, instantly restoring your position when reopened.
 - **Universal Media Progress in JSON Backup**: All reading progress (E-Books and Comics) and playback progress (Audiobooks and Music) are persisted directly into the portable `homecast_backup.json` offline file alongside server configurations and settings.

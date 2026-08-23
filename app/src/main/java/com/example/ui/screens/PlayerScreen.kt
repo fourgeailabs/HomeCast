@@ -34,15 +34,22 @@ import androidx.palette.graphics.Palette
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import com.example.data.MediaBookmark
+import com.example.data.MediaProgress
 import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     viewModel: MainViewModel,
@@ -127,6 +134,22 @@ fun PlayerScreen(
     var vibrantColor by remember { mutableStateOf(if (isAudiobook) AccentIndigo else AccentTeal) }
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepTimerMenu by remember { mutableStateOf(false) }
+    var showBookmarksSheet by remember { mutableStateOf(false) }
+    var bookmarkNoteText by remember { mutableStateOf("") }
+    var audioBookmarks by remember { mutableStateOf<List<MediaBookmark>>(emptyList()) }
+    var lastSavedSpot by remember { mutableStateOf<MediaProgress?>(null) }
+
+    val mediaId = book?.id ?: track?.id ?: ""
+    fun refreshAudioBookmarks() {
+        if (mediaId.isNotBlank()) {
+            audioBookmarks = viewModel.getBookmarks(mediaId)
+            lastSavedSpot = if (isAudiobook) viewModel.loadAudiobookProgress(mediaId) else viewModel.loadMusicProgress(mediaId)
+        }
+    }
+
+    LaunchedEffect(mediaId) {
+        refreshAudioBookmarks()
+    }
 
     val context = LocalContext.current
     val painter = rememberAsyncImagePainter(
@@ -632,6 +655,36 @@ fun PlayerScreen(
                         )
                     }
 
+                    // Bookmarks & Last Spot Button
+                    Surface(
+                        color = SurfaceGlass,
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                        modifier = Modifier.clickable {
+                            refreshAudioBookmarks()
+                            showBookmarksSheet = true
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (audioBookmarks.isNotEmpty()) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = "Bookmarks",
+                                modifier = Modifier.size(16.dp),
+                                tint = if (audioBookmarks.isNotEmpty()) vibrantColor else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                if (audioBookmarks.isNotEmpty()) "Bookmarks (${audioBookmarks.size})" else "Bookmark",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
                     // Sleep Timer Menu
                     Box {
                         Surface(
@@ -666,6 +719,311 @@ fun PlayerScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Auto-save audio progress on position change and screen exit
+    LaunchedEffect(currentPositionMs) {
+        if (mediaId.isNotBlank() && currentPositionMs > 500L) {
+            val progressPct = ((currentPositionMs.toFloat() / durationMs.toFloat()) * 100).toInt().coerceIn(0, 100)
+            if (isAudiobook) {
+                viewModel.saveAudiobookProgress(
+                    id = mediaId,
+                    title = title,
+                    author = subtitle,
+                    positionMs = currentPositionMs,
+                    durationMs = durationMs
+                )
+            } else {
+                viewModel.saveMusicProgress(
+                    id = mediaId,
+                    title = title,
+                    artist = subtitle,
+                    positionMs = currentPositionMs,
+                    durationMs = durationMs
+                )
+            }
+        }
+    }
+
+    DisposableEffect(mediaId) {
+        onDispose {
+            if (mediaId.isNotBlank() && currentPositionMs > 500L) {
+                if (isAudiobook) {
+                    viewModel.saveAudiobookProgress(
+                        id = mediaId,
+                        title = title,
+                        author = subtitle,
+                        positionMs = currentPositionMs,
+                        durationMs = durationMs
+                    )
+                } else {
+                    viewModel.saveMusicProgress(
+                        id = mediaId,
+                        title = title,
+                        artist = subtitle,
+                        positionMs = currentPositionMs,
+                        durationMs = durationMs
+                    )
+                }
+            }
+        }
+    }
+
+    // --- AUDIO BOOKMARKS & LAST SPOT MODAL BOTTOM SHEET ---
+    if (showBookmarksSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBookmarksSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (isAudiobook) "Audiobook Bookmarks" else "Music Track Bookmarks",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(onClick = {
+                        val positionStr = formatTime(currentPositionMs)
+                        val note = bookmarkNoteText.ifBlank { "Bookmark at $positionStr" }
+                        val newBookmark = MediaBookmark(
+                            mediaId = mediaId,
+                            mediaType = if (isAudiobook) "AUDIOBOOK" else "MUSIC",
+                            title = title,
+                            positionMs = currentPositionMs,
+                            excerpt = note,
+                            createdAt = System.currentTimeMillis()
+                        )
+                        viewModel.saveBookmark(newBookmark)
+                        bookmarkNoteText = ""
+                        refreshAudioBookmarks()
+                    }) {
+                        Icon(Icons.Default.BookmarkAdd, contentDescription = "Add Current Time Bookmark", tint = vibrantColor)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 1. Quick Add Bookmark Card with Note Input
+                Surface(
+                    color = SurfaceGlass,
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Current Spot: ${formatTime(currentPositionMs)}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = vibrantColor
+                            )
+                            Button(
+                                onClick = {
+                                    val positionStr = formatTime(currentPositionMs)
+                                    val note = bookmarkNoteText.ifBlank { "Bookmark at $positionStr" }
+                                    val newBookmark = MediaBookmark(
+                                        mediaId = mediaId,
+                                        mediaType = if (isAudiobook) "AUDIOBOOK" else "MUSIC",
+                                        title = title,
+                                        positionMs = currentPositionMs,
+                                        excerpt = note,
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                    viewModel.saveBookmark(newBookmark)
+                                    bookmarkNoteText = ""
+                                    refreshAudioBookmarks()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = vibrantColor),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.BookmarkAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Save Spot", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = bookmarkNoteText,
+                            onValueChange = { bookmarkNoteText = it },
+                            placeholder = { Text("Add optional note (e.g. Favorite quote)", fontSize = 12.sp) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Last Listened Spot Quick Resume Card
+                val lastSpot = lastSavedSpot
+                if (lastSpot != null && lastSpot.currentPosition > 0L) {
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = vibrantColor.copy(alpha = 0.15f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, vibrantColor.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.playbackManager.seekTo(lastSpot.currentPosition)
+                                showBookmarksSheet = false
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(vibrantColor.copy(alpha = 0.25f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.History, contentDescription = null, tint = vibrantColor, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        "Last Listened Spot (${lastSpot.progressPercent}%)",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "Position: " + formatTime(lastSpot.currentPosition),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.playbackManager.seekTo(lastSpot.currentPosition)
+                                    showBookmarksSheet = false
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = vibrantColor),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Resume", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // 3. Saved Audio Bookmarks List
+                Text(
+                    "Saved Bookmarks (${audioBookmarks.size})",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (audioBookmarks.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No bookmarks saved for this audio yet.\nTap 'Save Spot' above to bookmark your favorite moment.",
+                            textAlign = TextAlign.Center,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            lineHeight = 18.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(audioBookmarks) { bookmark ->
+                            val dateStr = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(bookmark.createdAt))
+                            Surface(
+                                color = SurfaceGlass,
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.playbackManager.seekTo(bookmark.positionMs)
+                                            showBookmarksSheet = false
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Default.Bookmark, contentDescription = null, tint = vibrantColor, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    formatTime(bookmark.positionMs),
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    fontSize = 14.sp,
+                                                    color = vibrantColor
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    dateStr,
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                            if (bookmark.excerpt.isNotBlank()) {
+                                                Text(
+                                                    bookmark.excerpt,
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    IconButton(onClick = {
+                                        viewModel.deleteBookmark(bookmark.id)
+                                        refreshAudioBookmarks()
+                                    }) {
+                                        Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Bookmark", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }

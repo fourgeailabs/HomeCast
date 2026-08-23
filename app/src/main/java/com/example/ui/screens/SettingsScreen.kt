@@ -1863,6 +1863,16 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "4.9.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "True Screen-Budget Dynamic Pagination: Completely fixed the e-reader pagination engine. Chapters are now split into true screen-fitting pages based on font size and line spacing, allowing smooth page-by-page reading instead of single-page chapters.",
+                    "Universal Bookmarks for E-Books & Audiobooks: Added a complete bookmarking system. In the E-Reader and Audio/Music Player, tap the bookmark icon to save your current page or timestamp with preview excerpts and notes.",
+                    "Interactive Bookmarks & Last Spot Drawer: Browse all saved bookmarks and instantly resume reading or listening from your last spot with a single tap.",
+                    "Instant JSON & Room Progress Synchronization: Every page turn, scrub, and bookmark is immediately written to local Room storage and exported to the portable JSON backup."
+                )
+            ),
+            UpdateNotice(
                 version = "4.8.0",
                 date = "August 2026",
                 highlights = listOf(

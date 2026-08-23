@@ -20,6 +20,20 @@ data class MediaProgress(
     val lastUpdated: Long = System.currentTimeMillis()
 )
 
+data class MediaBookmark(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val mediaId: String,
+    val mediaType: String, // "EBOOK", "COMIC", "AUDIOBOOK", "MUSIC"
+    val title: String,
+    val note: String = "",
+    val chapterIndex: Int = 0,
+    val chapterTitle: String = "",
+    val pageIndex: Int = 0,
+    val positionMs: Long = 0L,
+    val excerpt: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 data class BackupPayload(
     val version: Int = 2,
     val backupDate: Long = System.currentTimeMillis(),
@@ -27,6 +41,7 @@ data class BackupPayload(
     val publicDomainSources: List<PublicDomainSource> = emptyList(),
     val localFolders: List<LocalFolderConfig> = emptyList(),
     val mediaProgressList: List<MediaProgress> = emptyList(),
+    val bookmarks: List<MediaBookmark> = emptyList(),
     val lastPlaybackPrefs: Map<String, String> = emptyMap()
 )
 
@@ -127,6 +142,68 @@ class SettingsBackupManager(private val context: Context) {
             e.printStackTrace()
         }
         return null
+    }
+
+    // Save bookmark for books, comics, audiobooks, or music
+    @Synchronized
+    fun saveBookmark(bookmark: MediaBookmark) {
+        try {
+            val currentPayload = loadCurrentPayload()
+            val updatedBookmarks = currentPayload.bookmarks.filter { it.id != bookmark.id }.toMutableList()
+            updatedBookmarks.add(0, bookmark)
+
+            val updatedPayload = currentPayload.copy(
+                backupDate = System.currentTimeMillis(),
+                bookmarks = updatedBookmarks
+            )
+            val json = adapter.toJson(updatedPayload)
+            getInternalBackupFile().writeText(json, Charsets.UTF_8)
+            try {
+                getSilentBackupFile().writeText(json, Charsets.UTF_8)
+            } catch (_: Exception) {}
+            android.util.Log.d("SettingsBackupManager", "Bookmark saved: ${bookmark.title} at Chapter ${bookmark.chapterIndex + 1}, Page ${bookmark.pageIndex + 1} / pos ${bookmark.positionMs}")
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsBackupManager", "Failed to save bookmark", e)
+        }
+    }
+
+    // Delete bookmark
+    @Synchronized
+    fun deleteBookmark(bookmarkId: String) {
+        try {
+            val currentPayload = loadCurrentPayload()
+            val updatedBookmarks = currentPayload.bookmarks.filter { it.id != bookmarkId }
+            val updatedPayload = currentPayload.copy(
+                backupDate = System.currentTimeMillis(),
+                bookmarks = updatedBookmarks
+            )
+            val json = adapter.toJson(updatedPayload)
+            getInternalBackupFile().writeText(json, Charsets.UTF_8)
+            try {
+                getSilentBackupFile().writeText(json, Charsets.UTF_8)
+            } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsBackupManager", "Failed to delete bookmark", e)
+        }
+    }
+
+    // Get all bookmarks for a specific media item
+    fun getBookmarks(mediaId: String): List<MediaBookmark> {
+        return try {
+            val payload = loadCurrentPayload()
+            payload.bookmarks.filter { it.mediaId == mediaId }.sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    // Get all saved bookmarks across the entire library
+    fun getAllBookmarks(): List<MediaBookmark> {
+        return try {
+            loadCurrentPayload().bookmarks.sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     // Load current active payload from internal or public storage

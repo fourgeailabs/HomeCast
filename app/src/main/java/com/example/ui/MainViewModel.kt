@@ -1964,4 +1964,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadMusicProgress(id: String): MediaProgress? {
         return backupManager.getMediaProgress(id)
     }
+
+    // Bookmark Management (E-Books, Comics, Audiobooks, Music)
+    fun saveBookmark(bookmark: com.example.data.MediaBookmark) {
+        viewModelScope.launch(Dispatchers.IO) {
+            backupManager.saveBookmark(bookmark)
+        }
+    }
+
+    fun deleteBookmark(bookmarkId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            backupManager.deleteBookmark(bookmarkId)
+        }
+    }
+
+    fun getBookmarks(mediaId: String): List<com.example.data.MediaBookmark> {
+        return backupManager.getBookmarks(mediaId)
+    }
+
+    fun getAllBookmarks(): List<com.example.data.MediaBookmark> {
+        return backupManager.getAllBookmarks()
+    }
 }
