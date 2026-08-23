@@ -328,12 +328,12 @@ object AudiobookshelfClient {
                             ""
                         }
 
-                        // Stream url for Audiobookshelf item - direct file endpoint, with download and play fallbacks
+                        // Stream url for Audiobookshelf item - direct file endpoint with dual auth tokens
                         val firstAudioFile = item.media?.audioFiles?.firstOrNull()
                         val streamUrl = if (!firstAudioFile?.ino.isNullOrBlank()) {
-                            "$root/api/items/${item.id}/file/${firstAudioFile!!.ino}?token=$cleanToken"
+                            "$root/api/items/${item.id}/file/${firstAudioFile!!.ino}?token=$cleanToken&apiKey=$cleanToken"
                         } else {
-                            "$root/api/items/${item.id}/download?token=$cleanToken"
+                            "$root/api/items/${item.id}/file/0?token=$cleanToken&apiKey=$cleanToken"
                         }
 
                         allAudiobooks.add(
@@ -503,5 +503,34 @@ object AudiobookshelfClient {
             diagnosticLog = logs,
             recommendations = recommendations
         )
+    }
+
+    suspend fun resolveItemStreamUrl(baseUrl: String, token: String, itemId: String): String = withContext(Dispatchers.IO) {
+        val root = normalizeUrl(baseUrl)
+        val cleanToken = token.trim()
+        if (root.isBlank() || itemId.isBlank()) return@withContext ""
+
+        try {
+            val req = Request.Builder()
+                .url("$root/api/items/$itemId")
+                .addHeader("Authorization", "Bearer $cleanToken")
+                .addHeader("x-auth-token", cleanToken)
+                .addHeader("Accept", "application/json")
+                .get()
+                .build()
+
+            val res = client.newCall(req).execute()
+            if (res.isSuccessful) {
+                val body = res.body?.string() ?: ""
+                val adapter = moshi.adapter(AbsItem::class.java)
+                val detail = adapter.fromJson(body)
+                val ino = detail?.media?.audioFiles?.firstOrNull()?.ino
+                if (!ino.isNullOrBlank()) {
+                    return@withContext "$root/api/items/$itemId/file/$ino?token=$cleanToken&apiKey=$cleanToken"
+                }
+            }
+        } catch (_: Exception) {}
+
+        return@withContext "$root/api/items/$itemId/file/0?token=$cleanToken&apiKey=$cleanToken"
     }
 }

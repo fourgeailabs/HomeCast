@@ -25,6 +25,37 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
+        val tokenInterceptor = okhttp3.Interceptor { chain ->
+            val original = chain.request()
+            val url = original.url
+            val tokenParam = url.queryParameter("token") 
+                ?: url.queryParameter("apiKey") 
+                ?: url.queryParameter("access_token")
+                ?: url.queryParameter("X-Plex-Token")
+
+            val requestBuilder = original.newBuilder()
+                .header("User-Agent", "HomeCast-Android/5.04")
+                .header("Accept", "*/*")
+
+            if (!tokenParam.isNullOrBlank()) {
+                val cleanToken = if (tokenParam.startsWith("Bearer ", ignoreCase = true)) {
+                    tokenParam.substring(7).trim()
+                } else tokenParam.trim()
+
+                if (original.header("Authorization") == null) {
+                    requestBuilder.header("Authorization", "Bearer $cleanToken")
+                }
+                if (original.header("x-auth-token") == null) {
+                    requestBuilder.header("x-auth-token", cleanToken)
+                }
+                if (original.header("X-Plex-Token") == null && (url.host.contains("plex", ignoreCase = true) || url.port == 32400 || url.queryParameter("X-Plex-Token") != null)) {
+                    requestBuilder.header("X-Plex-Token", cleanToken)
+                }
+            }
+
+            chain.proceed(requestBuilder.build())
+        }
+
         // Create a permissive OkHttpClient for ExoPlayer to stream from personal servers with self-signed SSL or reverse proxies
         val permissiveOkHttpClient = try {
             val trustAllCerts = arrayOf<TrustManager>(
@@ -40,6 +71,7 @@ class PlaybackService : MediaSessionService() {
             OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
                 .hostnameVerifier { _, _ -> true }
+                .addInterceptor(tokenInterceptor)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -47,6 +79,7 @@ class PlaybackService : MediaSessionService() {
                 .build()
         } catch (_: Exception) {
             OkHttpClient.Builder()
+                .addInterceptor(tokenInterceptor)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .connectTimeout(30, TimeUnit.SECONDS)

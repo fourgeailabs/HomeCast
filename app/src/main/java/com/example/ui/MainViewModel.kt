@@ -17,6 +17,7 @@ import com.example.data.*
 import com.example.data.network.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -1475,8 +1476,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playAudiobook(book: Audiobook, playlist: List<Audiobook>? = null) {
-        playbackManager.playAudiobook(book, playlist ?: allBooks.value)
-        viewModelScope.launch {
+        val safePlaylist = playlist ?: run {
+            val fullList = allBooks.value
+            val idx = fullList.indexOfFirst { it.id == book.id }
+            if (idx != -1) {
+                val start = maxOf(0, idx - 10)
+                val end = minOf(fullList.size, idx + 25)
+                fullList.subList(start, end)
+            } else {
+                listOf(book)
+            }
+        }
+        playbackManager.playAudiobook(book, safePlaylist)
+        viewModelScope.launch(Dispatchers.IO) {
             repository.updateProgress(book.id, book.progress)
         }
         val source = if (book.serverId == "demo_server" || book.serverId == "pd_server") 1 else 0
@@ -1484,8 +1496,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playAudiobookWithResolution(book: Audiobook, playlist: List<Audiobook>? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             var finalUrl = book.streamUrl
+            if (book.serverId.startsWith("abs_") || finalUrl.isBlank() || finalUrl.contains("/download?")) {
+                val server = servers.value.firstOrNull { it.id == book.serverId }
+                if (server != null && server.hostUrl.isNotBlank()) {
+                    val resolved = com.example.data.network.AudiobookshelfClient.resolveItemStreamUrl(
+                        server.hostUrl, server.apiKey, book.id
+                    )
+                    if (resolved.isNotBlank()) {
+                        finalUrl = resolved
+                    }
+                }
+            }
             if (book.serverId == "pd_server" && (finalUrl.isBlank() || finalUrl.contains("_64kb.mp3"))) {
                 val resolved = resolveArchiveOrgStreamUrl(book.id, ".mp3")
                 if (resolved.isNotBlank()) {
@@ -1496,13 +1519,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val resolvedPlaylist = playlist?.map { b ->
                 if (b.id == book.id) resolvedBook else b
             }
-            playAudiobook(resolvedBook, resolvedPlaylist)
+            withContext(Dispatchers.Main) {
+                playAudiobook(resolvedBook, resolvedPlaylist)
+            }
         }
     }
 
     fun playMusicTrack(track: MusicTrack, playlist: List<MusicTrack>? = null) {
-        playbackManager.playMusicTrack(track, playlist ?: allMusic.value)
-        viewModelScope.launch {
+        val safePlaylist = playlist ?: run {
+            val fullList = allMusic.value
+            val matchAlbum = fullList.filter { it.album.equals(track.album, ignoreCase = true) }
+            if (matchAlbum.isNotEmpty()) matchAlbum
+            else {
+                val idx = fullList.indexOfFirst { it.id == track.id }
+                if (idx != -1) {
+                    val start = maxOf(0, idx - 10)
+                    val end = minOf(fullList.size, idx + 40)
+                    fullList.subList(start, end)
+                } else {
+                    listOf(track)
+                }
+            }
+        }
+        playbackManager.playMusicTrack(track, safePlaylist)
+        viewModelScope.launch(Dispatchers.IO) {
             repository.updateMusicLastPlayed(track.id)
         }
         val source = if (track.serverId == "demo_server" || track.serverId == "pd_server") 1 else 0
@@ -1510,7 +1550,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playMusicTrackWithResolution(track: MusicTrack, playlist: List<MusicTrack>? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             var finalUrl = track.streamUrl
             if (track.serverId == "pd_server" && (finalUrl.isBlank() || finalUrl.contains(".mp3"))) {
                 val resolved = resolveArchiveOrgStreamUrl(track.id, ".mp3")
@@ -1522,7 +1562,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val resolvedPlaylist = playlist?.map { t ->
                 if (t.id == track.id) resolvedTrack else t
             }
-            playMusicTrack(resolvedTrack, resolvedPlaylist)
+            withContext(Dispatchers.Main) {
+                playMusicTrack(resolvedTrack, resolvedPlaylist)
+            }
         }
     }
 

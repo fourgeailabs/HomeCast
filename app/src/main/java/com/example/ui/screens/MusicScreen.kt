@@ -81,7 +81,8 @@ data class CategoryViewData(
 fun MusicScreen(
     viewModel: MainViewModel,
     onTrackClick: (MusicTrack) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onArtistClick: ((String) -> Unit)? = null
 ) {
     val allMusic by viewModel.allMusic.collectAsState()
     val recentMusic by viewModel.recentMusic.collectAsState()
@@ -679,6 +680,9 @@ fun MusicScreen(
                 onTrackClick = { track ->
                     viewModel.playMusicTrackWithResolution(track)
                     onTrackClick(track)
+                },
+                onViewBio = { artistName ->
+                    onArtistClick?.invoke(artistName)
                 }
             )
             return
@@ -2244,8 +2248,22 @@ fun ArtistDetailScreen(
     artist: ArtistGroup,
     onBack: () -> Unit,
     onAlbumClick: (AlbumGroup) -> Unit,
-    onTrackClick: (MusicTrack) -> Unit
+    onTrackClick: (MusicTrack) -> Unit,
+    onViewBio: ((String) -> Unit)? = null
 ) {
+    var artistBio by remember { mutableStateOf<com.example.data.network.CreatorBioData?>(null) }
+    var isLoadingBio by remember { mutableStateOf(true) }
+
+    LaunchedEffect(artist.name) {
+        isLoadingBio = true
+        artistBio = com.example.data.network.InternetCreatorBioFetcher.getCreatorBio(artist.name)
+        isLoadingBio = false
+    }
+
+    val bioData = artistBio
+    val bioText = bioData?.bio ?: ""
+    val bioImage = bioData?.imageUrl ?: ""
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -2264,7 +2282,18 @@ fun ArtistDetailScreen(
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(artist.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(artist.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (onViewBio != null) {
+                    Button(
+                        onClick = { onViewBio(artist.name) },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Artist Bio", fontSize = 13.sp)
+                    }
+                }
             }
         }
 
@@ -2272,7 +2301,9 @@ fun ArtistDetailScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onViewBio?.invoke(artist.name) }
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -2285,9 +2316,10 @@ fun ArtistDetailScreen(
                             .background(AccentIndigo.copy(alpha = 0.3f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (artist.coverUrl.isNotBlank()) {
+                        val heroImage = if (bioImage.isNotBlank()) bioImage else artist.coverUrl
+                        if (heroImage.isNotBlank()) {
                             AsyncImage(
-                                model = artist.coverUrl,
+                                model = heroImage,
                                 contentDescription = artist.name,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -2299,9 +2331,67 @@ fun ArtistDetailScreen(
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(artist.name, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                         Text("${artist.albums.size} Albums in collection", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (onViewBio != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Tap to view full biography & archives →", fontSize = 12.sp, color = AccentTeal, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Artist Biography Banner / Card
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceGlass.copy(alpha = 0.85f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Artist Biography", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        }
+                        if (onViewBio != null) {
+                            TextButton(
+                                onClick = { onViewBio(artist.name) },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("Full Bio →", fontSize = 13.sp, color = AccentTeal)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (isLoadingBio) {
+                        Text(
+                            "Loading artist biography...",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (bioText.isNotBlank()) {
+                        Text(
+                            bioText.take(280) + if (bioText.length > 280) "..." else "",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                            lineHeight = 18.sp
+                        )
+                    } else {
+                        Text(
+                            "Discover rich biography, discography history, Wikidata, and Internet Archive recordings for ${artist.name}.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

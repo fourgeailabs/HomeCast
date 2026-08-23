@@ -492,6 +492,22 @@ fun EReaderScreen(
         }
 
         // --- REALISTIC BOOK PAGE CANVAS & GESTURE LAYER ---
+        val underlyingPage = remember(safeChapterIdx, safePageIdx, isTurningForward, paginatedChapters, currentChapterPages, totalPagesInCurrentChapter) {
+            if (isTurningForward) {
+                if (safePageIdx < totalPagesInCurrentChapter - 1) {
+                    currentChapterPages.getOrNull(safePageIdx + 1)
+                } else if (safeChapterIdx < paginatedChapters.size - 1) {
+                    paginatedChapters.getOrNull(safeChapterIdx + 1)?.firstOrNull()
+                } else null
+            } else {
+                if (safePageIdx > 0) {
+                    currentChapterPages.getOrNull(safePageIdx - 1)
+                } else if (safeChapterIdx > 0) {
+                    paginatedChapters.getOrNull(safeChapterIdx - 1)?.lastOrNull()
+                } else null
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -516,11 +532,11 @@ fun EReaderScreen(
                             coroutineScope.launch {
                                 if (totalDragX < -50f) {
                                     isTurningForward = true
-                                    pageTurnAnim.animateTo(1f, tween(140, easing = LinearOutSlowInEasing))
+                                    pageTurnAnim.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
                                     triggerPageTurn(forward = true, animate = false)
                                 } else if (totalDragX > 50f) {
                                     isTurningForward = false
-                                    pageTurnAnim.animateTo(1f, tween(140, easing = LinearOutSlowInEasing))
+                                    pageTurnAnim.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
                                     triggerPageTurn(forward = false, animate = false)
                                 } else {
                                     pageTurnAnim.animateTo(0f, tween(200))
@@ -541,140 +557,197 @@ fun EReaderScreen(
                     )
                 }
         ) {
-            // Main Text Content Container with Realistic Paper Margin & Typography
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = marginPaddingDp.dp, vertical = 32.dp)
-                    .graphicsLayer {
-                        if (pageTurnAnim.value > 0f) {
-                            val progress = pageTurnAnim.value
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                            if (isTurningForward) {
-                                rotationY = -progress * 90f
-                                translationX = -progress * 100f
-                                scaleX = 1f - (progress * 0.1f)
-                                scaleY = 1f + (Math.sin(progress.toDouble() * Math.PI).toFloat() * 0.05f)
-                                alpha = 1f - progress
-                            } else {
-                                val invProgress = 1f - progress
-                                rotationY = -invProgress * 90f
-                                translationX = -invProgress * 100f
-                                scaleX = 1f - (invProgress * 0.1f)
-                                scaleY = 1f + (Math.sin(invProgress.toDouble() * Math.PI).toFloat() * 0.05f)
-                                alpha = progress
-                            }
-                            cameraDistance = 16f * density
-                        }
-                    }
-            ) {
-                // Header (Book Title & Chapter Title)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        eBook.title.uppercase(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = currentTheme.text.copy(alpha = 0.5f),
-                        letterSpacing = 1.2.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        activePage.chapterTitle,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = currentTheme.text.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            val animProgress = pageTurnAnim.value
 
-                HorizontalDivider(
-                    color = currentTheme.text.copy(alpha = 0.12f),
-                    thickness = 0.8.dp,
-                    modifier = Modifier.padding(bottom = 16.dp)
+            // 1. UNDERLYING PAGE LAYER (Revealed beneath the rolling page)
+            if (animProgress > 0f && underlyingPage != null) {
+                RenderBookPageLayout(
+                    page = underlyingPage,
+                    eBookTitle = eBook.title,
+                    currentTheme = currentTheme,
+                    currentFont = currentFont,
+                    fontSizeSp = fontSizeSp,
+                    lineSpacingMultiplier = lineSpacingMultiplier,
+                    marginPaddingDp = marginPaddingDp,
+                    textAlignJustified = textAlignJustified,
+                    totalBookPages = totalBookPages,
+                    chapterPageCounts = chapterPageCounts,
+                    wordsPerPage = wordsPerPage,
+                    readingSpeedWpm = readingSpeedWpm,
+                    modifier = Modifier.fillMaxSize()
                 )
-
-                // Chapter Head banner on page 0
-                if (safePageIdx == 0) {
-                    Text(
-                        activePage.chapterTitle,
-                        fontFamily = currentFont.fontFamily,
-                        fontSize = (fontSizeSp + 6f).sp,
-                        fontWeight = FontWeight.Bold,
-                        color = currentTheme.text,
-                        lineHeight = ((fontSizeSp + 6f) * 1.3f).sp,
-                        modifier = Modifier.padding(bottom = 14.dp)
-                    )
-                }
-
-                // Body Text Blocks
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy((fontSizeSp * 0.75f).dp)
-                ) {
-                    activePage.textBlocks.forEach { block ->
-                        Text(
-                            text = block,
-                            fontFamily = currentFont.fontFamily,
-                            fontSize = fontSizeSp.sp,
-                            color = currentTheme.text,
-                            lineHeight = (fontSizeSp * lineSpacingMultiplier).sp,
-                            textAlign = if (textAlignJustified) TextAlign.Justify else TextAlign.Start,
-                            letterSpacing = 0.2.sp
-                        )
-                    }
-                }
-
-                // Footer (Granular Page Counter & Remaining Time)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Page ${safePageIdx + 1} of $totalPagesInCurrentChapter in Ch. ${safeChapterIdx + 1} • $minutesLeftInChapter min left",
-                        fontSize = 11.sp,
-                        color = currentTheme.text.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    Text(
-                        "Book Page $absolutePageNumber / $totalBookPages ($overallProgressPercent%)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = currentTheme.text.copy(alpha = 0.7f)
-                    )
-                }
             }
 
-            // Page curl shadow
-            if (pageTurnAnim.value > 0f) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val curlProgress = pageTurnAnim.value
-                    val shadowWidth = size.width * 0.25f
-                    val shadowX = if (isTurningForward) size.width * (1f - curlProgress) else size.width * curlProgress
+            // 2. PRIMARY ROLLING / CURLING PAGE LAYER
+            RenderBookPageLayout(
+                page = activePage,
+                eBookTitle = eBook.title,
+                currentTheme = currentTheme,
+                currentFont = currentFont,
+                fontSizeSp = fontSizeSp,
+                lineSpacingMultiplier = lineSpacingMultiplier,
+                marginPaddingDp = marginPaddingDp,
+                textAlignJustified = textAlignJustified,
+                totalBookPages = totalBookPages,
+                chapterPageCounts = chapterPageCounts,
+                wordsPerPage = wordsPerPage,
+                readingSpeedWpm = readingSpeedWpm,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        if (animProgress > 0f) {
+                            cameraDistance = 14f * density
+                            if (isTurningForward) {
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                                scaleX = (1f - animProgress * 0.85f).coerceAtLeast(0.02f)
+                                translationX = -animProgress * (density * 160f)
+                                rotationY = -animProgress * 32f
+                                alpha = (1f - animProgress * 0.65f).coerceIn(0f, 1f)
+                            } else {
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+                                scaleX = (animProgress * 0.85f + 0.15f).coerceIn(0.02f, 1f)
+                                translationX = (1f - animProgress) * (density * 160f)
+                                rotationY = (1f - animProgress) * 32f
+                                alpha = (animProgress * 0.65f + 0.35f).coerceIn(0f, 1f)
+                            }
+                        }
+                    }
+            )
 
+            // 3. REALISTIC 3D PAPER ROLL / CYLINDER CURL OVERLAY CANVAS
+            if (animProgress > 0f) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val width = size.width
+                    val height = size.height
+                    val foldX = if (isTurningForward) width * (1f - animProgress) else width * animProgress
+                    val cylinderWidth = width * 0.22f
+                    val foldFactor = (Math.sin(animProgress.toDouble() * Math.PI)).toFloat()
+
+                    // A) Ambient Drop Shadow Cast Onto Revealing Page
+                    if (isTurningForward) {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.45f * foldFactor),
+                                    Color.Black.copy(alpha = 0.15f * foldFactor),
+                                    Color.Transparent
+                                ),
+                                startX = foldX,
+                                endX = foldX + cylinderWidth * 1.6f
+                            ),
+                            topLeft = Offset(foldX, 0f),
+                            size = Size(cylinderWidth * 1.6f, height)
+                        )
+                    } else {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.15f * foldFactor),
+                                    Color.Black.copy(alpha = 0.45f * foldFactor)
+                                ),
+                                startX = foldX - cylinderWidth * 1.6f,
+                                endX = foldX
+                            ),
+                            topLeft = Offset(foldX - cylinderWidth * 1.6f, 0f),
+                            size = Size(cylinderWidth * 1.6f, height)
+                        )
+                    }
+
+                    // B) Rolled Cylinder Backside Paper Surface
+                    if (isTurningForward) {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    currentTheme.surface.copy(alpha = 0.95f),
+                                    currentTheme.bg.copy(alpha = 0.88f),
+                                    Color.Black.copy(alpha = 0.18f * foldFactor)
+                                ),
+                                startX = foldX - cylinderWidth * 0.7f,
+                                endX = foldX
+                            ),
+                            topLeft = Offset(foldX - cylinderWidth * 0.7f, 0f),
+                            size = Size(cylinderWidth * 0.7f, height)
+                        )
+                    } else {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.18f * foldFactor),
+                                    currentTheme.bg.copy(alpha = 0.88f),
+                                    currentTheme.surface.copy(alpha = 0.95f)
+                                ),
+                                startX = foldX,
+                                endX = foldX + cylinderWidth * 0.7f
+                            ),
+                            topLeft = Offset(foldX, 0f),
+                            size = Size(cylinderWidth * 0.7f, height)
+                        )
+                    }
+
+                    // C) Glossy Specular Highlight Along Roll Apex
+                    val highlightX = if (isTurningForward) foldX - cylinderWidth * 0.35f else foldX + cylinderWidth * 0.35f
+                    val highlightWidth = 24.dp.toPx()
                     drawRect(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.15f * (1f - abs(curlProgress - 0.5f) * 2f)),
+                                Color.White.copy(alpha = 0.55f * foldFactor),
                                 Color.Transparent
                             ),
-                            startX = shadowX - shadowWidth,
-                            endX = shadowX + shadowWidth
+                            startX = highlightX - highlightWidth,
+                            endX = highlightX + highlightWidth
                         ),
-                        size = size
+                        topLeft = Offset(highlightX - highlightWidth, 0f),
+                        size = Size(highlightWidth * 2f, height)
+                    )
+
+                    // D) 3D Curved Top & Bottom Page Silhouette Arcs
+                    val arcDepth = 18.dp.toPx() * foldFactor
+                    val topPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(foldX - cylinderWidth * 0.7f, 0f)
+                        quadraticBezierTo(
+                            foldX, -arcDepth,
+                            foldX + cylinderWidth * 0.7f, 0f
+                        )
+                        lineTo(foldX + cylinderWidth * 0.7f, 8.dp.toPx())
+                        quadraticBezierTo(
+                            foldX, -arcDepth + 8.dp.toPx(),
+                            foldX - cylinderWidth * 0.7f, 8.dp.toPx()
+                        )
+                        close()
+                    }
+                    drawPath(
+                        path = topPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.40f * foldFactor),
+                                Color.Black.copy(alpha = 0.15f * foldFactor)
+                            )
+                        )
+                    )
+
+                    val bottomPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(foldX - cylinderWidth * 0.7f, height)
+                        quadraticBezierTo(
+                            foldX, height + arcDepth,
+                            foldX + cylinderWidth * 0.7f, height
+                        )
+                        lineTo(foldX + cylinderWidth * 0.7f, height - 8.dp.toPx())
+                        quadraticBezierTo(
+                            foldX, height + arcDepth - 8.dp.toPx(),
+                            foldX - cylinderWidth * 0.7f, height - 8.dp.toPx()
+                        )
+                        close()
+                    }
+                    drawPath(
+                        path = bottomPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.15f * foldFactor),
+                                Color.White.copy(alpha = 0.40f * foldFactor)
+                            )
+                        )
                     )
                 }
             }
@@ -1259,6 +1332,121 @@ fun EReaderScreen(
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RenderBookPageLayout(
+    page: FormattedPage,
+    eBookTitle: String,
+    currentTheme: ReaderTheme,
+    currentFont: ReaderFont,
+    fontSizeSp: Float,
+    lineSpacingMultiplier: Float,
+    marginPaddingDp: Float,
+    textAlignJustified: Boolean,
+    totalBookPages: Int,
+    chapterPageCounts: List<Int>,
+    wordsPerPage: Int,
+    readingSpeedWpm: Int,
+    modifier: Modifier = Modifier
+) {
+    val prevPages = chapterPageCounts.take(page.chapterIndex).sum()
+    val absolutePageNumber = (prevPages + page.pageIndexInChapter + 1).coerceIn(1, totalBookPages)
+    val overallProgressPercent = ((absolutePageNumber.toFloat() / totalBookPages.toFloat()) * 100).toInt().coerceIn(0, 100)
+    val minutesLeftInChapter = (((page.totalPagesInChapter - page.pageIndexInChapter) * wordsPerPage) / readingSpeedWpm).coerceAtLeast(1)
+
+    Column(
+        modifier = modifier
+            .padding(horizontal = marginPaddingDp.dp, vertical = 32.dp)
+    ) {
+        // Header (Book Title & Chapter Title)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                eBookTitle.uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = currentTheme.text.copy(alpha = 0.5f),
+                letterSpacing = 1.2.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                page.chapterTitle,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = currentTheme.text.copy(alpha = 0.5f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        HorizontalDivider(
+            color = currentTheme.text.copy(alpha = 0.12f),
+            thickness = 0.8.dp,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // Chapter Head banner on page 0
+        if (page.pageIndexInChapter == 0) {
+            Text(
+                page.chapterTitle,
+                fontFamily = currentFont.fontFamily,
+                fontSize = (fontSizeSp + 6f).sp,
+                fontWeight = FontWeight.Bold,
+                color = currentTheme.text,
+                lineHeight = ((fontSizeSp + 6f) * 1.3f).sp,
+                modifier = Modifier.padding(bottom = 14.dp)
+            )
+        }
+
+        // Body Text Blocks
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy((fontSizeSp * 0.75f).dp)
+        ) {
+            page.textBlocks.forEach { block ->
+                Text(
+                    text = block,
+                    fontFamily = currentFont.fontFamily,
+                    fontSize = fontSizeSp.sp,
+                    color = currentTheme.text,
+                    lineHeight = (fontSizeSp * lineSpacingMultiplier).sp,
+                    textAlign = if (textAlignJustified) TextAlign.Justify else TextAlign.Start,
+                    letterSpacing = 0.2.sp
+                )
+            }
+        }
+
+        // Footer (Granular Page Counter & Remaining Time)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Page ${page.pageIndexInChapter + 1} of ${page.totalPagesInChapter} in Ch. ${page.chapterIndex + 1} • $minutesLeftInChapter min left",
+                fontSize = 11.sp,
+                color = currentTheme.text.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Medium
+            )
+
+            Text(
+                "Book Page $absolutePageNumber / $totalBookPages ($overallProgressPercent%)",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = currentTheme.text.copy(alpha = 0.7f)
+            )
         }
     }
 }
