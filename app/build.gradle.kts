@@ -30,8 +30,8 @@ android {
     applicationId = "com.fourgeailabs.homecast"
     minSdk = 24
     targetSdk = 36
-    versionCode = 48
-    versionName = "5.1.0"
+    versionCode = 50
+    versionName = "5.03.00"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -159,4 +159,5 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-session:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
+    implementation("androidx.media3:media3-datasource-okhttp:$media3_version")
 }

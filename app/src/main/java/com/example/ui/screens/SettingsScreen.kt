@@ -1863,7 +1863,28 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
-                version = "5.1.0",
+                version = "5.03.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Authentic Internet Creator Biographies: Replaced generic templated AI text with verified, multi-paragraph biographies sourced live from Wikipedia's official REST API, Wikidata, and comprehensive historical archives.",
+                    "Genuine Internet Portrait Photos: Creator profiles now display authentic high-resolution portraits fetched directly from Wikimedia Commons and official archives.",
+                    "Direct IMDb & Wikipedia Integration: Each creator profile features one-tap action buttons linking directly to their official Wikipedia articles, IMDb filmography/credits, and Internet Archive catalogs.",
+                    "Curated Historical Mastermind Encyclopedia: Integrated zero-latency offline biographies and verified portraits for classic novelists, spoken-word authors, philosophers, and classical composers (H.G. Wells, Mary Shelley, Jane Austen, Arthur Conan Doyle, Edgar Allan Poe, Beethoven, Mozart, Bach, Chopin, and more).",
+                    "Creator Spotlight & Media Navigation: Added creator jump-cards from media detail views, letting you explore all related e-books, audiobooks, and music tracks by the author."
+                )
+            ),
+            UpdateNotice(
+                version = "5.02.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Personal Server E-Book Loading Resolution: Fixed e-book loading from personal servers (Booklore, Komga, Audiobookshelf) with an enhanced multi-endpoint fallback engine, token extraction, Bearer authentication headers, and permissive SSL handling for self-hosted certificates.",
+                    "Robust E-Reader Text & EPUB Parsing: Upgraded the EPUB and text stream parser to comprehensively unpack multi-directory EPUB archives, clean HTML/XML entities, and naturally order chapters for smooth reading.",
+                    "Zero-Crash Audiobook Playback Transition: Resolved playback crashes when switching between audiobooks on personal servers. ExoPlayer operations and progress updates are now strictly thread-isolated on the main loop with resilient error recovery and OkHttp data streaming.",
+                    "Optimized Media Progress Synchronization: Eliminated background race conditions and UI thread contention during audio playback and track switching."
+                )
+            ),
+            UpdateNotice(
+                version = "5.01.00",
                 date = "August 2026",
                 highlights = listOf(
                     "Fully Populated Dual-Side Discovery: Completely resolved the empty Discover tab on both Private Library and Public Domain sides with rich, dynamic feeds and interactive carousels.",

@@ -1,6 +1,7 @@
 package com.example.data
 
 import com.example.data.PublicDomainCatalog
+import com.example.data.network.CuratedCreatorsEncyclopedia
 
 object LocalMediaMetadataProvider {
 
@@ -12,19 +13,19 @@ object LocalMediaMetadataProvider {
             .firstOrNull { it.title.contains(title, ignoreCase = true) || title.contains(it.title, ignoreCase = true) }
 
         val bio = if (matchedCatalog != null && matchedCatalog.description.isNotBlank()) {
-            matchedCatalog.description + "\n\nThis classic work is preserved and cataloged within your home media library suite, featuring complete chapters, adaptive typography, and high-fidelity streaming playback."
+            matchedCatalog.description
         } else {
-            "'$title' by $creator is a celebrated piece of creative artistry preserved within your personal media ecosystem. Rich with narrative depth, thematic resonance, and historical importance, it offers a deeply rewarding experience across digital reading and listening."
+            "'$title' by $creator is preserved in your digital library collection, featuring full chapter navigation and high-fidelity media streaming."
         }
 
         val publisher = when (type) {
-            "BOOK" -> "Project Gutenberg / Classic Press"
-            "AUDIOBOOK" -> "LibriVox Audio / Spoken Classics"
-            "MUSIC" -> "Gramophone / Archive.org Sound Vault"
+            "BOOK" -> "Project Gutenberg / Digital Classic"
+            "AUDIOBOOK" -> "LibriVox Spoken Word Archive"
+            "MUSIC" -> "Internet Archive Sound Vault"
             else -> "Classic Vault Publishing"
         }
 
-        val rating = when ((cleanTitle.hashCode() % 4)) {
+        val rating = when ((Math.abs(cleanTitle.hashCode()) % 4)) {
             0 -> "4.9/5 (Masterpiece Collection)"
             1 -> "4.8/5 (Reader's Choice)"
             2 -> "4.7/5 (Critically Acclaimed)"
@@ -43,13 +44,26 @@ object LocalMediaMetadataProvider {
     }
 
     fun getFallbackCreatorDetails(creatorName: String): Map<String, String> {
-        val bio = "$creatorName is a distinguished creator whose influential portfolio continues to inspire audiences worldwide. Cataloged extensively across your self-hosted server repositories and public domain archives, their legacy encompasses landmark works across literature, audio, and storytelling."
+        val curated = CuratedCreatorsEncyclopedia.find(creatorName)
+        if (curated != null) {
+            return curated.toMap()
+        }
+
+        val cleanName = creatorName.trim()
+        val wikiLink = "https://en.wikipedia.org/wiki/${cleanName.replace(" ", "_")}"
+        val imdbLink = "https://www.imdb.com/find/?q=${android.net.Uri.encode(cleanName)}&s=nm"
+        val archiveLink = "https://archive.org/search.php?query=${android.net.Uri.encode(cleanName)}"
+
         return mapOf(
-            "roles" to "Author • Storyteller • Master Creator",
-            "bio" to bio,
-            "wikiLink" to "https://en.wikipedia.org/wiki/${creatorName.replace(" ", "_")}",
-            "website" to "https://archive.org/search.php?query=${creatorName.replace(" ", "+")}",
-            "imageUrl" to ""
+            "name" to cleanName,
+            "roles" to "Creator & Author",
+            "bio" to "$cleanName's creative works are preserved and cataloged across your personal media servers and open digital archives. Explore their available e-books, audiobooks, and recordings below.",
+            "wikiLink" to wikiLink,
+            "imdbLink" to imdbLink,
+            "website" to archiveLink,
+            "imageUrl" to "",
+            "source" to "Open Internet Archive & IMDb",
+            "isVerified" to "false"
         )
     }
 }

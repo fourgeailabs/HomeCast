@@ -723,48 +723,33 @@ fun PlayerScreen(
         }
     }
 
-    // Auto-save audio progress on position change and screen exit
-    LaunchedEffect(currentPositionMs) {
-        if (mediaId.isNotBlank() && currentPositionMs > 500L) {
-            val progressPct = ((currentPositionMs.toFloat() / durationMs.toFloat()) * 100).toInt().coerceIn(0, 100)
-            if (isAudiobook) {
-                viewModel.saveAudiobookProgress(
-                    id = mediaId,
-                    title = title,
-                    author = subtitle,
-                    positionMs = currentPositionMs,
-                    durationMs = durationMs
-                )
-            } else {
-                viewModel.saveMusicProgress(
-                    id = mediaId,
-                    title = title,
-                    artist = subtitle,
-                    positionMs = currentPositionMs,
-                    durationMs = durationMs
-                )
-            }
-        }
-    }
+    // Note: PlaybackManager already automatically throttles and saves progress via onProgressUpdate callback
+    // We only preserve onDispose save for current media item when leaving the player
+    val currentSavedId by rememberUpdatedState(mediaId)
+    val currentSavedTitle by rememberUpdatedState(title)
+    val currentSavedSubtitle by rememberUpdatedState(subtitle)
+    val currentSavedIsAudiobook by rememberUpdatedState(isAudiobook)
+    val currentSavedPosition by rememberUpdatedState(currentPositionMs)
+    val currentSavedDuration by rememberUpdatedState(durationMs)
 
-    DisposableEffect(mediaId) {
+    DisposableEffect(currentSavedId) {
         onDispose {
-            if (mediaId.isNotBlank() && currentPositionMs > 500L) {
-                if (isAudiobook) {
+            if (currentSavedId.isNotBlank() && currentSavedPosition > 500L) {
+                if (currentSavedIsAudiobook) {
                     viewModel.saveAudiobookProgress(
-                        id = mediaId,
-                        title = title,
-                        author = subtitle,
-                        positionMs = currentPositionMs,
-                        durationMs = durationMs
+                        id = currentSavedId,
+                        title = currentSavedTitle,
+                        author = currentSavedSubtitle,
+                        positionMs = currentSavedPosition,
+                        durationMs = currentSavedDuration
                     )
                 } else {
                     viewModel.saveMusicProgress(
-                        id = mediaId,
-                        title = title,
-                        artist = subtitle,
-                        positionMs = currentPositionMs,
-                        durationMs = durationMs
+                        id = currentSavedId,
+                        title = currentSavedTitle,
+                        artist = currentSavedSubtitle,
+                        positionMs = currentSavedPosition,
+                        durationMs = currentSavedDuration
                     )
                 }
             }

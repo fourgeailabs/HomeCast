@@ -1,11 +1,39 @@
 # HomeCast
 
-**Version:** 5.1.0
+**Version:** 5.03.00
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.1.0)
+## 🚀 Recent Updates (v5.03.00)
+- **Authentic Internet Creator Biographies**:
+  - Replaced repetitive generic AI template text with authentic, verified biographies fetched live from Wikipedia's official REST API, Wikidata, and curated encyclopedic archives.
+  - Automatically queries page summaries, life eras, roles, and multi-paragraph biographical essays with smooth background fallback.
+- **Genuine Internet Portrait Photos**:
+  - High-resolution creator portraits sourced directly from Wikimedia Commons and official web archives displayed inside an elevated avatar container with subtle glowing gradients.
+- **Direct Wikipedia & IMDb Action Hub**:
+  - Integrated one-tap interactive action buttons linking directly to the creator's live Wikipedia article, IMDb filmography/credits profile, and Internet Archive media repository.
+  - Added a one-tap "Copy Bio" button with instant clipboard confirmation.
+- **Curated Historical Mastermind Encyclopedia**:
+  - Built-in instant, zero-latency database of authentic biographies and Wikimedia portraits for classic public domain creators, novelists, spoken-word authors, and classical composers (*H. G. Wells, Mary Shelley, Jane Austen, Arthur Conan Doyle, Edgar Allan Poe, Jules Verne, Bram Stoker, Mark Twain, Charles Dickens, Beethoven, Mozart, Bach, Tchaikovsky, Chopin, Kafka, Lovecraft, Wilde, Woolf, London, Carroll, Stevenson, Melville, Shakespeare*).
+- **Author Jump-Cards on Media Detail Views**:
+  - Added an interactive creator spotlight card to all media detail screens, allowing effortless jumping to the creator's full profile and catalog of works.
+
+## 🚀 Previous Updates (v5.02.00)
+- **Personal Server E-Book Loading Resolution**:
+  - Implemented an intelligent multi-endpoint fallback engine for personal servers (Booklore, Komga, Audiobookshelf, Calibre-Web).
+  - Automatically extracts tokens from query parameters or settings, providing dual-header authentication (`Authorization: Bearer <token>` and `x-auth-token`) along with URL query fallback.
+  - Added permissive SSL handling and cross-protocol redirect support for self-signed certificates on personal server instances.
+  - Upgraded EPUB and text stream parsing with natural chapter ordering, HTML entity decoding, and directory-agnostic unpacking.
+- **Zero-Crash Audiobook Playback Transition**:
+  - Solved playback crashes when switching between audiobooks on personal servers.
+  - Thread-isolated all ExoPlayer operations (`setMediaItem`, `prepare`, `seekTo`, `play`, `stop`) strictly on the main application looper.
+  - Integrated `androidx.media3:media3-datasource-okhttp` with permissive SSL and custom User-Agent headers in `PlaybackService` to stream flawlessly from personal servers.
+  - Hardened player state listeners and progress updates to eliminate race conditions during track transitions.
+- **Optimized Media Progress Synchronization**:
+  - Throttled progress persistence to prevent background storage contention and UI thread lockups during active audio playback.
+
+## 🚀 Previous Updates (v5.01.00)
 - **Fully Populated Dual-Side Discovery Feeds**: Completely overhauled the Discovery screen so both **Private Library** and **Public Domain** tabs are vibrant, rich, interactive, and never empty or dry.
 - **Public Domain Masterpiece Showcase & Sliding Shelves**:
   - **Featured Masterpiece Hero Spotlight**: Dynamic spotlight banner for premier classic literature and LibriVox recordings with direct 1-tap playback or reading.

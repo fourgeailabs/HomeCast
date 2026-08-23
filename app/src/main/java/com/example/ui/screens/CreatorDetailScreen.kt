@@ -1,10 +1,17 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -14,23 +21,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.data.Audiobook
 import com.example.data.LocalMediaMetadataProvider
 import com.example.data.MusicTrack
+import com.example.data.network.InternetCreatorBioFetcher
 import com.example.ui.MainViewModel
 import com.example.ui.components.MediaCoverArt
 import com.example.ui.theme.AccentTeal
@@ -51,6 +62,7 @@ fun CreatorDetailScreen(
     var details by remember(creatorName) {
         mutableStateOf(LocalMediaMetadataProvider.getFallbackCreatorDetails(creatorName))
     }
+    var isLoadingBio by remember(creatorName) { mutableStateOf(true) }
 
     val allMusic by viewModel.allMusic.collectAsState()
     val pdMusic by viewModel.publicDomainMusic.collectAsState()
@@ -61,13 +73,23 @@ fun CreatorDetailScreen(
     val resolvedDurations by viewModel.resolvedDurations.collectAsState()
 
     LaunchedEffect(creatorName) {
+        isLoadingBio = true
         try {
-            val result = viewModel.fetchCreatorDetailsWithGemini(creatorName)
-            if (result.isNotEmpty()) {
-                details = result
+            // First attempt direct internet bio fetcher from Wikipedia REST API & Curated Encyclopedia
+            val bioData = InternetCreatorBioFetcher.getCreatorBio(creatorName)
+            details = bioData.toMap()
+            
+            // If bio is brief, attempt enriched background fetch
+            if (bioData.bio.length < 100) {
+                val enriched = viewModel.fetchCreatorDetailsWithGemini(creatorName)
+                if (enriched.isNotEmpty() && (enriched["bio"]?.length ?: 0) > bioData.bio.length) {
+                    details = enriched
+                }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Keep fallback
+        } finally {
+            isLoadingBio = false
         }
     }
 
@@ -158,13 +180,22 @@ fun CreatorDetailScreen(
         (localMatch + pdMatch).distinctBy { it.title.lowercase().trim() }
     }
 
+    val imageUrl = details["imageUrl"] ?: ""
+    val roles = details["roles"] ?: "Author & Creator"
+    val bio = details["bio"] ?: "Biographical details are loading..."
+    val wikiLink = details["wikiLink"] ?: ""
+    val imdbLink = details["imdbLink"] ?: ""
+    val archiveLink = details["website"] ?: ""
+    val sourceName = details["source"] ?: "Wikipedia • IMDb • Wikimedia"
+    val isVerified = details["isVerified"] == "true" || imageUrl.isNotBlank() || wikiLink.isNotBlank()
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("About Creator", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { 
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White) 
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -173,110 +204,294 @@ fun CreatorDetailScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            val data = details
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Creator Portrait with Real Internet Photo & Backdrop Gradient
                 Box(
                     modifier = Modifier
-                        .size(110.dp)
+                        .size(130.dp)
                         .clip(CircleShape)
-                        .background(AccentTeal.copy(alpha = 0.2f))
-                        .border(2.dp, AccentTeal, CircleShape),
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(AccentTeal.copy(alpha = 0.35f), Color(0xFF1E293B))
+                            )
+                        )
+                        .border(3.dp, AccentTeal, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Person, 
-                        contentDescription = null, 
-                        tint = AccentTeal, 
-                        modifier = Modifier.size(54.dp)
-                    )
+                    if (imageUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(imageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = creatorName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = AccentTeal,
+                            modifier = Modifier.size(60.dp)
+                        )
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Creator Name
                 Text(
-                    text = creatorName, 
-                    fontSize = 24.sp, 
-                    fontWeight = FontWeight.ExtraBold, 
+                    text = creatorName,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center,
                     color = Color.White
                 )
+
                 Spacer(modifier = Modifier.height(4.dp))
+
+                // Roles & Era
                 Text(
-                    text = data["roles"] ?: "Master Creator", 
-                    fontSize = 13.sp, 
-                    color = AccentTeal, 
-                    fontWeight = FontWeight.Bold
+                    text = roles,
+                    fontSize = 13.sp,
+                    color = AccentTeal,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 )
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                Card(
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Verified Internet Bio Badge
+                Surface(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-                    modifier = Modifier.fillMaxWidth()
+                    color = if (isVerified) Color(0xFF0F766E).copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, 
+                        if (isVerified) AccentTeal.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f)
+                    )
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isVerified) Icons.Default.Verified else Icons.Default.Public,
+                            contentDescription = null,
+                            tint = AccentTeal,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Text(
-                            "Biography", 
-                            fontSize = 16.sp, 
+                            text = if (isVerified) "Verified Internet Profile" else "Digital Media Archive",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            data["bio"] ?: "No biography available.", 
-                            fontSize = 14.sp, 
-                            lineHeight = 22.sp,
-                            color = Color.White.copy(alpha = 0.9f)
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
-                
+
+                // Action Buttons: Wikipedia, IMDb, Archive.org, Copy
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    data["wikiLink"]?.takeIf { it.isNotBlank() && it != "N/A" }?.let { url ->
-                        OutlinedButton(
+                    if (wikiLink.isNotBlank() && wikiLink != "N/A") {
+                        FilledTonalButton(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                context.startActivity(intent)
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(wikiLink))
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
                             },
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = SurfaceGlass,
+                                contentColor = Color.White
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            modifier = Modifier.weight(1f).height(42.dp)
                         ) {
-                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Wikipedia", fontSize = 12.sp, color = AccentTeal)
+                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Wikipedia", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    
-                    data["website"]?.takeIf { it.isNotBlank() && it != "N/A" }?.let { url ->
-                        OutlinedButton(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+
+                    val finalImdbLink = if (imdbLink.isNotBlank() && imdbLink != "N/A") {
+                        imdbLink
+                    } else {
+                        "https://www.imdb.com/find/?q=${Uri.encode(creatorName)}&s=nm"
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalImdbLink))
                                 context.startActivity(intent)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            } catch (_: Exception) {}
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = SurfaceGlass,
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.weight(1f).height(42.dp)
+                    ) {
+                        Icon(Icons.Default.Movie, contentDescription = null, tint = Color(0xFFF5C518), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("IMDb", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    val finalArchiveLink = if (archiveLink.isNotBlank() && archiveLink != "N/A") {
+                        archiveLink
+                    } else {
+                        "https://archive.org/search.php?query=${Uri.encode(creatorName)}"
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalArchiveLink))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = SurfaceGlass,
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.weight(1f).height(42.dp)
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Archive", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    IconButton(
+                        onClick = {
+                            try {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("Creator Bio", "$creatorName\n\n$bio")
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "Biography copied to clipboard", Toast.LENGTH_SHORT).show()
+                            } catch (_: Exception) {}
+                        },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SurfaceGlass)
+                    ) {
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Bio", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Biography Card with Real Internet Biography
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Archive", fontSize = 12.sp, color = AccentTeal)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoStories,
+                                    contentDescription = null,
+                                    tint = AccentTeal,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Biography & Legacy",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                            if (isLoadingBio) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = AccentTeal,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Multi-paragraph biography text
+                        val bioParagraphs = bio.split("\n\n").filter { it.isNotBlank() }
+                        if (bioParagraphs.isEmpty()) {
+                            Text(
+                                text = bio,
+                                fontSize = 14.sp,
+                                lineHeight = 22.sp,
+                                color = Color.White.copy(alpha = 0.92f)
+                            )
+                        } else {
+                            bioParagraphs.forEachIndexed { index, para ->
+                                Text(
+                                    text = para.trim(),
+                                    fontSize = 14.sp,
+                                    lineHeight = 22.sp,
+                                    color = Color.White.copy(alpha = 0.92f)
+                                )
+                                if (index < bioParagraphs.size - 1) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Source citation inside card
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Source: $sourceName",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.55f)
+                            )
+                            if (imageUrl.isNotBlank()) {
+                                Text(
+                                    text = "Wikimedia Commons Portrait",
+                                    fontSize = 11.sp,
+                                    color = AccentTeal.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
                 }
 
                 // E-Books Shelf
                 CreatorItemShelf(
-                    title = "E-Books & Literature",
+                    title = "E-Books & Literature (${combinedEBooks.size})",
                     items = combinedEBooks,
                     icon = Icons.Default.Book,
                     onItemClick = onReadEBook
@@ -303,7 +518,7 @@ fun CreatorDetailScreen(
 
                 // Audiobooks Shelf
                 CreatorItemShelf(
-                    title = "Audiobooks",
+                    title = "Audiobooks (${combinedAudiobooks.size})",
                     items = combinedAudiobooks,
                     icon = Icons.Default.Headphones,
                     onItemClick = onPlayAudiobook
@@ -330,7 +545,7 @@ fun CreatorDetailScreen(
 
                 // Music Tracks Shelf
                 CreatorItemShelf(
-                    title = "Music Tracks",
+                    title = "Music Tracks (${combinedMusic.size})",
                     items = combinedMusic,
                     icon = Icons.Default.MusicNote,
                     onItemClick = onPlayMusicTrack

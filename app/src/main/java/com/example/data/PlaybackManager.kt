@@ -1,6 +1,7 @@
 package com.example.data
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -13,7 +14,6 @@ import androidx.media3.session.MediaSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import android.content.Intent
 
 data class PlaybackState(
     val currentAudiobook: Audiobook? = null,
@@ -40,38 +40,64 @@ class PlaybackManager(private val context: Context) {
 
     private var lastSavedPos = 0L
 
+    private fun runOnMainThread(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            try {
+                action()
+            } catch (e: Exception) {
+                Log.e("PlaybackManager", "Error in main thread action", e)
+            }
+        } else {
+            handler.post {
+                try {
+                    action()
+                } catch (e: Exception) {
+                    Log.e("PlaybackManager", "Error in posted main thread action", e)
+                }
+            }
+        }
+    }
+
     private val updateProgressRunnable = object : Runnable {
         override fun run() {
-            player?.let { p ->
-                val state = p.playbackState
-                if (state == Player.STATE_READY || state == Player.STATE_BUFFERING || p.isPlaying) {
-                    val pos = p.currentPosition
-                    val dur = p.duration.coerceAtLeast(0L)
-                    _playbackState.value = _playbackState.value.copy(
-                        currentPosition = pos,
-                        duration = if (dur > 0L) dur else _playbackState.value.duration,
-                        isPlaying = p.isPlaying
-                    )
-                    
-                    // Throttle saving progress to every 2 seconds or significant seek
-                    if (Math.abs(pos - lastSavedPos) > 2000L || !p.isPlaying) {
-                        lastSavedPos = pos
-                        onProgressUpdate?.invoke(
-                            _playbackState.value.currentAudiobook,
-                            _playbackState.value.currentMusicTrack,
-                            pos,
-                            dur
+            try {
+                player?.let { p ->
+                    val state = p.playbackState
+                    if (state == Player.STATE_READY || state == Player.STATE_BUFFERING || p.isPlaying) {
+                        val pos = p.currentPosition.coerceAtLeast(0L)
+                        val dur = p.duration.coerceAtLeast(0L)
+                        _playbackState.value = _playbackState.value.copy(
+                            currentPosition = pos,
+                            duration = if (dur > 0L) dur else _playbackState.value.duration,
+                            isPlaying = p.isPlaying
                         )
+                        
+                        // Throttle saving progress to every 2 seconds or significant seek
+                        if (Math.abs(pos - lastSavedPos) > 2000L || !p.isPlaying) {
+                            lastSavedPos = pos
+                            onProgressUpdate?.invoke(
+                                _playbackState.value.currentAudiobook,
+                                _playbackState.value.currentMusicTrack,
+                                pos,
+                                dur
+                            )
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.w("PlaybackManager", "Error in progress update loop", e)
             }
             handler.postDelayed(this, 500)
         }
     }
 
     init {
-        val intent = Intent(context, com.example.PlaybackService::class.java)
-        context.startService(intent)
+        try {
+            val intent = Intent(context, com.example.PlaybackService::class.java)
+            context.startService(intent)
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Failed to start PlaybackService", e)
+        }
         handler.post(updateProgressRunnable)
         
         // Polling to wait for player
@@ -87,73 +113,89 @@ class PlaybackManager(private val context: Context) {
     }
     
     private fun setupPlayer() {
-        player?.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
-            }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) {
-                    isPrepared = true
-                    val dur = player?.duration?.coerceAtLeast(0L) ?: 0L
-                    _playbackState.value = _playbackState.value.copy(
-                        duration = if (dur > 0L) dur else _playbackState.value.duration,
-                        errorMessage = null
-                    )
-                } else if (state == Player.STATE_ENDED) {
-                    _playbackState.value = _playbackState.value.copy(isPlaying = false, currentPosition = player?.duration ?: 0L)
-                    skipNextTrack()
+        try {
+            player?.addListener(object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
                 }
-            }
 
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                Log.e("PlaybackManager", "ExoPlayer error", error)
-                isPrepared = false
-                _playbackState.value = _playbackState.value.copy(
-                    isPlaying = false,
-                    errorMessage = "Playback error: ${error.message}"
-                )
-            }
-        })
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_READY) {
+                        isPrepared = true
+                        val dur = player?.duration?.coerceAtLeast(0L) ?: 0L
+                        _playbackState.value = _playbackState.value.copy(
+                            duration = if (dur > 0L) dur else _playbackState.value.duration,
+                            errorMessage = null
+                        )
+                    } else if (state == Player.STATE_ENDED) {
+                        _playbackState.value = _playbackState.value.copy(isPlaying = false, currentPosition = player?.duration ?: 0L)
+                        skipNextTrack()
+                    }
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    Log.e("PlaybackManager", "ExoPlayer error", error)
+                    isPrepared = false
+                    _playbackState.value = _playbackState.value.copy(
+                        isPlaying = false,
+                        errorMessage = "Stream error: ${error.localizedMessage ?: "Source unavailable"}"
+                    )
+                }
+            })
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Failed to setup player listener", e)
+        }
     }
 
     fun playAudiobook(book: Audiobook, list: List<Audiobook> = emptyList()) {
-        currentAudiobookList = if (list.isNotEmpty()) list else listOf(book)
-        _playbackState.value = _playbackState.value.copy(
-            currentAudiobook = book,
-            currentMusicTrack = null,
-            currentPosition = 0L,
-            duration = book.duration * 1000L,
-            errorMessage = null
-        )
-        
-        val meta = MediaMetadata.Builder()
-            .setTitle(book.title)
-            .setArtist(book.author)
-            .setArtworkUri(Uri.parse(book.coverUrl))
-            .build()
+        runOnMainThread {
+            currentAudiobookList = if (list.isNotEmpty()) list else listOf(book)
+            _playbackState.value = _playbackState.value.copy(
+                currentAudiobook = book,
+                currentMusicTrack = null,
+                currentPosition = 0L,
+                duration = if (book.duration > 0) book.duration * 1000L else 0L,
+                errorMessage = null
+            )
             
-        startStream(book.streamUrl, meta, book.progress, true, book)
+            val metaBuilder = MediaMetadata.Builder()
+                .setTitle(book.title.ifBlank { "Untitled Audiobook" })
+                .setArtist(book.author.ifBlank { "Unknown Author" })
+
+            if (book.coverUrl.isNotBlank()) {
+                try {
+                    metaBuilder.setArtworkUri(Uri.parse(book.coverUrl))
+                } catch (_: Exception) {}
+            }
+                
+            startStream(book.streamUrl, metaBuilder.build(), book.progress, true, book)
+        }
     }
 
     fun playMusicTrack(track: MusicTrack, playlist: List<MusicTrack> = emptyList()) {
-        currentPlaylist = if (playlist.isNotEmpty()) playlist else listOf(track)
-        _playbackState.value = _playbackState.value.copy(
-            currentMusicTrack = track,
-            currentAudiobook = null,
-            currentPosition = 0L,
-            duration = track.duration,
-            errorMessage = null
-        )
-        
-        val meta = MediaMetadata.Builder()
-            .setTitle(track.title)
-            .setArtist(track.artist)
-            .setAlbumTitle(track.album)
-            .setArtworkUri(Uri.parse(track.coverUrl))
-            .build()
+        runOnMainThread {
+            currentPlaylist = if (playlist.isNotEmpty()) playlist else listOf(track)
+            _playbackState.value = _playbackState.value.copy(
+                currentMusicTrack = track,
+                currentAudiobook = null,
+                currentPosition = 0L,
+                duration = track.duration,
+                errorMessage = null
+            )
             
-        startStream(track.streamUrl, meta, 0L, false)
+            val metaBuilder = MediaMetadata.Builder()
+                .setTitle(track.title.ifBlank { "Untitled Track" })
+                .setArtist(track.artist.ifBlank { "Unknown Artist" })
+                .setAlbumTitle(track.album.ifBlank { "Unknown Album" })
+
+            if (track.coverUrl.isNotBlank()) {
+                try {
+                    metaBuilder.setArtworkUri(Uri.parse(track.coverUrl))
+                } catch (_: Exception) {}
+            }
+                
+            startStream(track.streamUrl, metaBuilder.build(), 0L, false)
+        }
     }
 
     private fun startStream(
@@ -164,167 +206,214 @@ class PlaybackManager(private val context: Context) {
         fallbackCandidate: Audiobook? = null
     ) {
         try {
-            val uri = Uri.parse(url)
             val finalUrl = if (url.isBlank()) {
                 "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3"
             } else url
 
-            val mediaItemBuilder = MediaItem.Builder()
+            val mediaItem = MediaItem.Builder()
                 .setUri(finalUrl)
                 .setMediaId(finalUrl)
                 .setMediaMetadata(metadata)
+                .build()
 
-            val tokenParam = uri.getQueryParameter("token") ?: uri.getQueryParameter("apiKey") ?: uri.getQueryParameter("X-Plex-Token")
-            
-            // Note: Since we are using MediaItem directly, ExoPlayer will fetch using its DefaultDataSource.
-            // For custom headers, we usually need a DefaultHttpDataSource.Factory, but this works for basic URLs.
-            // If the token is in the query, it should work fine without headers.
+            // Safely stop previous playback before loading next
+            try {
+                player?.stop()
+                player?.clearMediaItems()
+            } catch (e: Exception) {
+                Log.w("PlaybackManager", "Error resetting previous player state", e)
+            }
 
-            val mediaItem = mediaItemBuilder.build()
             player?.setMediaItem(mediaItem)
             player?.prepare()
             if (startPositionMs > 0) {
-                player?.seekTo(startPositionMs)
+                try {
+                    player?.seekTo(startPositionMs)
+                } catch (e: Exception) {
+                    Log.w("PlaybackManager", "Initial seek to $startPositionMs failed", e)
+                }
             }
             player?.play()
             setPlaybackSpeed(_playbackState.value.playbackSpeed)
             isPrepared = false // Will be set true in listener
         } catch (e: Exception) {
             Log.e("PlaybackManager", "Failed to start stream", e)
+            _playbackState.value = _playbackState.value.copy(
+                isPlaying = false,
+                errorMessage = "Failed to stream: ${e.message}"
+            )
         }
     }
 
     fun skipNextTrack() {
-        val currentTrack = _playbackState.value.currentMusicTrack
-        val currentBook = _playbackState.value.currentAudiobook
+        runOnMainThread {
+            val currentTrack = _playbackState.value.currentMusicTrack
+            val currentBook = _playbackState.value.currentAudiobook
 
-        if (currentTrack != null && currentPlaylist.isNotEmpty()) {
-            val idx = currentPlaylist.indexOfFirst { it.id == currentTrack.id }
-            if (idx != -1 && idx < currentPlaylist.size - 1) {
-                playMusicTrack(currentPlaylist[idx + 1])
-            } else if (currentPlaylist.isNotEmpty()) {
-                playMusicTrack(currentPlaylist.first())
-            }
-        } else if (currentBook != null && currentAudiobookList.isNotEmpty()) {
-            val idx = currentAudiobookList.indexOfFirst { it.id == currentBook.id }
-            if (idx != -1 && idx < currentAudiobookList.size - 1) {
-                playAudiobook(currentAudiobookList[idx + 1])
+            if (currentTrack != null && currentPlaylist.isNotEmpty()) {
+                val idx = currentPlaylist.indexOfFirst { it.id == currentTrack.id }
+                if (idx != -1 && idx < currentPlaylist.size - 1) {
+                    playMusicTrack(currentPlaylist[idx + 1], currentPlaylist)
+                } else if (currentPlaylist.isNotEmpty()) {
+                    playMusicTrack(currentPlaylist.first(), currentPlaylist)
+                }
+            } else if (currentBook != null && currentAudiobookList.isNotEmpty()) {
+                val idx = currentAudiobookList.indexOfFirst { it.id == currentBook.id }
+                if (idx != -1 && idx < currentAudiobookList.size - 1) {
+                    playAudiobook(currentAudiobookList[idx + 1], currentAudiobookList)
+                } else {
+                    skipForward(30)
+                }
             } else {
                 skipForward(30)
             }
-        } else {
-            skipForward(30)
         }
     }
 
     fun skipPreviousTrack() {
-        val currentTrack = _playbackState.value.currentMusicTrack
-        val currentBook = _playbackState.value.currentAudiobook
+        runOnMainThread {
+            val currentTrack = _playbackState.value.currentMusicTrack
+            val currentBook = _playbackState.value.currentAudiobook
 
-        if (currentTrack != null && currentPlaylist.isNotEmpty()) {
-            if (_playbackState.value.currentPosition > 3000L) {
-                seekTo(0L)
-            } else {
-                val idx = currentPlaylist.indexOfFirst { it.id == currentTrack.id }
-                if (idx > 0) {
-                    playMusicTrack(currentPlaylist[idx - 1])
-                } else {
+            if (currentTrack != null && currentPlaylist.isNotEmpty()) {
+                if (_playbackState.value.currentPosition > 3000L) {
                     seekTo(0L)
-                }
-            }
-        } else if (currentBook != null && currentAudiobookList.isNotEmpty()) {
-            if (_playbackState.value.currentPosition > 5000L) {
-                seekTo(0L)
-            } else {
-                val idx = currentAudiobookList.indexOfFirst { it.id == currentBook.id }
-                if (idx > 0) {
-                    playAudiobook(currentAudiobookList[idx - 1])
                 } else {
-                    seekTo(0L)
+                    val idx = currentPlaylist.indexOfFirst { it.id == currentTrack.id }
+                    if (idx > 0) {
+                        playMusicTrack(currentPlaylist[idx - 1], currentPlaylist)
+                    } else {
+                        seekTo(0L)
+                    }
                 }
+            } else if (currentBook != null && currentAudiobookList.isNotEmpty()) {
+                if (_playbackState.value.currentPosition > 5000L) {
+                    seekTo(0L)
+                } else {
+                    val idx = currentAudiobookList.indexOfFirst { it.id == currentBook.id }
+                    if (idx > 0) {
+                        playAudiobook(currentAudiobookList[idx - 1], currentAudiobookList)
+                    } else {
+                        seekTo(0L)
+                    }
+                }
+            } else {
+                skipBackward(10)
             }
-        } else {
-            skipBackward(10)
         }
     }
 
     fun togglePlayPause() {
-        player?.let { p ->
-            val state = p.playbackState
-            if (state == Player.STATE_IDLE || p.mediaItemCount == 0) {
-                val book = _playbackState.value.currentAudiobook
-                val track = _playbackState.value.currentMusicTrack
-                if (book != null) {
-                    playAudiobook(book, currentAudiobookList)
-                } else if (track != null) {
-                    playMusicTrack(track, currentPlaylist)
+        runOnMainThread {
+            player?.let { p ->
+                val state = p.playbackState
+                if (state == Player.STATE_IDLE || p.mediaItemCount == 0) {
+                    val book = _playbackState.value.currentAudiobook
+                    val track = _playbackState.value.currentMusicTrack
+                    if (book != null) {
+                        playAudiobook(book, currentAudiobookList)
+                    } else if (track != null) {
+                        playMusicTrack(track, currentPlaylist)
+                    }
+                } else {
+                    if (p.isPlaying) p.pause() else p.play()
                 }
-            } else {
-                if (p.isPlaying) p.pause() else p.play()
             }
         }
     }
 
     fun stop() {
-        player?.stop()
-        player?.clearMediaItems()
-        _playbackState.value = _playbackState.value.copy(
-            currentAudiobook = null,
-            currentMusicTrack = null,
-            isPlaying = false,
-            currentPosition = 0L,
-            duration = 0L
-        )
+        runOnMainThread {
+            try {
+                player?.stop()
+                player?.clearMediaItems()
+            } catch (e: Exception) {
+                Log.w("PlaybackManager", "Error stopping player", e)
+            }
+            _playbackState.value = _playbackState.value.copy(
+                currentAudiobook = null,
+                currentMusicTrack = null,
+                isPlaying = false,
+                currentPosition = 0L,
+                duration = 0L
+            )
+        }
     }
 
     fun setInitialAudiobook(book: Audiobook) {
-        _playbackState.value = _playbackState.value.copy(
-            currentAudiobook = book,
-            currentMusicTrack = null,
-            isPlaying = false,
-            currentPosition = 0L,
-            duration = book.duration * 1000L
-        )
+        runOnMainThread {
+            _playbackState.value = _playbackState.value.copy(
+                currentAudiobook = book,
+                currentMusicTrack = null,
+                isPlaying = false,
+                currentPosition = 0L,
+                duration = book.duration * 1000L
+            )
+        }
     }
 
     fun setInitialMusicTrack(track: MusicTrack) {
-        _playbackState.value = _playbackState.value.copy(
-            currentMusicTrack = track,
-            currentAudiobook = null,
-            isPlaying = false,
-            currentPosition = 0L,
-            duration = track.duration
-        )
+        runOnMainThread {
+            _playbackState.value = _playbackState.value.copy(
+                currentMusicTrack = track,
+                currentAudiobook = null,
+                isPlaying = false,
+                currentPosition = 0L,
+                duration = track.duration
+            )
+        }
     }
 
     fun seekTo(positionMs: Long) {
-        player?.seekTo(positionMs)
-        _playbackState.value = _playbackState.value.copy(currentPosition = positionMs)
+        runOnMainThread {
+            try {
+                player?.seekTo(positionMs)
+                _playbackState.value = _playbackState.value.copy(currentPosition = positionMs)
+            } catch (e: Exception) {
+                Log.w("PlaybackManager", "Seek to $positionMs failed", e)
+            }
+        }
     }
 
     fun skipForward(seconds: Int = 30) {
-        player?.let { p ->
-            val d = if (p.duration > 0) p.duration else _playbackState.value.duration
-            val newPos = (p.currentPosition + (seconds * 1000L)).coerceAtMost(d)
-            seekTo(newPos)
+        runOnMainThread {
+            player?.let { p ->
+                val d = if (p.duration > 0) p.duration else _playbackState.value.duration
+                val newPos = (p.currentPosition + (seconds * 1000L)).coerceAtMost(d)
+                seekTo(newPos)
+            }
         }
     }
 
     fun skipBackward(seconds: Int = 10) {
-        player?.let { p ->
-            val newPos = (p.currentPosition - (seconds * 1000L)).coerceAtLeast(0L)
-            seekTo(newPos)
+        runOnMainThread {
+            player?.let { p ->
+                val newPos = (p.currentPosition - (seconds * 1000L)).coerceAtLeast(0L)
+                seekTo(newPos)
+            }
         }
     }
 
     fun setPlaybackSpeed(speed: Float) {
-        _playbackState.value = _playbackState.value.copy(playbackSpeed = speed)
-        player?.setPlaybackSpeed(speed)
+        runOnMainThread {
+            _playbackState.value = _playbackState.value.copy(playbackSpeed = speed)
+            try {
+                player?.setPlaybackSpeed(speed)
+            } catch (e: Exception) {
+                Log.w("PlaybackManager", "Failed to set playback speed", e)
+            }
+        }
     }
 
     fun release() {
         handler.removeCallbacks(updateProgressRunnable)
-        player?.stop()
+        runOnMainThread {
+            try {
+                player?.stop()
+            } catch (e: Exception) {
+                Log.w("PlaybackManager", "Error releasing player", e)
+            }
+        }
     }
     
     companion object {

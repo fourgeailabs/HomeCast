@@ -339,6 +339,56 @@ fun MediaDetailScreen(
                     }
                 }
 
+                if (creator.isNotBlank() && !creator.equals("Unknown", ignoreCase = true)) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onCreatorClick(creator) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = AccentTeal,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "About the Creator",
+                                        fontSize = 12.sp,
+                                        color = Color.White.copy(alpha = 0.6f)
+                                    )
+                                    Text(
+                                        text = creator,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "View Profile",
+                                tint = AccentTeal
+                            )
+                        }
+                    }
+                }
+
                 // Other books by creator
                 if (otherItems.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(28.dp))
