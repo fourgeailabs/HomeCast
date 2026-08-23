@@ -1,11 +1,28 @@
 # HomeCast
 
-**Version:** 5.03.00
-**Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
+**Version:** 5.04.00
+**Description:** A premium, all-in-one local network audiobook, e-book, music, comic, and podcast media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.03.00)
+## 🚀 Recent Updates (v5.04.00)
+- **New Podcast Navigation Hub & Directory**:
+  - Integrated a dedicated "Podcasts" bottom navigation section with a personal/public toggle.
+  - Personal section supports local device media vs personal server filtering (`All Personal`, `Local Device`, `Personal Server`).
+  - Public directory features direct curated feeds from requested directories (*PlayPodcast.net*, *RSS.com Community Showcase*, and *GetPodcast Global Charts*) with AI Daily Briefing blends.
+- **Smart System Back Button Navigation Stack**:
+  - Refactored `BackHandler` so system back button presses smoothly pop the navigation stack back to the previous screen rather than resetting to the personal audiobooks library.
+- **Overhauled Artist Bio & Discography Experience**:
+  - **Popular Tracks Dropdown**: Features a persistent 1-tap dropdown for top tracks (stuck open by default) with instant play buttons on the right of each song.
+  - **Chronological Albums Shelf**: Displays artist discography albums sorted newest to oldest from left to right below top tracks.
+  - **AI Sanity Check Indicator**: Background verification loading state ensuring images, metadata, and tracks are fully validated.
+- **AI-Guided Cinematic Comic & Manga Panel Zoom**:
+  - Integrated "Cinematic" mode into `ComicReaderScreen` with energetic spring transitions and panel-by-panel guided zoom (Top-Left, Top-Right, Bottom-Left, Bottom-Right) across pages.
+  - Added smart comic detection when opening books so CBZ/CBR/Manga archives automatically trigger the high-performance comic viewer instead of text reformatting.
+- **Solid Full-Screen Player Background**:
+  - Reinforced `PlayerScreen` root container with an opaque dark base canvas to prevent lower screens or controls from bleeding through during sheet transitions.
+
+## 🚀 Previous Updates (v5.03.00)
 - **Authentic Internet Creator Biographies**:
   - Replaced repetitive generic AI template text with authentic, verified biographies fetched live from Wikipedia's official REST API, Wikidata, and curated encyclopedic archives.
   - Automatically queries page summaries, life eras, roles, and multi-paragraph biographical essays with smooth background fallback.

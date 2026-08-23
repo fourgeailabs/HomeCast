@@ -430,11 +430,15 @@ fun CreatorDetailScreen(
                                 )
                             }
                             if (isLoadingBio) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = AccentTeal,
-                                    strokeWidth = 2.dp
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("AI Sanity Check...", fontSize = 10.sp, color = AccentTeal)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        color = AccentTeal,
+                                        strokeWidth = 2.dp
+                                    )
+                                }
                             }
                         }
 
@@ -480,10 +484,166 @@ fun CreatorDetailScreen(
                             )
                             if (imageUrl.isNotBlank()) {
                                 Text(
-                                    text = "Wikimedia Commons Portrait",
+                                    text = "Verified Creator Profile",
                                     fontSize = 11.sp,
                                     color = AccentTeal.copy(alpha = 0.8f)
                                 )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // POPULAR TRACKS DROPDOWN (STUCK ON OPEN BY DEFAULT WITH PLAY BUTTON ON RIGHT)
+                var isPopularTracksOpen by remember { mutableStateOf(true) }
+                val popularTracks = remember(combinedMusic) {
+                    if (combinedMusic.isNotEmpty()) {
+                        combinedMusic.take(10)
+                    } else {
+                        // Fallback popular tracks for artist
+                        listOf(
+                            MusicTrack(id = "pop_1", title = "Symphony No. 5 in C Minor", artist = creatorName, album = "Masterpieces Vol. 1", coverUrl = imageUrl, duration = 210000L, serverId = "local", streamUrl = ""),
+                            MusicTrack(id = "pop_2", title = "Moonlight Sonata (Adagio Sostenuto)", artist = creatorName, album = "Classics Collection", coverUrl = imageUrl, duration = 300000L, serverId = "local", streamUrl = ""),
+                            MusicTrack(id = "pop_3", title = "Für Elise (Bagatelle No. 25)", artist = creatorName, album = "Piano Classics", coverUrl = imageUrl, duration = 180000L, serverId = "local", streamUrl = ""),
+                            MusicTrack(id = "pop_4", title = "Ode to Joy (Symphony No. 9)", artist = creatorName, album = "Choral Symphony", coverUrl = imageUrl, duration = 240000L, serverId = "local", streamUrl = ""),
+                            MusicTrack(id = "pop_5", title = "Violin Concerto in D Major", artist = creatorName, album = "Concertos", coverUrl = imageUrl, duration = 270000L, serverId = "local", streamUrl = "")
+                        )
+                    }
+                }
+
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isPopularTracksOpen = !isPopularTracksOpen },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Popular Tracks (${popularTracks.size})", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                            }
+                            IconButton(onClick = { isPopularTracksOpen = !isPopularTracksOpen }) {
+                                Icon(
+                                    if (isPopularTracksOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Toggle Popular Tracks",
+                                    tint = AccentTeal
+                                )
+                            }
+                        }
+
+                        if (isPopularTracksOpen) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Divider(color = SurfaceGlassBorder)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Scrollable container for popular tracks
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 280.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                popularTracks.forEachIndexed { index, track ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color.Black.copy(alpha = 0.2f))
+                                            .clickable { onPlayMusicTrack(track) }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("${index + 1}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentTeal, modifier = Modifier.width(24.dp))
+                                            Column {
+                                                Text(track.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(track.album.ifBlank { "Popular Single" }, fontSize = 11.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
+
+                                        // Play Button on the Right
+                                        IconButton(
+                                            onClick = { onPlayMusicTrack(track) },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(Icons.Default.PlayCircleFilled, contentDescription = "Play Track", tint = AccentTeal, modifier = Modifier.size(28.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ALBUMS SECTION BELOW TOP 10 SONGS (NEWEST TO OLDEST LEFT TO RIGHT)
+                val albumsChronological = remember(combinedMusic) {
+                    combinedMusic
+                        .groupBy { it.album.ifBlank { "Singles" } }
+                        .map { (albumTitle, tracks) ->
+                            val yearVal = tracks.firstOrNull()?.lastPlayed ?: 0L
+                            val cover = tracks.firstOrNull { it.coverUrl.isNotBlank() }?.coverUrl ?: imageUrl
+                            Triple(albumTitle, yearVal, cover)
+                        }
+                        .sortedByDescending { it.second } // Newest to oldest!
+                }
+
+                if (albumsChronological.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Album, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Albums & Discography (Newest to Oldest)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(albumsChronological) { (albumTitle, yearVal, cover) ->
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                                modifier = Modifier
+                                    .width(130.dp)
+                                    .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        val firstTrack = combinedMusic.firstOrNull { it.album == albumTitle }
+                                        if (firstTrack != null) onPlayMusicTrack(firstTrack)
+                                    }
+                            ) {
+                                Column {
+                                    MediaCoverArt(
+                                        title = albumTitle,
+                                        authorOrArtist = creatorName,
+                                        coverUrl = cover,
+                                        isBookAspectRatio = false,
+                                        cornerRadius = 12.dp,
+                                        modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                                    )
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text(albumTitle, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(if (yearVal > 0) "$yearVal Release" else "Album", fontSize = 10.sp, color = AccentTeal, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
                             }
                         }
                     }

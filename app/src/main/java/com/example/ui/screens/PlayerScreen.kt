@@ -179,10 +179,11 @@ fun PlayerScreen(
     val coroutineScope = rememberCoroutineScope()
     val dragOffsetY = remember { Animatable(0f) }
 
-    // Full screen Frosted Glass Background
+    // Full screen Smoked Translucent Dark Glass Background (matches screenshot depth)
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xFF090D16).copy(alpha = 0.93f))
             .offset { IntOffset(0, dragOffsetY.value.roundToInt().coerceAtLeast(0)) }
             .pointerInput(onCollapse) {
                 detectVerticalDragGestures(
@@ -232,9 +233,9 @@ fun PlayerScreen(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                dominantColor.copy(alpha = 0.6f),
-                                Color(0xFF0F172A).copy(alpha = 0.85f),
-                                Color(0xFF020617).copy(alpha = 0.95f)
+                                dominantColor.copy(alpha = 0.40f),
+                                Color(0xFF090D16).copy(alpha = 0.65f),
+                                Color(0xFF04060C).copy(alpha = 0.85f)
                             )
                         )
                     )
@@ -246,10 +247,9 @@ fun PlayerScreen(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                dominantColor.copy(alpha = 0.45f),
-                                vibrantColor.copy(alpha = 0.25f),
-                                Color.Transparent,
-                                Color.Transparent
+                                dominantColor.copy(alpha = 0.35f),
+                                vibrantColor.copy(alpha = 0.15f),
+                                Color(0xFF090D16).copy(alpha = 0.60f)
                             )
                         )
                     )

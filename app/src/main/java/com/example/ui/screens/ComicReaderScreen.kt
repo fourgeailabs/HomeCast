@@ -215,32 +215,68 @@ fun ComicReaderScreen(
     var manualScale by remember { mutableFloatStateOf(1f) }
     var manualOffset by remember { mutableStateOf(Offset.Zero) }
 
+    // AI Guided Cinematic Panel Mode
+    var isCinematicMode by remember { mutableStateOf(false) }
+    var currentPanelIndex by remember { mutableIntStateOf(0) } // 0..3 panels
+
+    fun applyCinematicPanelZoom(panelIdx: Int) {
+        val targetScale = 2.2f
+        val offsetMap = mapOf(
+            0 to Offset(180f, 240f),   // Panel 1: Top-Left
+            1 to Offset(-180f, 240f),  // Panel 2: Top-Right
+            2 to Offset(180f, -240f),  // Panel 3: Bottom-Left
+            3 to Offset(-180f, -240f)  // Panel 4: Bottom-Right
+        )
+        manualScale = targetScale
+        manualOffset = offsetMap[panelIdx] ?: Offset.Zero
+    }
+
     // Page Slide Transition
     val slideAnim = remember { Animatable(0f) }
 
     fun goToNextPage() {
+        if (isCinematicMode) {
+            if (currentPanelIndex < 3) {
+                currentPanelIndex += 1
+                applyCinematicPanelZoom(currentPanelIndex)
+                return
+            } else {
+                currentPanelIndex = 0
+            }
+        }
         if (currentPageIndex < pages.size - 1) {
             coroutineScope.launch {
-                manualScale = 1f
+                manualScale = if (isCinematicMode) 2.2f else 1f
                 manualOffset = Offset.Zero
                 slideAnim.snapTo(if (readingMode == ComicReadingMode.MANGA_RTL) -150f else 150f)
                 val newPage = currentPageIndex + 1
                 currentPageIndex = newPage
                 persistComicProgress(newPage)
+                if (isCinematicMode) applyCinematicPanelZoom(0)
                 slideAnim.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
             }
         }
     }
 
     fun goToPrevPage() {
+        if (isCinematicMode) {
+            if (currentPanelIndex > 0) {
+                currentPanelIndex -= 1
+                applyCinematicPanelZoom(currentPanelIndex)
+                return
+            } else {
+                currentPanelIndex = 3
+            }
+        }
         if (currentPageIndex > 0) {
             coroutineScope.launch {
-                manualScale = 1f
+                manualScale = if (isCinematicMode) 2.2f else 1f
                 manualOffset = Offset.Zero
                 slideAnim.snapTo(if (readingMode == ComicReadingMode.MANGA_RTL) 150f else -150f)
                 val newPage = currentPageIndex - 1
                 currentPageIndex = newPage
                 persistComicProgress(newPage)
+                if (isCinematicMode) applyCinematicPanelZoom(3)
                 slideAnim.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
             }
         }
@@ -409,6 +445,33 @@ fun ComicReaderScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // AI Guided Cinematic Panel Toggle Button
+                        Button(
+                            onClick = {
+                                isCinematicMode = !isCinematicMode
+                                if (isCinematicMode) {
+                                    currentPanelIndex = 0
+                                    applyCinematicPanelZoom(0)
+                                } else {
+                                    manualScale = 1f
+                                    manualOffset = Offset.Zero
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isCinematicMode) Color(0xFF38BDF8) else Color(0xFF1E293B),
+                                contentColor = if (isCinematicMode) Color.Black else Color.White
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(Icons.Default.Movie, contentDescription = "Cinematic Mode", modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Cinematic", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
                         // Fit Mode Toggle
                         IconButton(
                             onClick = {

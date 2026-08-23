@@ -45,6 +45,7 @@ object Routes {
     const val Library = "library"
     const val Music = "music"
     const val EBooks = "ebooks"
+    const val Podcasts = "podcasts"
     const val Player = "player"
     const val Discovery = "discovery"
     const val Settings = "settings"
@@ -282,6 +283,20 @@ fun MainScreen(
                             colors = navColors
                         )
                         NavigationBarItem(
+                            selected = isSelected(Routes.Podcasts),
+                            onClick = {
+                                isPlayerSlidUp = false
+                                navController.navigate(Routes.Podcasts) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = false }
+                                    launchSingleTop = true
+                                    restoreState = false
+                                }
+                            },
+                            icon = { Icon(Icons.Default.Podcasts, contentDescription = "Podcasts") },
+                            label = { Text("Podcasts", maxLines = 1) },
+                            colors = navColors
+                        )
+                        NavigationBarItem(
                             selected = isSelected(Routes.Discovery),
                             onClick = {
                                 isPlayerSlidUp = false
@@ -343,6 +358,17 @@ fun MainScreen(
                         },
                         onNavigateToCreator = { name ->
                             navController.navigate(Routes.CreatorDetail(name))
+                        }
+                    )
+                }
+                composable(Routes.Podcasts) {
+                    PodcastsScreen(
+                        viewModel = viewModel,
+                        onEpisodeClick = {
+                            isPlayerSlidUp = true
+                        },
+                        onNavigateToSettings = {
+                            navController.navigate(Routes.Settings)
                         }
                     )
                 }

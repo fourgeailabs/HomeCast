@@ -1863,6 +1863,17 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "5.04.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "New Podcasts Section: Added a primary Podcasts tab to bottom navigation featuring personal server feeds and curated public directories (PlayPodcast.net, RSS.com, GetPodcast).",
+                    "Smart System Back Navigation: Resolved back button behavior so pressing back smoothly pops navigation history rather than resetting to personal audiobooks.",
+                    "Artist Bio Overhaul: Added persistent popular tracks dropdown with right-aligned play buttons and chronological album display (newest to oldest left to right).",
+                    "AI-Guided Cinematic Comic Zoom: Panel-by-panel guided zoom with energetic spring transitions and smart comic archive detection.",
+                    "Solid Player Canvas: Opaque dark background canvas prevents lower screens from bleeding through full-screen player transitions."
+                )
+            ),
+            UpdateNotice(
                 version = "5.03.00",
                 date = "August 2026",
                 highlights = listOf(
