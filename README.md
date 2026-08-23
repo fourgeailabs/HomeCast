@@ -1,11 +1,24 @@
 # HomeCast
 
-**Version:** 4.6.0
+**Version:** 4.7.0
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.6.0)
+## 🚀 Recent Updates (v4.7.0)
+- **Dedicated Server Connections Submenu**: Re-architected personal media server settings into a streamlined, dedicated sub-screen supporting Audiobookshelf, Plex, Booklore, Komga, Kavita, and Jellyfin with real-time status diagnostics and synchronization triggers.
+- **Public Domain Media Sources Manager**: Added a dedicated sub-menu to change, add, or customize public domain repositories. Users can type or paste any catalog website URL (e.g. Project Gutenberg, LibriVox, Standard Ebooks, Internet Archive). Google Gemini inspects and validates the endpoint, repairs broken protocols or subpaths, detects supported media types (Audiobook, E-Book/Comic, Music), and presents an interactive confirmation dialog with detailed explanations before activating.
+- **Local Device Storage Folders Submenu**: Added a dedicated sub-menu to import and manage storage directories for each of the three media types (Audiobooks, E-Books/Comics, Music). Supports both system directory browsing (SAF) and direct storage path entry. Discovered offline files automatically import into the user's Personal Library tabs.
+- **AI Local Media Metadata & Biography Enrichment**: Gemini AI scans offline files across local device storage, correcting messy file tags, locating high-resolution public cover art, and finding comprehensive literary/musical biographies.
+
+## 🚀 Previous Updates (v4.6.1)
+- **Authentic Comic & Manga Page Engine**: Fully replaced AI summary placeholders with direct graphical page streaming from Komga, Kavita, Archive.org, and local/downloaded CBZ/ZIP archives. Comics now render their genuine original full-bleed visual pages with zoom, pan, and LTR/RTL reading modes.
+- **Direct E-Book Text Stream Reader**: E-books now stream genuine unabridged text chapters directly from Booklore, Project Gutenberg, and EPUB files without AI summary fallbacks.
+- **Dark Mode Typography Polish**: Upgraded all media titles, author names, and descriptions to ensure crisp contrast and legibility across both dark and light modes.
+- **Audiobooks Switcher UI Alignment**: Replicated the polished segmented switcher buttons from Books and Music onto the Audiobooks screen for seamless visual and interaction consistency.
+- **Clean Bookshelf Header**: Simplified the e-book header to 'Bookshelf' for a clean, distraction-free reading experience.
+
+## 🚀 Previous Updates (v4.6.0)
 - **Unified Switcher UI/UX Across Media Tabs**: Replicated the sleek personal library & public domain switcher button tab bar from Books and Music across the Audiobooks screen for seamless visual and interaction consistency.
 - **Relabeled Bookshelf Header**: Renamed "Glass Bookshelf" to "Bookshelf" in the primary e-book reading screen with crisp typography and high contrast.
 - **Resilient Cover Art Engine (MediaCoverArt)**: Replaced fragile image loaders across all shelves with high-contrast, gold-embossed fallback covers. Book covers now load reliably and never display empty or broken boxes.

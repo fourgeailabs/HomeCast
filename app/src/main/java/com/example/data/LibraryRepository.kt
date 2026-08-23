@@ -12,8 +12,28 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
     val recentMusic: Flow<List<MusicTrack>> = dao.getRecentMusic()
     val allEBooks: Flow<List<EBook>> = dao.getAllEBooks()
     val servers: Flow<List<ServerConfig>> = secureConfigManager.serversFlow
+    val allPublicDomainSources: Flow<List<PublicDomainSource>> = dao.getAllPublicDomainSources()
+    val allLocalFolders: Flow<List<LocalFolderConfig>> = dao.getAllLocalFolders()
 
     suspend fun insertBook(book: Audiobook) = dao.insertBook(book)
+    suspend fun insertBooks(books: List<Audiobook>) = dao.insertBooks(books)
+    suspend fun insertMusicTracks(tracks: List<MusicTrack>) = dao.insertMusicTracks(tracks)
+    suspend fun insertEBooks(ebooks: List<EBook>) = dao.insertEBooks(ebooks)
+    
+    suspend fun deleteBooksByServer(serverId: String) = dao.deleteBooksByServer(serverId)
+    suspend fun deleteMusicByServer(serverId: String) = dao.deleteMusicByServer(serverId)
+    suspend fun deleteEBooksByServer(serverId: String) = dao.deleteEBooksByServer(serverId)
+
+    // Public Domain Sources
+    suspend fun addPublicDomainSource(source: PublicDomainSource) = dao.insertPublicDomainSource(source)
+    suspend fun addPublicDomainSources(sources: List<PublicDomainSource>) = dao.insertPublicDomainSources(sources)
+    suspend fun togglePublicDomainSource(id: String, isEnabled: Boolean) = dao.togglePublicDomainSource(id, isEnabled)
+    suspend fun deletePublicDomainSource(id: String) = dao.deletePublicDomainSource(id)
+
+    // Local Folders
+    suspend fun addLocalFolder(folder: LocalFolderConfig) = dao.insertLocalFolder(folder)
+    suspend fun deleteLocalFolder(id: String) = dao.deleteLocalFolder(id)
+    suspend fun updateFolderScanStatus(id: String, count: Int, timestamp: Long) = dao.updateFolderScanStatus(id, count, timestamp)
     suspend fun updateProgress(id: String, progress: Long) {
         dao.updateProgress(id, progress, System.currentTimeMillis())
     }

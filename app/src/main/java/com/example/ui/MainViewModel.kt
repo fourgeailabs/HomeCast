@@ -48,11 +48,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val recentMusic = repository.recentMusic.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allEBooks = repository.allEBooks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val servers = repository.servers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val publicDomainSources = repository.allPublicDomainSources.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val localFolders = repository.allLocalFolders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val playbackState = playbackManager.playbackState
 
     private val _serverOpState = MutableStateFlow<ServerOperationState>(ServerOperationState.Idle)
     val serverOpState = _serverOpState.asStateFlow()
+
+    // Public Domain Sources AI Verification State
+    private val _verificationResult = MutableStateFlow<com.example.data.VerificationResult?>(null)
+    val verificationResult = _verificationResult.asStateFlow()
+    private val _isVerifyingSource = MutableStateFlow(false)
+    val isVerifyingSource = _isVerifyingSource.asStateFlow()
+
+    // Local Folders Scanning & AI State
+    private val _isScanningFolders = MutableStateFlow(false)
+    val isScanningFolders = _isScanningFolders.asStateFlow()
+    private val _folderScanMessage = MutableStateFlow<String?>(null)
+    val folderScanMessage = _folderScanMessage.asStateFlow()
+    private val _isEnrichingLocalMedia = MutableStateFlow(false)
+    val isEnrichingLocalMedia = _isEnrichingLocalMedia.asStateFlow()
 
     // Discovery State
     val _recommendations = MutableStateFlow<List<String>>(emptyList())
@@ -350,6 +366,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 database.libraryDao().insertEBooks(seedEBooks)
                 database.libraryDao().insertBooks(seedAudiobooks)
                 database.libraryDao().insertMusicTracks(seedMusic)
+            }
+
+            // Seed default Public Domain Sources if empty
+            val hasSources = database.libraryDao().getAllPublicDomainSources().firstOrNull()?.isNotEmpty() ?: false
+            if (!hasSources) {
+                val defaultSources = listOf(
+                    com.example.data.PublicDomainSource(
+                        id = "source_gutenberg",
+                        name = "Project Gutenberg",
+                        originalUrl = "https://www.gutenberg.org/ebooks/",
+                        verifiedUrl = "https://www.gutenberg.org/ebooks/",
+                        mediaTypes = "EBOOK",
+                        isEnabled = true,
+                        isDefault = true,
+                        aiExplanation = "Official Project Gutenberg repository with over 70,000 free unabridged e-books."
+                    ),
+                    com.example.data.PublicDomainSource(
+                        id = "source_archive_texts",
+                        name = "Internet Archive Texts & Comics",
+                        originalUrl = "https://archive.org/details/texts",
+                        verifiedUrl = "https://archive.org/details/texts",
+                        mediaTypes = "EBOOK,COMIC",
+                        isEnabled = true,
+                        isDefault = true,
+                        aiExplanation = "Massive open library of historical books, periodicals, and classic comics & manga."
+                    ),
+                    com.example.data.PublicDomainSource(
+                        id = "source_librivox",
+                        name = "LibriVox Free Audiobooks",
+                        originalUrl = "https://librivox.org",
+                        verifiedUrl = "https://librivox.org",
+                        mediaTypes = "AUDIOBOOK",
+                        isEnabled = true,
+                        isDefault = true,
+                        aiExplanation = "Community-recorded public domain unabridged audiobooks read by volunteers worldwide."
+                    ),
+                    com.example.data.PublicDomainSource(
+                        id = "source_archive_78rpm",
+                        name = "Internet Archive Great 78 RPM & Live Music",
+                        originalUrl = "https://archive.org/details/78rpm",
+                        verifiedUrl = "https://archive.org/details/78rpm",
+                        mediaTypes = "MUSIC",
+                        isEnabled = true,
+                        isDefault = true,
+                        aiExplanation = "Preservation project for 78rpm records and vintage audio recordings from early 20th century."
+                    ),
+                    com.example.data.PublicDomainSource(
+                        id = "source_standard_ebooks",
+                        name = "Standard Ebooks",
+                        originalUrl = "https://standardebooks.org",
+                        verifiedUrl = "https://standardebooks.org",
+                        mediaTypes = "EBOOK",
+                        isEnabled = true,
+                        isDefault = true,
+                        aiExplanation = "Volunteer-driven project producing high quality, beautifully formatted open domain editions."
+                    ),
+                    com.example.data.PublicDomainSource(
+                        id = "source_musopen",
+                        name = "Musopen Classical Vault",
+                        originalUrl = "https://musopen.org",
+                        verifiedUrl = "https://musopen.org",
+                        mediaTypes = "MUSIC",
+                        isEnabled = true,
+                        isDefault = true,
+                        aiExplanation = "Non-profit focused on increasing access to classical music through free recordings and sheet music."
+                    )
+                )
+                database.libraryDao().insertPublicDomainSources(defaultSources)
             }
             
             // Automatically clean authors/genres and locate beautiful cover-art URLs immediately!
@@ -1514,6 +1598,199 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 e.printStackTrace()
             }
             com.example.data.LocalMediaMetadataProvider.getFallbackCreatorDetails(creatorName)
+        }
+    }
+
+    // --- Public Domain Sources AI Verification & Management ---
+
+    fun verifyPublicDomainSource(url: String, customName: String? = null) {
+        viewModelScope.launch {
+            _isVerifyingSource.value = true
+            _verificationResult.value = null
+            try {
+                val result = com.example.data.PublicDomainSourceVerifier.verifyAndCorrectSourceUrl(url, customName)
+                _verificationResult.value = result
+            } catch (e: Exception) {
+                _verificationResult.value = com.example.data.VerificationResult(
+                    isValid = false,
+                    sourceName = customName ?: "Error",
+                    originalUrl = url,
+                    correctedUrl = url,
+                    mediaTypes = emptyList(),
+                    explanation = "Verification failed: ${e.message}",
+                    requiresCorrection = false
+                )
+            } finally {
+                _isVerifyingSource.value = false
+            }
+        }
+    }
+
+    fun confirmAndSaveVerifiedSource(result: com.example.data.VerificationResult) {
+        viewModelScope.launch {
+            val newSource = com.example.data.PublicDomainSource(
+                id = "source_custom_${System.currentTimeMillis()}",
+                name = result.sourceName,
+                originalUrl = result.originalUrl,
+                verifiedUrl = result.correctedUrl,
+                mediaTypes = result.mediaTypes.joinToString(","),
+                isEnabled = true,
+                isDefault = false,
+                aiExplanation = result.explanation
+            )
+            repository.addPublicDomainSource(newSource)
+            _verificationResult.value = null
+            _serverOpState.value = ServerOperationState.Success("Added public domain source: ${result.sourceName}")
+        }
+    }
+
+    fun clearVerificationResult() {
+        _verificationResult.value = null
+    }
+
+    fun togglePublicDomainSource(id: String, isEnabled: Boolean) {
+        viewModelScope.launch {
+            repository.togglePublicDomainSource(id, isEnabled)
+        }
+    }
+
+    fun deletePublicDomainSource(id: String) {
+        viewModelScope.launch {
+            repository.deletePublicDomainSource(id)
+            _serverOpState.value = ServerOperationState.Success("Removed source")
+        }
+    }
+
+    // --- Local Device Folder Management & AI Enrichment ---
+
+    fun addLocalFolder(mediaType: String, folderPath: String, displayName: String) {
+        viewModelScope.launch {
+            val folder = com.example.data.LocalFolderConfig(
+                id = "folder_${System.currentTimeMillis()}",
+                mediaType = mediaType,
+                folderPath = folderPath,
+                displayName = displayName.ifBlank { "Local $mediaType Folder" },
+                isEnabled = true
+            )
+            repository.addLocalFolder(folder)
+            scanFolder(folder)
+        }
+    }
+
+    fun deleteLocalFolder(folder: com.example.data.LocalFolderConfig) {
+        viewModelScope.launch {
+            repository.deleteLocalFolder(folder.id)
+            _serverOpState.value = ServerOperationState.Success("Removed local folder '${folder.displayName}'")
+        }
+    }
+
+    fun scanFolder(folder: com.example.data.LocalFolderConfig) {
+        viewModelScope.launch {
+            _isScanningFolders.value = true
+            _folderScanMessage.value = "Scanning '${folder.displayName}' for ${folder.mediaType} files..."
+            try {
+                val result = com.example.data.LocalMediaScanner.scanFolder(getApplication(), folder)
+                var itemCount = 0
+                when (folder.mediaType.uppercase()) {
+                    "AUDIOBOOK" -> {
+                        if (result.audiobooks.isNotEmpty()) {
+                            repository.insertBooks(result.audiobooks)
+                            itemCount = result.audiobooks.size
+                        }
+                    }
+                    "EBOOK" -> {
+                        if (result.ebooks.isNotEmpty()) {
+                            repository.insertEBooks(result.ebooks)
+                            itemCount = result.ebooks.size
+                        }
+                    }
+                    "MUSIC" -> {
+                        if (result.musicTracks.isNotEmpty()) {
+                            repository.insertMusicTracks(result.musicTracks)
+                            itemCount = result.musicTracks.size
+                        }
+                    }
+                }
+                repository.updateFolderScanStatus(folder.id, itemCount, System.currentTimeMillis())
+                _folderScanMessage.value = "Found $itemCount media items in '${folder.displayName}'"
+                _serverOpState.value = ServerOperationState.Success("Found $itemCount items in '${folder.displayName}'")
+            } catch (e: Exception) {
+                _folderScanMessage.value = "Scan error: ${e.message}"
+            } finally {
+                _isScanningFolders.value = false
+            }
+        }
+    }
+
+    fun scanAllLocalFolders() {
+        viewModelScope.launch {
+            val folders = localFolders.value
+            if (folders.isEmpty()) {
+                _serverOpState.value = ServerOperationState.Error("No local folders configured yet.")
+                return@launch
+            }
+            _isScanningFolders.value = true
+            _folderScanMessage.value = "Scanning ${folders.size} local device folders..."
+            var totalFound = 0
+            try {
+                for (folder in folders) {
+                    if (folder.isEnabled) {
+                        val result = com.example.data.LocalMediaScanner.scanFolder(getApplication(), folder)
+                        when (folder.mediaType.uppercase()) {
+                            "AUDIOBOOK" -> {
+                                if (result.audiobooks.isNotEmpty()) {
+                                    repository.insertBooks(result.audiobooks)
+                                    totalFound += result.audiobooks.size
+                                    repository.updateFolderScanStatus(folder.id, result.audiobooks.size, System.currentTimeMillis())
+                                }
+                            }
+                            "EBOOK" -> {
+                                if (result.ebooks.isNotEmpty()) {
+                                    repository.insertEBooks(result.ebooks)
+                                    totalFound += result.ebooks.size
+                                    repository.updateFolderScanStatus(folder.id, result.ebooks.size, System.currentTimeMillis())
+                                }
+                            }
+                            "MUSIC" -> {
+                                if (result.musicTracks.isNotEmpty()) {
+                                    repository.insertMusicTracks(result.musicTracks)
+                                    totalFound += result.musicTracks.size
+                                    repository.updateFolderScanStatus(folder.id, result.musicTracks.size, System.currentTimeMillis())
+                                }
+                            }
+                        }
+                    }
+                }
+                _folderScanMessage.value = "Scan complete. Discovered $totalFound local media items."
+                _serverOpState.value = ServerOperationState.Success("Discovered $totalFound local items.")
+            } catch (e: Exception) {
+                _folderScanMessage.value = "Scan error: ${e.message}"
+            } finally {
+                _isScanningFolders.value = false
+            }
+        }
+    }
+
+    fun enrichLocalMediaWithAI() {
+        viewModelScope.launch {
+            _isEnrichingLocalMedia.value = true
+            try {
+                val localAudiobooks = allBooks.value.filter { it.serverId == "local_device" }
+                val localEBooks = allEBooks.value.filter { it.serverId == "local_device" }
+                val localMusic = allMusic.value.filter { it.serverId == "local_device" }
+
+                val enrichedCount = com.example.data.LocalMediaEnricher.enrichMediaItems(
+                    audiobooks = localAudiobooks,
+                    ebooks = localEBooks,
+                    musicTracks = localMusic,
+                    dao = database.libraryDao()
+                )
+                _serverOpState.value = ServerOperationState.Success("AI Enriched $enrichedCount local media items with covers, biographies & clean titles!")
+            } catch (e: Exception) {
+                _serverOpState.value = ServerOperationState.Error("AI Enrichment failed: ${e.message}")
+            } finally {
+                _isEnrichingLocalMedia.value = false
+            }
         }
     }
 }

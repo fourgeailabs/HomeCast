@@ -55,4 +55,33 @@ interface LibraryDao {
 
     @Query("DELETE FROM ebooks WHERE serverId = :serverId")
     suspend fun deleteEBooksByServer(serverId: String)
+
+    // Public Domain Sources
+    @Query("SELECT * FROM public_domain_sources ORDER BY isDefault DESC, dateAdded ASC")
+    fun getAllPublicDomainSources(): Flow<List<PublicDomainSource>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPublicDomainSource(source: PublicDomainSource)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPublicDomainSources(sources: List<PublicDomainSource>)
+
+    @Query("UPDATE public_domain_sources SET isEnabled = :isEnabled WHERE id = :id")
+    suspend fun togglePublicDomainSource(id: String, isEnabled: Boolean)
+
+    @Query("DELETE FROM public_domain_sources WHERE id = :id")
+    suspend fun deletePublicDomainSource(id: String)
+
+    // Local Folder Configurations
+    @Query("SELECT * FROM local_folders ORDER BY mediaType ASC, displayName ASC")
+    fun getAllLocalFolders(): Flow<List<LocalFolderConfig>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLocalFolder(folder: LocalFolderConfig)
+
+    @Query("DELETE FROM local_folders WHERE id = :id")
+    suspend fun deleteLocalFolder(id: String)
+
+    @Query("UPDATE local_folders SET fileCount = :count, lastScanned = :timestamp WHERE id = :id")
+    suspend fun updateFolderScanStatus(id: String, count: Int, timestamp: Long)
 }

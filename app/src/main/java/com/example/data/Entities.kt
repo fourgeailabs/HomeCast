@@ -64,3 +64,28 @@ data class ServerConfig(
     val isConnected: Boolean = false,
     val lastSyncTime: Long = 0L
 )
+
+@Entity(tableName = "public_domain_sources")
+data class PublicDomainSource(
+    @PrimaryKey val id: String,
+    val name: String,
+    val originalUrl: String,
+    val verifiedUrl: String,
+    val mediaTypes: String, // e.g. "AUDIOBOOK,EBOOK,MUSIC,COMIC"
+    val isEnabled: Boolean = true,
+    val isDefault: Boolean = false,
+    val aiExplanation: String = "",
+    val dateAdded: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "local_folders")
+data class LocalFolderConfig(
+    @PrimaryKey val id: String,
+    val mediaType: String, // "AUDIOBOOK", "EBOOK", "MUSIC"
+    val folderPath: String, // DocumentTree URI string or file path
+    val displayName: String,
+    val isEnabled: Boolean = true,
+    val fileCount: Int = 0,
+    val lastScanned: Long = 0L
+)
+

@@ -45,6 +45,7 @@ data class BookshelfItem(
     val id: String,
     val title: String,
     val authorOrArtist: String,
+    val downloadUrl: String? = null,
     val publicDomainUrl: String? = null,
     val coverUrl: String,
     val genre: String,
@@ -52,7 +53,8 @@ data class BookshelfItem(
     val progressPercent: Int = 0,
     val pageCount: Int = 320,
     val rating: Float = 4.8f,
-    val description: String = ""
+    val description: String = "",
+    val serverId: String = ""
 )
 
 val sampleBookshelfItems = listOf(
@@ -65,7 +67,8 @@ val sampleBookshelfItems = listOf(
         genre = "Sci-Fi",
         progressPercent = 65,
         pageCount = 180,
-        description = "A Victorian scientist constructs a machine that travels through fourth-dimensional spacetime into the far future year 802,701 AD."
+        description = "A Victorian scientist constructs a machine that travels through fourth-dimensional spacetime into the far future year 802,701 AD.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "ebook_2",
@@ -76,7 +79,8 @@ val sampleBookshelfItems = listOf(
         genre = "Classic",
         progressPercent = 30,
         pageCount = 280,
-        description = "Victor Frankenstein creates a sentient creature in an unorthodox scientific experiment with haunting consequences."
+        description = "Victor Frankenstein creates a sentient creature in an unorthodox scientific experiment with haunting consequences.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "ebook_3",
@@ -86,7 +90,8 @@ val sampleBookshelfItems = listOf(
         genre = "Cyberpunk",
         progressPercent = 88,
         pageCount = 271,
-        description = "Case, a washed-up computer hacker hired by a mysterious employer, is contracted for the ultimate digital hack into the Matrix."
+        description = "Case, a washed-up computer hacker hired by a mysterious employer, is contracted for the ultimate digital hack into the Matrix.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "comic_1",
@@ -97,7 +102,8 @@ val sampleBookshelfItems = listOf(
         isComic = true,
         progressPercent = 45,
         pageCount = 32,
-        description = "In Neo-Kyoto 2088, rogue cyber-enforcers uncover an omnipotent rogue artificial intelligence governing the skyline."
+        description = "In Neo-Kyoto 2088, rogue cyber-enforcers uncover an omnipotent rogue artificial intelligence governing the skyline.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "ebook_4",
@@ -108,7 +114,8 @@ val sampleBookshelfItems = listOf(
         genre = "Philosophy",
         progressPercent = 100,
         pageCount = 112,
-        description = "Ancient Chinese military treatise attributed to Sun Tzu, devoted to strategic thinking and tactics."
+        description = "Ancient Chinese military treatise attributed to Sun Tzu, devoted to strategic thinking and tactics.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "comic_2",
@@ -119,7 +126,8 @@ val sampleBookshelfItems = listOf(
         isComic = true,
         progressPercent = 15,
         pageCount = 28,
-        description = "Deep space explorers approach an oceanic sentient planet exhibiting reality-bending gravitational anomalies."
+        description = "Deep space explorers approach an oceanic sentient planet exhibiting reality-bending gravitational anomalies.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "ebook_5",
@@ -130,7 +138,8 @@ val sampleBookshelfItems = listOf(
         genre = "Classic",
         progressPercent = 12,
         pageCount = 190,
-        description = "A tragic story of Jay Gatsby, a self-made millionaire, and his pursuit of Daisy Buchanan."
+        description = "A tragic story of Jay Gatsby, a self-made millionaire, and his pursuit of Daisy Buchanan.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "ebook_6",
@@ -141,7 +150,8 @@ val sampleBookshelfItems = listOf(
         genre = "Philosophy",
         progressPercent = 50,
         pageCount = 128,
-        description = "Gregor Samsa awakens one morning to find himself transformed into a monstrous insect."
+        description = "Gregor Samsa awakens one morning to find himself transformed into a monstrous insect.",
+        serverId = "demo_server"
     ),
     BookshelfItem(
         id = "comic_3",
@@ -152,7 +162,8 @@ val sampleBookshelfItems = listOf(
         isComic = true,
         progressPercent = 90,
         pageCount = 44,
-        description = "A lone samurai in a neon-drenched dystopia fights to protect the last biological memory vault."
+        description = "A lone samurai in a neon-drenched dystopia fights to protect the last biological memory vault.",
+        serverId = "demo_server"
     )
 )
 
@@ -182,12 +193,14 @@ fun EBooksScreen(
                     id = ebook.id,
                     title = ebook.title,
                     authorOrArtist = ebook.author,
+                    downloadUrl = ebook.downloadUrl,
                     coverUrl = ebook.coverUrl,
                     genre = ebook.genre,
                     isComic = ebook.isComic,
                     progressPercent = ebook.progressPercent,
                     pageCount = ebook.totalPages,
-                    description = ebook.description
+                    description = ebook.description,
+                    serverId = ebook.serverId
                 )
             }
         } else {
@@ -196,12 +209,15 @@ fun EBooksScreen(
                     id = ebook.id,
                     title = ebook.title,
                     authorOrArtist = ebook.author,
+                    downloadUrl = ebook.downloadUrl,
+                    publicDomainUrl = ebook.downloadUrl,
                     coverUrl = ebook.coverUrl,
                     genre = ebook.genre,
                     isComic = ebook.isComic,
                     progressPercent = ebook.progressPercent,
                     pageCount = ebook.totalPages,
-                    description = ebook.description
+                    description = ebook.description,
+                    serverId = ebook.serverId
                 )
             }
             val fetched = archiveBooks.map { doc ->
@@ -217,14 +233,18 @@ fun EBooksScreen(
                     is String -> doc.description
                     else -> ""
                 }
+                val isComicDoc = (doc.description?.toString()?.contains("comic", true) == true) || (doc.title?.contains("comic", true) == true)
                 BookshelfItem(
                     id = doc.identifier,
                     title = title,
                     authorOrArtist = author,
-                    publicDomainUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_djvu.txt", // best effort
+                    publicDomainUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_djvu.txt",
+                    downloadUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}.cbz",
                     coverUrl = coverUrl,
-                    genre = "Classic",
-                    description = desc
+                    genre = if (isComicDoc) "Comics" else "Classic",
+                    isComic = isComicDoc,
+                    description = desc,
+                    serverId = "pd_server"
                 )
             }.filter { f -> localPD.none { l -> l.title.equals(f.title, ignoreCase = true) } }
             localPD + fetched
@@ -245,8 +265,9 @@ fun EBooksScreen(
     }
 
     fun openItem(item: BookshelfItem) {
+        val server = viewModel.servers.value.firstOrNull { it.id == item.serverId }
         if (item.isComic) {
-            val sampleComic = ComicData(
+            val comic = ComicData(
                 id = item.id,
                 title = item.title,
                 series = item.title,
@@ -254,54 +275,25 @@ fun EBooksScreen(
                 writer = item.authorOrArtist.split("•").firstOrNull()?.trim() ?: item.authorOrArtist,
                 artist = item.authorOrArtist.split("•").lastOrNull()?.trim() ?: "Unknown",
                 coverUrl = item.coverUrl,
-                pages = listOf(
-                    ComicPage(
-                        pageNumber = 1,
-                        fullPageArtUrl = item.coverUrl,
-                        pageTitle = "Prologue",
-                        frames = listOf(
-                            ComicFrame(
-                                id = "f1",
-                                frameNumber = 1,
-                                title = "Establishing Shot - Neo Metropolis",
-                                speaker = "NARRATOR",
-                                dialogue = "Rain fell in sheets over the shimmering spires of Neo-Tokyo. 2088.",
-                                sfx = "SHSHHH...",
-                                gradientColors = listOf(Color(0xFF1E1B4B), Color(0xFF0F172A))
-                            ),
-                            ComicFrame(
-                                id = "f2",
-                                frameNumber = 2,
-                                title = "Rooftop Infiltration",
-                                speaker = "KAI",
-                                dialogue = "Visual sensors calibrated. Perimeter security is bypassed.",
-                                sfx = "CLIK-WHIRR",
-                                gradientColors = listOf(Color(0xFF0C4A6E), Color(0xFF0284C7))
-                            ),
-                            ComicFrame(
-                                id = "f3",
-                                frameNumber = 3,
-                                title = "Action Clash",
-                                speaker = "CYBER ENFORCER",
-                                dialogue = "Halt! You are trespassing on secure sector 9!",
-                                sfx = "KRAAA-KOOOM!!",
-                                gradientColors = listOf(Color(0xFF7F1D1D), Color(0xFFEA580C))
-                            )
-                        )
-                    )
-                )
+                downloadUrl = item.downloadUrl ?: item.publicDomainUrl ?: "",
+                pageCount = item.pageCount,
+                serverHostUrl = server?.hostUrl ?: "",
+                serverApiKey = server?.apiKey ?: ""
             )
-            onOpenComic(sampleComic)
+            onOpenComic(comic)
         } else {
-            val sampleEBook = EBookData(
+            val eBook = EBookData(
                 id = item.id,
                 title = item.title,
                 author = item.authorOrArtist,
                 totalChapters = 0,
                 chapters = emptyList(),
-                publicDomainUrl = item.publicDomainUrl
+                downloadUrl = item.downloadUrl,
+                publicDomainUrl = item.publicDomainUrl ?: item.downloadUrl,
+                serverHostUrl = server?.hostUrl ?: "",
+                serverApiKey = server?.apiKey ?: ""
             )
-            onOpenEBook(sampleEBook)
+            onOpenEBook(eBook)
         }
     }
 

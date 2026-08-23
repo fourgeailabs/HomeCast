@@ -390,20 +390,36 @@ fun MainScreen(
                         onBack = { navController.popBackStack() },
                         onCreatorClick = { navController.navigate(Routes.CreatorDetail(it)) },
                         onPlayReadClick = {
-                            if (type == "BOOK") {
-                                // 1. Check if this is a personal/local e-book
+                            if (type == "BOOK" || type == "COMIC") {
                                 val localEBook = viewModel.allEBooks.value.firstOrNull { it.title.equals(title, ignoreCase = true) }
-                                if (localEBook != null && localEBook.serverId != "demo_server" && localEBook.serverId != "pd_server") {
+                                val server = localEBook?.let { ebook -> viewModel.servers.value.firstOrNull { it.id == ebook.serverId } }
+                                val isComic = type == "COMIC" || (localEBook?.isComic == true)
+
+                                if (isComic) {
+                                    activeComic = ComicData(
+                                        id = localEBook?.id ?: title.lowercase().replace(" ", "_"),
+                                        title = title,
+                                        series = title,
+                                        writer = creator,
+                                        coverUrl = localEBook?.coverUrl ?: "https://archive.org/services/img/${title.lowercase().replace(" ", "_")}",
+                                        downloadUrl = localEBook?.downloadUrl ?: "",
+                                        pageCount = localEBook?.totalPages ?: 0,
+                                        serverHostUrl = server?.hostUrl ?: "",
+                                        serverApiKey = server?.apiKey ?: ""
+                                    )
+                                } else if (localEBook != null && localEBook.serverId != "demo_server" && localEBook.serverId != "pd_server") {
                                     activeEBook = EBookData(
                                         id = localEBook.id,
                                         title = localEBook.title,
                                         author = localEBook.author,
                                         totalChapters = 0,
                                         chapters = emptyList(),
-                                        publicDomainUrl = "" // will trigger high-quality local/AI reading generation
+                                        downloadUrl = localEBook.downloadUrl,
+                                        publicDomainUrl = localEBook.downloadUrl,
+                                        serverHostUrl = server?.hostUrl ?: "",
+                                        serverApiKey = server?.apiKey ?: ""
                                     )
                                 } else {
-                                    // 2. Fall back to standard/public domain content
                                     val standardGutenbergUrls = mapOf(
                                         "The Time Machine" to "https://www.gutenberg.org/cache/epub/35/pg35.txt",
                                         "Frankenstein" to "https://www.gutenberg.org/cache/epub/84/pg84.txt",

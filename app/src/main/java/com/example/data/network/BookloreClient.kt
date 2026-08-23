@@ -161,6 +161,12 @@ object BookloreClient {
                                                 "$normalizedUrl/api/v1/media/book/${book.id}/cover$queryParam"
                                             }
                                             
+                                            val download = if (normalizedUrl.contains("komga") || endpoint.contains("komga")) {
+                                                "$normalizedUrl/api/v1/books/${book.id}/file"
+                                            } else {
+                                                "$normalizedUrl/api/v1/media/book/${book.id}/file$queryParam"
+                                            }
+                                            
                                             EBook(
                                                 id = book.id,
                                                 title = book.metadata?.title ?: book.title ?: book.name ?: "Unknown",
@@ -170,7 +176,8 @@ object BookloreClient {
                                                 genre = genreName,
                                                 description = book.metadata?.description ?: book.description ?: book.summary ?: "",
                                                 totalPages = book.metadata?.pageCount ?: book.totalPages ?: book.media?.pagesCount ?: 0,
-                                                isComic = book.isComic ?: (genreName == "Comic" || genreName == "Manga")
+                                                downloadUrl = download,
+                                                isComic = book.isComic ?: (genreName.contains("comic", true) || genreName.contains("manga", true))
                                             )
                                         }
                                         return@withContext Result.success(ebooks)
@@ -199,6 +206,12 @@ object BookloreClient {
                                                 "$normalizedUrl/api/v1/media/book/${book.id}/cover$queryParam"
                                             }
                                             
+                                            val download = if (normalizedUrl.contains("komga") || endpoint.contains("komga")) {
+                                                "$normalizedUrl/api/v1/books/${book.id}/file"
+                                            } else {
+                                                "$normalizedUrl/api/v1/media/book/${book.id}/file$queryParam"
+                                            }
+
                                             EBook(
                                                 id = book.id,
                                                 title = book.metadata?.title ?: book.title ?: book.name ?: "Unknown",
@@ -208,7 +221,8 @@ object BookloreClient {
                                                 genre = genreName,
                                                 description = book.metadata?.description ?: book.description ?: book.summary ?: "",
                                                 totalPages = book.metadata?.pageCount ?: book.totalPages ?: book.media?.pagesCount ?: 0,
-                                                isComic = book.isComic ?: (genreName == "Comic" || genreName == "Manga")
+                                                downloadUrl = download,
+                                                isComic = book.isComic ?: (genreName.contains("comic", true) || genreName.contains("manga", true))
                                             )
                                         }
                                         return@withContext Result.success(ebooks)

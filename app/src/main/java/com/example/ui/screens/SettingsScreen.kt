@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -14,14 +15,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -45,13 +50,61 @@ import com.example.ui.theme.SurfaceGlassBorder
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class SettingsSubMenu {
+    SERVERS,
+    PUBLIC_DOMAIN_SOURCES,
+    LOCAL_FOLDERS
+}
+
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
     onThemeToggle: (Boolean) -> Unit
 ) {
+    var currentSubMenu by remember { mutableStateOf<SettingsSubMenu?>(null) }
+
+    when (currentSubMenu) {
+        SettingsSubMenu.SERVERS -> {
+            BackHandler { currentSubMenu = null }
+            ServerConnectionsSubScreen(
+                viewModel = viewModel,
+                onBack = { currentSubMenu = null }
+            )
+        }
+        SettingsSubMenu.PUBLIC_DOMAIN_SOURCES -> {
+            BackHandler { currentSubMenu = null }
+            PublicDomainSourcesScreen(
+                viewModel = viewModel,
+                onBack = { currentSubMenu = null }
+            )
+        }
+        SettingsSubMenu.LOCAL_FOLDERS -> {
+            BackHandler { currentSubMenu = null }
+            LocalFoldersScreen(
+                viewModel = viewModel,
+                onBack = { currentSubMenu = null }
+            )
+        }
+        null -> {
+            MainSettingsMenu(
+                viewModel = viewModel,
+                onThemeToggle = onThemeToggle,
+                onNavigateToSubMenu = { currentSubMenu = it }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MainSettingsMenu(
+    viewModel: MainViewModel,
+    onThemeToggle: (Boolean) -> Unit,
+    onNavigateToSubMenu: (SettingsSubMenu) -> Unit
+) {
     val isDarkTheme = LocalThemeMode.current
     val servers by viewModel.servers.collectAsState()
+    val publicDomainSources by viewModel.publicDomainSources.collectAsState()
+    val localFolders by viewModel.localFolders.collectAsState()
     val serverOpState by viewModel.serverOpState.collectAsState()
     val hasSilentBackup by viewModel.hasSilentBackup.collectAsState()
     val context = LocalContext.current
@@ -131,6 +184,50 @@ fun SettingsScreen(
             }
         }
 
+        // Submenus Section
+        item {
+            Text("Media & Server Configuration", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+
+        item {
+            SettingsSubMenuEntryCard(
+                title = "Server Connections",
+                subtitle = "${servers.size} personal server(s) configured",
+                description = "Manage Audiobookshelf, Plex, Booklore, Komga, Kavita & Jellyfin connections",
+                icon = Icons.Default.Dns,
+                iconTint = AccentTeal,
+                onClick = { onNavigateToSubMenu(SettingsSubMenu.SERVERS) }
+            )
+        }
+
+        item {
+            SettingsSubMenuEntryCard(
+                title = "Public Domain Sources",
+                subtitle = "${publicDomainSources.count { it.isEnabled }} active catalog feed(s)",
+                description = "Add or change open-access sources with automated AI verification & URL repair",
+                icon = Icons.Default.Language,
+                iconTint = AccentIndigo,
+                onClick = { onNavigateToSubMenu(SettingsSubMenu.PUBLIC_DOMAIN_SOURCES) }
+            )
+        }
+
+        item {
+            SettingsSubMenuEntryCard(
+                title = "Local Device Folders",
+                subtitle = "${localFolders.size} storage directory(s) imported",
+                description = "Import Audiobooks, E-Books & Music from local storage with AI cover & bio enrichment",
+                icon = Icons.Default.FolderSpecial,
+                iconTint = Color(0xFFE6A23C),
+                onClick = { onNavigateToSubMenu(SettingsSubMenu.LOCAL_FOLDERS) }
+            )
+        }
+
+        // App Preferences
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Preferences", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+
         item {
             // Theme Setting
             Card(
@@ -138,6 +235,7 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(
                     containerColor = SurfaceGlass
                 ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -159,67 +257,15 @@ fun SettingsScreen(
             }
         }
 
-        // Active Connected Servers
-        if (servers.isNotEmpty()) {
-            item {
-                Text("Connected Servers", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            }
-            items(servers) { server ->
-                ServerItemCard(
-                    server = server,
-                    onSync = { viewModel.syncServer(server) },
-                    onDelete = { viewModel.removeServer(server.id) },
-                    isLoading = serverOpState is ServerOperationState.Loading
-                )
-            }
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Add New Server", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-
-        // Audiobookshelf Config Card
-        item {
-            AudiobookshelfConfigCard(
-                viewModel = viewModel,
-                isLoading = serverOpState is ServerOperationState.Loading,
-                serverOpState = serverOpState,
-                onConnect = { name, url, token, username, password ->
-                    viewModel.saveAndConnectAudiobookshelf(name, url, token, username, password)
-                }
-            )
-        }
-
-        // Plex Config Card
-        item {
-            PlexConfigCard(
-                viewModel = viewModel,
-                isLoading = serverOpState is ServerOperationState.Loading,
-                onConnect = { name, url, token ->
-                    viewModel.saveAndConnectPlexDirect(name, url, token)
-                }
-            )
-        }
-
-        // Booklore Config Card
-        item {
-            BookloreConfigCard(
-                isLoading = serverOpState is ServerOperationState.Loading,
-                onConnect = { name, url, username, password ->
-                    viewModel.saveAndConnectBooklore(name, url, username, password)
-                }
-            )
-        }
-
         // Backup & Restore settings card
         item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("Backup & Restore Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
+            Text("Backup & Restore Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -268,12 +314,13 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("AI Magic Optimizer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
+            Text("AI Magic Optimizer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -331,12 +378,13 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("About", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
+            Text("About", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -363,9 +411,10 @@ fun SettingsScreen(
                     Text("AI-Powered Features", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
+                        "✨ Public Domain Source Verifier\nInspects and fixes open-access media links using Gemini before adding.\n\n" +
+                        "✨ Local Media Scanner & Enricher\nRetrieves high-res cover art and author/artist biographies for offline storage files.\n\n" +
                         "✨ Dynamic Daily Menus & Themes\nRotates category bookshelves automatically at midnight to keep collections fresh daily.\n\n" +
-                        "✨ Intelligent Author Cleaning\nRefines messy catalog indexing (e.g. 'Wells, H.G. (1866-1946)') into clean human author names.\n\n" +
-                        "✨ Smart Cover Art Locator\nLeverages Gemini to identify and source missing cover art based on media titles.\n\n" +
+                        "✨ Intelligent Author Cleaning\nRefines messy catalog indexing into clean human author names.\n\n" +
                         "✨ AI Discovery Blends\nGenerate bespoke thematic playlists and discovery mixes in the Discovery tab.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -402,6 +451,164 @@ fun SettingsScreen(
 
     if (showWhatsNewDialog) {
         WhatsNewDialog(onDismiss = { showWhatsNewDialog = false })
+    }
+}
+
+@Composable
+fun SettingsSubMenuEntryCard(
+    title: String,
+    subtitle: String,
+    description: String,
+    icon: ImageVector,
+    iconTint: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(iconTint.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(subtitle, fontSize = 12.sp, color = iconTint, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 15.sp)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ServerConnectionsSubScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val servers by viewModel.servers.collectAsState()
+    val serverOpState by viewModel.serverOpState.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Server Connections", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("Manage Audiobookshelf, Plex, Booklore, Komga & Kavita", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
+            )
+        },
+        containerColor = Color.Transparent
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Active Connected Servers
+            if (servers.isNotEmpty()) {
+                item {
+                    Text("Configured Servers (${servers.size})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+                items(servers) { server ->
+                    ServerItemCard(
+                        server = server,
+                        onSync = { viewModel.syncServer(server) },
+                        onDelete = { viewModel.removeServer(server.id) },
+                        isLoading = serverOpState is ServerOperationState.Loading
+                    )
+                }
+            } else {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("No Personal Servers Added Yet", fontWeight = FontWeight.Medium)
+                            Text("Configure an Audiobookshelf, Plex, or Booklore server below.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Add New Server Connection", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Audiobookshelf Config Card
+            item {
+                AudiobookshelfConfigCard(
+                    viewModel = viewModel,
+                    isLoading = serverOpState is ServerOperationState.Loading,
+                    serverOpState = serverOpState,
+                    onConnect = { name, url, token, username, password ->
+                        viewModel.saveAndConnectAudiobookshelf(name, url, token, username, password)
+                    }
+                )
+            }
+
+            // Plex Config Card
+            item {
+                PlexConfigCard(
+                    viewModel = viewModel,
+                    isLoading = serverOpState is ServerOperationState.Loading,
+                    onConnect = { name, url, token ->
+                        viewModel.saveAndConnectPlexDirect(name, url, token)
+                    }
+                )
+            }
+
+            // Booklore Config Card
+            item {
+                BookloreConfigCard(
+                    isLoading = serverOpState is ServerOperationState.Loading,
+                    onConnect = { name, url, username, password ->
+                        viewModel.saveAndConnectBooklore(name, url, username, password)
+                    }
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
     }
 }
 
@@ -1655,6 +1862,27 @@ fun BookloreConfigCard(
 fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
+            UpdateNotice(
+                version = "4.7.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "Dedicated Server Connections Submenu: Organized all personal media servers (Audiobookshelf, Plex, Booklore, Komga, Kavita, Jellyfin) into a streamlined sub-screen with live diagnostics and quick connection setup.",
+                    "Public Domain Sources & AI Verification: Added a dedicated sub-menu to change, add, or customize public domain media repositories. Enter any website or catalog URL, and HomeCast's Gemini AI will inspect the endpoint, fix broken links/protocols, detect supported media types, and present a confirmation card before saving.",
+                    "Local Storage Folders Submenu: Easily select or input device folders for Audiobooks, E-Books/Comics, and Music. Files automatically import and appear in the Personal Library tab for each media type.",
+                    "AI Media Cover Art & Biography Enrichment: Gemini AI scans local media files to correct messy file tags, locate high-resolution cover art, and retrieve authentic literary/musical biographies."
+                )
+            ),
+            UpdateNotice(
+                version = "4.6.1",
+                date = "August 2026",
+                highlights = listOf(
+                    "Authentic Comic & Manga Page Engine: Fully replaced AI summaries in the comic reader with direct image streaming from Komga, Kavita, Archive.org, and CBZ/ZIP archives. Comics now load their actual original graphical pages.",
+                    "Direct E-Book Text Stream Reader: E-books now stream genuine unabridged text chapters from Booklore, Project Gutenberg, and EPUB files without AI summary fallbacks.",
+                    "Dark Mode Typography Polish: Upgraded all media titles, author names, and descriptions to ensure crisp contrast across both dark and light modes.",
+                    "Audiobooks Switcher UI Alignment: Replicated the polished segmented switcher buttons from Books and Music onto the Audiobooks screen.",
+                    "Clean Bookshelf Header: Simplified the e-book header to 'Bookshelf' for a clean, distraction-free reading experience."
+                )
+            ),
             UpdateNotice(
                 version = "4.6.0",
                 date = "August 2026",
