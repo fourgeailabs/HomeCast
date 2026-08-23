@@ -409,7 +409,7 @@ fun MainScreen(
                                         id = id,
                                         title = title,
                                         author = creator,
-                                        duration = 3600L,
+                                        duration = 0L,
                                         coverUrl = "https://archive.org/services/img/$id",
                                         serverId = "pd_server",
                                         streamUrl = "https://archive.org/download/$id/${id}_64kb.mp3"

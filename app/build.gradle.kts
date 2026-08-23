@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Base64
 
 plugins {
   alias(libs.plugins.android.application)
@@ -9,6 +10,18 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val keystoreFile = file("${rootDir}/debug.keystore")
+val base64File = file("${rootDir}/debug.keystore.base64")
+if (base64File.exists() && !keystoreFile.exists()) {
+    try {
+        val base64Text = base64File.readText().trim()
+        val decodedBytes = Base64.getDecoder().decode(base64Text)
+        keystoreFile.writeBytes(decodedBytes)
+    } catch (e: Exception) {
+        println("Failed to decode keystore: ${e.message}")
+    }
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,8 +30,8 @@ android {
     applicationId = "com.fourgeailabs.homecast"
     minSdk = 24
     targetSdk = 36
-    versionCode = 34
-    versionName = "4.3.1"
+    versionCode = 35
+    versionName = "4.3.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

@@ -1,11 +1,16 @@
 # HomeCast
 
-**Version:** 4.3.1
+**Version:** 4.3.2
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.3.1)
+## 🚀 Recent Updates (v4.3.2)
+- **Resolved Audiobook Duration Display**: Solved the pervasive 1-hour default duration display bug on public domain audiobook cards. Fallbacks are now set to `0L` (hiding the duration badge until resolved) and the reactive background metadata worker is throttled using a Coroutine Semaphore (`Semaphore(3)`). This prevents network flooding/rate-limiting and ensures actual audio durations are resolved successfully and displayed beautifully.
+- **Fixed Password Input Auto-Spacing**: Discovered that standard input fields without explicit password configurations trigger predictive text, causing mobile keyboards (like Gboard/SwiftKey) to automatically insert spaces when typing special characters (like `.`, `@`, `#`). Adding dedicated `KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrect = false)` to the Server Settings fields disables auto-spacing and predictive suggestions entirely.
+- **Embedded Keystore Restoration**: Resolved installation failures that occurred when users uninstalled previous app versions while choosing to "Keep app data" (which retains signature records). By configuring `app/build.gradle.kts` to dynamically decode and restore the identical, secure `debug.keystore` from `debug.keystore.base64` prior to compilation, we guarantee perfectly consistent signing certificates across all environments (browser builds, local development, and GitHub Actions CI/CD workflows).
+
+## 🚀 Previous Updates (v4.3.1)
 - **Dual Adaptive Icon Compatibility**: Introduced native adaptive icon layouts with distinct foreground configurations. Devices that prefer round/circular icons (like Google Pixel) load a mathematically perfect circular version of the gradient badge, preventing any forced letterboxing, cutting off of square corners, or double-outline stretching, while maintaining a classic squircle badge on square-preferring launchers.
 
 ## 🚀 Previous Updates (v4.3.0)

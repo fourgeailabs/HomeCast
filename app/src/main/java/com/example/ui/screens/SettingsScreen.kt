@@ -24,6 +24,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ServerConfig
@@ -524,6 +526,10 @@ fun AudiobookshelfConfigCard(
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        autoCorrect = false
+                    ),
                     trailingIcon = {
                         IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                             Icon(
@@ -1467,6 +1473,10 @@ fun BookloreConfigCard(
                 label = { Text("Password") },
                 singleLine = true,
                 visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    autoCorrect = false
+                ),
                 trailingIcon = {
                     val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                     IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {

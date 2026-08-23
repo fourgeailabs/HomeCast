@@ -77,7 +77,7 @@ fun LibraryScreen(
                 id = doc.identifier,
                 title = title,
                 author = author,
-                duration = resolvedDurations[doc.identifier] ?: 3600L,
+                duration = resolvedDurations[doc.identifier] ?: 0L,
                 coverUrl = coverUrl,
                 serverId = "pd_server",
                 streamUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_64kb.mp3", // best effort

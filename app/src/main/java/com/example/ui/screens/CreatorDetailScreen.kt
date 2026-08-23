@@ -112,7 +112,7 @@ fun CreatorDetailScreen(
                 id = doc.identifier,
                 title = doc.title ?: "Audiobook",
                 author = creatorName,
-                duration = resolvedDurations[doc.identifier] ?: 3600L,
+                duration = resolvedDurations[doc.identifier] ?: 0L,
                 coverUrl = "https://archive.org/services/img/${doc.identifier}",
                 serverId = "pd_server",
                 streamUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_64kb.mp3",

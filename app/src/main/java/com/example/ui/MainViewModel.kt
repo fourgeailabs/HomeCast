@@ -18,6 +18,8 @@ import com.example.data.network.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -92,17 +94,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Launch background resolution for audiobooks duration
             launch(Dispatchers.IO) {
                 try {
+                    val semaphore = Semaphore(3)
                     _publicDomainAudiobooks.collect { docs ->
                         if (docs.isNotEmpty()) {
                             kotlinx.coroutines.delay(2000)
                             docs.forEach { doc ->
                                 launch {
                                     try {
-                                        val files = ArchiveOrgClient.fetchFilesForIdentifier(doc.identifier)
-                                        val mp3Files = files.filter { it.name.endsWith(".mp3", ignoreCase = true) }
-                                        val totalLength = mp3Files.sumOf { it.length }
-                                        if (totalLength > 0) {
-                                            _resolvedDurations.value = _resolvedDurations.value + (doc.identifier to totalLength.toLong())
+                                        semaphore.withPermit {
+                                            val files = ArchiveOrgClient.fetchFilesForIdentifier(doc.identifier)
+                                            val mp3Files = files.filter { it.name.endsWith(".mp3", ignoreCase = true) }
+                                            val totalLength = mp3Files.sumOf { it.length }
+                                            if (totalLength > 0) {
+                                                _resolvedDurations.value = _resolvedDurations.value + (doc.identifier to totalLength.toLong())
+                                            }
                                         }
                                     } catch (e: Exception) {
                                         // ignore
