@@ -3,8 +3,12 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -49,7 +53,21 @@ fun SettingsScreen(
     val isDarkTheme = LocalThemeMode.current
     val servers by viewModel.servers.collectAsState()
     val serverOpState by viewModel.serverOpState.collectAsState()
+    val hasSilentBackup by viewModel.hasSilentBackup.collectAsState()
     val context = LocalContext.current
+    var showWhatsNewDialog by remember { mutableStateOf(false) }
+
+    val exportBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let { viewModel.exportBackup(context, it) }
+    }
+
+    val importBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.importBackup(context, it) }
+    }
 
     LaunchedEffect(serverOpState) {
         when (serverOpState) {
@@ -73,6 +91,44 @@ fun SettingsScreen(
     ) {
         item {
             Text("Settings & Connections", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        }
+
+        if (servers.isEmpty() && hasSilentBackup) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Found Automatic Settings Backup!",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "We detected a settings backup in your public Downloads folder. Tap below to automatically restore all your server configurations, passwords, and preferences in 1-click.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { viewModel.restoreFromSilentBackup() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                contentColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) {
+                            Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Restore Settings Now")
+                        }
+                    }
+                }
+            }
         }
 
         item {
@@ -156,6 +212,61 @@ fun SettingsScreen(
             )
         }
 
+        // Backup & Restore settings card
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Backup & Restore Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Preserve Your Settings Offline",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Export all your server connections, logins, API tokens, and preferences to a secure local file. If you reinstall or update the app, simply import this file to restore everything instantly.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { exportBackupLauncher.launch("homecast_backup.json") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                        ) {
+                            Icon(Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Export", fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                        ) {
+                            Icon(Icons.Default.RestorePage, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Import", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Spacer(modifier = Modifier.height(24.dp))
             Text("AI Magic Optimizer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -229,11 +340,24 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Booklore", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    Text("HomeCast", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                     Text("Version ${com.example.BuildConfig.VERSION_NAME}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Made by FourgeAI LABS", fontSize = 14.sp)
-                    Text("© 2026", fontSize = 14.sp)
+                    
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Created by ", fontSize = 14.sp)
+                        Text(
+                            text = "FourgeAI LABS",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentIndigo,
+                            modifier = Modifier.clickable {
+                                uriHandler.openUri("https://github.com/fourgeailabs")
+                            }
+                        )
+                    }
+                    Text("© 2026", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text("AI-Powered Features", fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -248,9 +372,21 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    Button(
+                        onClick = { showWhatsNewDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                    ) {
+                        Icon(Icons.Default.NewReleases, contentDescription = "What's New")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("What's New in this Update")
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedButton(
-                        onClick = { uriHandler.openUri("https://github.com/booklore-app/booklore") },
+                        onClick = { uriHandler.openUri("https://github.com/fourgeailabs/HomeCast") },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -262,6 +398,10 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(48.dp))
         }
+    }
+
+    if (showWhatsNewDialog) {
+        WhatsNewDialog(onDismiss = { showWhatsNewDialog = false })
     }
 }
 
@@ -1510,3 +1650,170 @@ fun BookloreConfigCard(
         }
     }
 }
+
+@Composable
+fun WhatsNewDialog(onDismiss: () -> Unit) {
+    val updates = remember {
+        listOf(
+            UpdateNotice(
+                version = "4.5.2",
+                date = "August 2026",
+                highlights = listOf(
+                    "Signature Bypass Settings Migration (Dual-Path): Solved the Android package installation/signature collision issue completely! If you are migrating from a previous GitHub version or are forced to do a clean uninstall/reinstall due to conflicting debug keystores, HomeCast now supports an absolute, signature-free, storage-independent backup mechanism.",
+                    "Offline Storage Access Framework (SAF) Export/Import: Users can now click 'Export Backup' inside the settings menu to save their encrypted server configs, passwords, and playback state into a portable .json backup file anywhere (local downloads, Google Drive, SD card). Selecting 'Import Backup' restores everything instantly in 1-click.",
+                    "Automatic Auto-Backup Detection: On any modification, connection profiles are auto-saved to public Downloads (/sdcard/Download/homecast_backup.json). On fresh reinstalls, if the database is unconfigured, Settings presents a prominent 1-click prompt to auto-restore all connections immediately."
+                )
+            ),
+            UpdateNotice(
+                version = "4.5.1",
+                date = "August 2026",
+                highlights = listOf(
+                    "Automatic Settings Preservation & Cloud Backup: Explicitly configured native Android Auto Backup and modern Cloud Data Extraction rules (backup_rules.xml and data_extraction_rules.xml). This guarantees that all configuration files and Room SQLite database assets are preserved during updates, reinstalls, or device-to-device transfers.",
+                    "Fragile Data Retention Support: Fully integrated android:hasFragileUserData=\"true\", ensuring that if a user manually uninstalls the app on modern Android versions, they are offered an OS-level checkbox to seamlessly preserve their settings, configurations, and reading history for subsequent reinstalls."
+                )
+            ),
+            UpdateNotice(
+                version = "4.5.0",
+                date = "August 2026",
+                highlights = listOf(
+                    "Unified Mini-Player and Custom Stop Controls: Added a direct 'Stop' button to the sliding player controls. This halts ExoPlayer playback, collapses the player screen, and dismisses the mini-player completely. The mini-player now incorporates a sleek, non-interactive visual seek bar overlay that utilizes theme-matching gradients to reflect real-time playback progress.",
+                    "Dynamic Startup Navigation & Tab Presets: On launch, HomeCast loads the exact media section (Library, Music, or Ebooks) and initializes the view's data source filter according to the media's origin.",
+                    "Premium Adaptive Icon Compatibility: Re-architected launcher icon vector drawables to move the multi-stop gradient (Cyan to Magenta) into a full-bleed background layer.",
+                    "AI-Powered Personal Server Categorization: Expanded the Gemini-backed automated dynamic categorization and curation engines to process personal server files, organizing them into gorgeous dynamic shelves alongside public domain media.",
+                    "Keyboard Password Input Auto-Spacing Fix: Integrated dedicated KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrect = false) to prevent mobile keyboards (like Gboard) from inserting automatic spaces when typing special characters.",
+                    "Enhanced E-Book Loading Resilience: Resolved text parsing and file loading crashes across Project Gutenberg collections, ensuring stable page rendering.",
+                    "Seamless Update Integration: Incremented build configuration to versionCode 37 and versionName \"4.5.0\" to eliminate installer conflicts."
+                )
+            ),
+            UpdateNotice(
+                version = "4.3.2",
+                date = "July 2026",
+                highlights = listOf(
+                    "Resolved Audiobook Duration Display: Solved the pervasive 1-hour default duration display bug on public domain audiobook cards. Fallbacks are now set to 0L and background worker is throttled.",
+                    "Fixed Password Input Auto-Spacing: Added dedicated KeyboardOptions to Server Settings fields to disable auto-spacing entirely.",
+                    "Embedded Keystore Restoration: Configured dynamically restored debug.keystore to guarantee identical signing certificates across all build environments."
+                )
+            ),
+            UpdateNotice(
+                version = "4.3.0",
+                date = "July 2026",
+                highlights = listOf(
+                    "Clickable Creator Bio Detail Navigation: Transition the user directly to the Google Gemini-powered Creator Detail screen on clicking author names.",
+                    "Dynamic Public Domain Library Matching: Cross-reference personal files with public domain records for matching shelves in bios.",
+                    "On-Demand Full Music Album Resolution: Fetch and load entire tracklists from Archive.org files API.",
+                    "Reactive Background Audiobook Durations: Background worker queries Archive.org files and updates duration badges in real-time."
+                )
+            )
+        )
+    }
+
+    var expandedIndex by remember { mutableStateOf<Int?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.NewReleases,
+                    contentDescription = null,
+                    tint = AccentIndigo,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("What's New in HomeCast", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Explore recent updates and features added to your app by FourgeAI LABS.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                updates.forEachIndexed { index, update ->
+                    val isExpanded = expandedIndex == index
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isExpanded) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else SurfaceGlass
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                expandedIndex = if (isExpanded) null else index
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        "Version ${update.version}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = if (isExpanded) AccentIndigo else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        update.date,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                    tint = if (isExpanded) AccentIndigo else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            AnimatedVisibility(visible = isExpanded) {
+                                Column {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    update.highlights.forEach { highlight ->
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 4.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text("• ", fontWeight = FontWeight.Bold, color = AccentIndigo)
+                                            Text(
+                                                text = highlight,
+                                                fontSize = 13.sp,
+                                                lineHeight = 18.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+            ) {
+                Text("Awesome")
+            }
+        }
+    )
+}
+
+data class UpdateNotice(
+    val version: String,
+    val date: String,
+    val highlights: List<String>
+)

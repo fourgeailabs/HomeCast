@@ -1,11 +1,18 @@
 # HomeCast
 
-**Version:** 4.5.1
+**Version:** 4.5.2
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.5.1)
+## 🚀 Recent Updates (v4.5.2)
+- **Signature Bypass Settings Migration (Dual-Path)**: Solved the Android package installation/signature collision issue completely! If you are migrating from a previous GitHub version or are forced to do a clean uninstall/reinstall due to conflicting debug keystores, HomeCast now supports an absolute, signature-free, storage-independent backup mechanism.
+- **Offline Storage Access Framework (SAF) Export/Import**: Users can now click "Export Backup" inside the settings menu to save their encrypted server configs, passwords, and playback state into a portable `.json` backup file anywhere (local downloads, Google Drive, SD card). Selecting "Import Backup" restores everything instantly in 1-click.
+- **Automatic Auto-Backup Detection**: On any modification, connection profiles are auto-saved to public Downloads (/sdcard/Download/homecast_backup.json). On fresh reinstalls, if the database is unconfigured, Settings presents a prominent 1-click prompt to auto-restore all connections immediately.
+- **Interactive "What's New" Accordion Log**: Added a premium "What's New" dialog available directly from the settings menu. All release notes and updates starting from v4.3.0 up to the current release (v4.5.2) are loaded into a self-collapsing dropdown accordion list. The dropdown items start fully closed, and clicking on any update automatically closes the previously opened one to maintain clean visual structure.
+- **Official Creator Branding & Repository Links**: Enhanced the "About" section in Settings to display the official publisher branding: **Created by FourgeAI LABS**. Clicking on the publisher name automatically links directly to the global publisher GitHub organization profile (`https://github.com/fourgeailabs`), alongside a brand-new official button linking directly to the HomeCast repository (`https://github.com/fourgeailabs/HomeCast`).
+
+## 🚀 Previous Updates (v4.5.1)
 - **Automatic Settings Preservation & Cloud Backup**: Explicitly configured native Android Auto Backup and modern Cloud Data Extraction rules (`backup_rules.xml` and `data_extraction_rules.xml`). This guarantees that all configuration files (including EncryptedSharedPreferences for servers and general playback preferences) and Room SQLite database assets are preserved during updates, reinstalls, or device-to-device transfers.
 - **Fragile Data Retention Support**: Fully integrated `android:hasFragileUserData="true"`, ensuring that if a user manually uninstalls the app on modern Android versions, they are offered an OS-level checkbox to seamlessly preserve their settings, configurations, and reading history for subsequent reinstalls.
 

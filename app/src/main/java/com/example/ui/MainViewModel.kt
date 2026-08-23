@@ -34,6 +34,10 @@ sealed class ServerOperationState {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val secureConfigManager = SecureConfigManager(application)
+    val backupManager = com.example.data.SettingsBackupManager(application)
+    private val _hasSilentBackup = MutableStateFlow(backupManager.hasSilentBackup())
+    val hasSilentBackup = _hasSilentBackup.asStateFlow()
+
     val repository = LibraryRepository(database.libraryDao(), secureConfigManager)
     val playbackManager = PlaybackManager(application)
 
@@ -315,6 +319,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             // Automatically clean authors/genres and locate beautiful cover-art URLs immediately!
             performDailyDynamicMenuAndCategoryCleanup()
+        }
+
+        viewModelScope.launch {
+            servers.collect { serverList ->
+                if (serverList.isNotEmpty()) {
+                    backupManager.saveSilentBackup(serverList)
+                    _hasSilentBackup.value = backupManager.hasSilentBackup()
+                }
+            }
         }
     }
 
@@ -1175,6 +1188,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetServerOpState() {
         _serverOpState.value = ServerOperationState.Idle
+    }
+
+    // --- Backup & Restore Controls ---
+    fun exportBackup(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _serverOpState.value = ServerOperationState.Loading
+            val success = backupManager.exportToUri(uri, servers.value)
+            _hasSilentBackup.value = backupManager.hasSilentBackup()
+            if (success) {
+                _serverOpState.value = ServerOperationState.Success("Settings exported successfully!")
+            } else {
+                _serverOpState.value = ServerOperationState.Error("Failed to export settings.")
+            }
+        }
+    }
+
+    fun importBackup(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _serverOpState.value = ServerOperationState.Loading
+            val success = backupManager.importFromUri(uri, secureConfigManager)
+            _hasSilentBackup.value = backupManager.hasSilentBackup()
+            if (success) {
+                _serverOpState.value = ServerOperationState.Success("Settings imported successfully! Syncing...")
+                servers.value.forEach { server ->
+                    syncServer(server)
+                }
+            } else {
+                _serverOpState.value = ServerOperationState.Error("Failed to import settings backup.")
+            }
+        }
+    }
+
+    fun restoreFromSilentBackup() {
+        viewModelScope.launch {
+            _serverOpState.value = ServerOperationState.Loading
+            val success = backupManager.loadSilentBackup(secureConfigManager)
+            _hasSilentBackup.value = backupManager.hasSilentBackup()
+            if (success) {
+                _serverOpState.value = ServerOperationState.Success("Auto-backup restored successfully! Syncing...")
+                servers.value.forEach { server ->
+                    syncServer(server)
+                }
+            } else {
+                _serverOpState.value = ServerOperationState.Error("No auto-backup could be restored.")
+            }
+        }
     }
 
     // --- Playback Controls ---
