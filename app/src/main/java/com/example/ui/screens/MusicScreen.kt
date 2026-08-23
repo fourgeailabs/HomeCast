@@ -81,25 +81,55 @@ fun MusicScreen(
     var selectedTab by remember { mutableStateOf(MusicNavTab.SHELVES) }
     var selectedSource by remember { mutableIntStateOf(0) } // 0 = Personal, 1 = Public Domain
 
-    val publicDomainMusic = remember {
-        listOf(
+    val archiveMusic by viewModel.publicDomainMusic.collectAsState()
+
+    val publicDomainMusic = remember(archiveMusic) {
+        archiveMusic.map { doc ->
+            val coverUrl = "https://archive.org/services/img/${doc.identifier}"
+            val title = doc.title ?: "Unknown Track"
+            val artist = when (doc.creator) {
+                is List<*> -> (doc.creator as List<*>).firstOrNull()?.toString() ?: "Various Artists"
+                is String -> doc.creator
+                else -> "Various Artists"
+            }
+            val desc = when (doc.description) {
+                is List<*> -> doc.description.firstOrNull()?.toString() ?: ""
+                is String -> doc.description
+                else -> ""
+            }.lowercase()
+
+            val assignedGenre = when {
+                desc.contains("jazz") || desc.contains("blues") || artist.lowercase().contains("jazz") -> "Jazz & Blues"
+                desc.contains("classical") || desc.contains("piano") || desc.contains("orchestra") || artist.lowercase().contains("classical") -> "Classical & Soundtracks"
+                desc.contains("electronic") || desc.contains("ambient") || desc.contains("synth") -> "Electronic & Dance"
+                desc.contains("rock") || desc.contains("metal") || desc.contains("guitar") -> "Rock & Alternative"
+                desc.contains("hip hop") || desc.contains("rap") || desc.contains("r&b") -> "Hip Hop & R&B"
+                else -> "Jazz & Blues" // Fallback to fit nicely
+            }
+
             MusicTrack(
-                id = "pd_track_1",
-                title = "Acoustic Chill",
-                artist = "Various Artists",
-                album = "Public Domain Sounds",
-                duration = 2700000L,
-                coverUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
+                id = doc.identifier,
+                title = title,
+                artist = artist,
+                album = "Archive.org Classics",
+                coverUrl = coverUrl.takeIf { doc.identifier.isNotBlank() } ?: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
+                duration = 180000L,
                 serverId = "pd_server",
-                streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3",
-                trackNumber = 1,
-                genre = "Acoustic"
+                streamUrl = "", // Dynamically resolved on play click!
+                genre = assignedGenre,
+                trackNumber = 1
             )
-        )
+        }
     }
 
-    val currentMusic = remember(allMusic, selectedSource) {
-        if (selectedSource == 0) allMusic else publicDomainMusic
+    val currentMusic = remember(allMusic, publicDomainMusic, selectedSource) {
+        if (selectedSource == 0) {
+            allMusic.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+        } else {
+            val localPD = allMusic.filter { it.serverId == "demo_server" || it.serverId == "pd_server" }
+            val fetched = publicDomainMusic.filter { f -> localPD.none { l -> l.title.equals(f.title, ignoreCase = true) } }
+            localPD + fetched
+        }
     }
 
     // Navigation Stack for File Structure Drilldown
@@ -398,13 +428,13 @@ fun MusicScreen(
                 currentTrackId = playbackState.currentMusicTrack?.id,
                 onBack = { selectedAlbum = null },
                 onTrackSelected = { track ->
-                    viewModel.playbackManager.playMusicTrack(track)
+                    viewModel.playMusicTrackWithResolution(track)
                     onTrackClick(track)
                 },
                 onPlayAll = {
                     val first = selectedAlbum!!.tracks.firstOrNull()
                     if (first != null) {
-                        viewModel.playbackManager.playMusicTrack(first)
+                        viewModel.playMusicTrackWithResolution(first)
                         onTrackClick(first)
                     }
                 }
@@ -419,7 +449,7 @@ fun MusicScreen(
                 onBack = { selectedArtist = null },
                 onAlbumClick = { album -> selectedAlbum = album },
                 onTrackClick = { track ->
-                    viewModel.playbackManager.playMusicTrack(track)
+                    viewModel.playMusicTrackWithResolution(track)
                     onTrackClick(track)
                 }
             )
@@ -481,7 +511,7 @@ fun MusicScreen(
                         track = track,
                         isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
                         onClick = {
-                            viewModel.playbackManager.playMusicTrack(track)
+                            viewModel.playMusicTrackWithResolution(track)
                             onTrackClick(track)
                         }
                     )
@@ -543,14 +573,14 @@ fun MusicScreen(
         when (selectedTab) {
             MusicNavTab.SHELVES -> {
                 MusicShelvesView(
-                    allTracks = allMusic,
+                    allTracks = currentMusic,
                     recentTracks = recentMusic,
                     albumGroups = albumGroups,
                     artistGroups = artistGroups,
                     playbackState = playbackState,
                     onAlbumClick = { selectedAlbum = it },
                     onTrackClick = { track ->
-                        viewModel.playbackManager.playMusicTrack(track)
+                        viewModel.playMusicTrackWithResolution(track)
                         onTrackClick(track)
                     }
                 )
@@ -582,12 +612,12 @@ fun MusicScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(allMusic, key = { it.id }) { track ->
+                    items(currentMusic, key = { it.id }) { track ->
                         MusicTrackRowItem(
                             track = track,
                             isPlaying = playbackState.currentMusicTrack?.id == track.id && playbackState.isPlaying,
                             onClick = {
-                                viewModel.playbackManager.playMusicTrack(track)
+                                viewModel.playMusicTrackWithResolution(track)
                                 onTrackClick(track)
                             }
                         )

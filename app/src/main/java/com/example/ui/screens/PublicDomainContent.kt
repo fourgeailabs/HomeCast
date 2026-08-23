@@ -14,9 +14,35 @@ object PublicDomainContentFetcher {
         try {
             if (url.isBlank()) return@withContext emptyList()
             
+            var fullText: String? = null
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
-            val fullText = response.body?.string() ?: return@withContext emptyList()
+            if (response.isSuccessful) {
+                fullText = response.body?.string()
+            }
+            
+            // Auto fallback for Archive.org text format variations
+            if (fullText == null && url.contains("_djvu.txt")) {
+                val fallbackUrl = url.replace("_djvu.txt", ".txt")
+                val fallbackReq = Request.Builder().url(fallbackUrl).build()
+                val fallbackResp = client.newCall(fallbackReq).execute()
+                if (fallbackResp.isSuccessful) {
+                    fullText = fallbackResp.body?.string()
+                }
+            }
+
+            if (fullText == null && url.contains(".txt")) {
+                val fallbackUrl = url.replace(".txt", "_djvu.txt")
+                val fallbackReq = Request.Builder().url(fallbackUrl).build()
+                val fallbackResp = client.newCall(fallbackReq).execute()
+                if (fallbackResp.isSuccessful) {
+                    fullText = fallbackResp.body?.string()
+                }
+            }
+
+            if (fullText.isNullOrBlank()) {
+                return@withContext emptyList()
+            }
             
             // Simple logic: split into chapters by "CHAPTER" or just chunk it
             val chunks = fullText.split("CHAPTER").filter { it.isNotBlank() }

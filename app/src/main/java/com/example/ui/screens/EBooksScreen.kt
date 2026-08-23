@@ -175,9 +175,9 @@ fun EBooksScreen(
     val allEBooks by viewModel.allEBooks.collectAsState()
     val archiveBooks by viewModel.publicDomainBooks.collectAsState()
     
-    val currentBookshelfItems = remember(allEBooks, selectedSource) {
+    val currentBookshelfItems = remember(allEBooks, archiveBooks, selectedSource) {
         if (selectedSource == 0) {
-            allEBooks.map { ebook ->
+            allEBooks.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }.map { ebook ->
                 BookshelfItem(
                     id = ebook.id,
                     title = ebook.title,
@@ -191,7 +191,20 @@ fun EBooksScreen(
                 )
             }
         } else {
-            archiveBooks.map { doc ->
+            val localPD = allEBooks.filter { it.serverId == "demo_server" || it.serverId == "pd_server" }.map { ebook ->
+                BookshelfItem(
+                    id = ebook.id,
+                    title = ebook.title,
+                    authorOrArtist = ebook.author,
+                    coverUrl = ebook.coverUrl,
+                    genre = ebook.genre,
+                    isComic = ebook.isComic,
+                    progressPercent = ebook.progressPercent,
+                    pageCount = ebook.totalPages,
+                    description = ebook.description
+                )
+            }
+            val fetched = archiveBooks.map { doc ->
                 val coverUrl = "https://archive.org/services/img/${doc.identifier}"
                 val title = doc.title ?: "Unknown Title"
                 val author = when (doc.creator) {
@@ -213,7 +226,8 @@ fun EBooksScreen(
                     genre = "Classic",
                     description = desc
                 )
-            }
+            }.filter { f -> localPD.none { l -> l.title.equals(f.title, ignoreCase = true) } }
+            localPD + fetched
         }
     }
 

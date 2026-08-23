@@ -1,15 +1,22 @@
 # HomeCast
 
-**Version:** 4.1.1
+**Version:** 4.2.1
 **Description:** A premium, all-in-one local network audiobook, e-book, and music media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v4.1.1)
-- **Universal Public Domain Access**: Decoupled public domain audiobook and music tabs from personal server connection empty states. Users can now immediately explore and play classic public domain audiobooks and ambient tracks without needing to connect an Audiobookshelf or Plex server first.
-- **Contextual Empty-State Cards**: Redesigned empty-state card components to dynamically adapt to the selected source, showing network guidance for public domain archives and connection prompts for personal servers.
+## 🚀 Recent Updates (v4.2.1)
+- **Resolved Audiobook Playback & Stream Resolution**: Solved the issue where public domain audiobooks and music tracks failed to play. The app now queries the Archive.org files metadata API in real-time, dynamically resolving actual `.mp3` and `.txt` file paths rather than relying on standard filename assumptions.
+- **Fixed Audiobook Duration Calculations**: Corrected the duration scaling bug by normalizing data units. Seeded audiobooks and dynamic metadata items are now consistently declared in seconds, allowing the media player's formatting engine to calculate and display exact durations perfectly (fixing the 1,000+ hour display bug).
+- **Expanded Public Domain Collections & Shelves**: Dramatically enriched the public domain discovery experience. By fetching multiple popular Archive.org collections in parallel (such as 78rpm Golden Era recordings, netlabels electronic/ambient, live concert archives, LibriVox, Gutenberg texts, and Smithsonian catalogs) and automatically mapping them into distinct, beautifully structured genre shelves, the app now provides endless hours of free media.
+- **Unified Media Detail Action Pipeline**: Connected the contextual "Read" and "Play" buttons on the Media Detail screen. Clicking these buttons now correctly launches the native E-Reader or sliding ambient music/audiobook player with resolved streaming files directly from any view.
+- **Intelligent OCR Fallback E-Reader**: Implemented automatic fallback routing within the custom E-Reader. If a book's primary OCR file (`_djvu.txt`) is missing on Archive.org, the fetcher automatically recovers by requesting the clean `.txt` variation, completely preventing empty page loads.
 
-### 🚀 Previous Updates (v4.1.0)
+### 🚀 Previous Updates (v4.1.2)
+- **Source-Level Library Separation**: Segregated public domain classics from the "Personal Library" section. The local pre-seeded/downloaded public domain files (like *The Time Machine* or *Dracula*) now appear correctly within the **Public Domain** section alongside fetched online items, keeping the **Personal** section completely clean for the user's synced Audiobookshelf or Plex servers.
+
+### 🚀 Previous Updates (v4.1.1)
+- **Universal Public Domain Access**: Decoupled public domain audiobook and music tabs from personal server connection empty states. Users can now immediately explore and play classic public domain audiobooks and ambient tracks without needing to connect an Audiobookshelf or Plex server first.
 - **First-Launch Library Auto-Seeding**: Solves empty state issues by preloading highly realistic, slightly messy catalog entities on the very first startup (including classic books, popular audiobooks, and synthwave music tracks). This allows users to experience the AI-powered organizers and cover art locators immediately upon installation.
 - **Dynamic Adaptive Genres**: Rewrote music and eBook category lists to be extracted reactively from active database records. When Google Gemini optimizes categories or genres, tabs and shelves update instantly in real-time.
 - **Frosted Glass Borders & Outlines**: Enhanced the glassmorphic aesthetics by extending `SurfaceGlassBorder` highlights to the persistent mini-player, music album covers, song list rows, and track shelf cards.

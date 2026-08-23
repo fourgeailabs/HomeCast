@@ -76,7 +76,7 @@ fun LibraryScreen(
                 id = doc.identifier,
                 title = title,
                 author = author,
-                duration = 3600000L,
+                duration = 3600L,
                 coverUrl = coverUrl,
                 serverId = "pd_server",
                 streamUrl = "https://archive.org/download/${doc.identifier}/${doc.identifier}_64kb.mp3", // best effort
@@ -88,7 +88,13 @@ fun LibraryScreen(
 
 
     val currentBooks = remember(allBooks, publicDomainAudiobooks, selectedSource) {
-        if (selectedSource == 0) allBooks else publicDomainAudiobooks
+        if (selectedSource == 0) {
+            allBooks.filter { it.serverId != "demo_server" && it.serverId != "pd_server" }
+        } else {
+            val localPD = allBooks.filter { it.serverId == "demo_server" || it.serverId == "pd_server" }
+            val fetched = publicDomainAudiobooks.filter { f -> localPD.none { l -> l.title.equals(f.title, ignoreCase = true) } }
+            localPD + fetched
+        }
     }
 
     val genreList = remember(currentBooks) {
@@ -260,7 +266,7 @@ fun LibraryScreen(
                             book = book,
                             isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
                             onClick = {
-                                viewModel.playAudiobook(book)
+                                viewModel.playAudiobookWithResolution(book)
                                 onBookClick(book)
                             }
                         )
@@ -298,7 +304,7 @@ fun LibraryScreen(
                             book = book,
                             isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
                             onClick = {
-                                viewModel.playAudiobook(book)
+                                viewModel.playAudiobookWithResolution(book)
                                 onBookClick(book)
                             }
                         )
@@ -396,7 +402,7 @@ fun LibraryScreen(
                                 showProgress = true,
                                 isPlaying = playbackState.currentAudiobook?.id == book.id && playbackState.isPlaying,
                                 onClick = {
-                                    viewModel.playAudiobook(book)
+                                    viewModel.playAudiobookWithResolution(book)
                                     onBookClick(book)
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
@@ -426,7 +432,7 @@ fun LibraryScreen(
                                 book = book,
                                 tag = "New",
                                 onClick = {
-                                    viewModel.playAudiobook(book)
+                                    viewModel.playAudiobookWithResolution(book)
                                     onBookClick(book)
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
@@ -455,7 +461,7 @@ fun LibraryScreen(
                                 book = book,
                                 tag = "Popular",
                                 onClick = {
-                                    viewModel.playAudiobook(book)
+                                    viewModel.playAudiobookWithResolution(book)
                                     onBookClick(book)
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
@@ -483,7 +489,7 @@ fun LibraryScreen(
                             AudiobookShelfCard(
                                 book = book,
                                 onClick = {
-                                    viewModel.playAudiobook(book)
+                                    viewModel.playAudiobookWithResolution(book)
                                     onBookClick(book)
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
@@ -512,7 +518,7 @@ fun LibraryScreen(
                                 book = book,
                                 tag = book.seriesName.take(16),
                                 onClick = {
-                                    viewModel.playAudiobook(book)
+                                    viewModel.playAudiobookWithResolution(book)
                                     onBookClick(book)
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
@@ -540,7 +546,7 @@ fun LibraryScreen(
                             AudiobookShelfCard(
                                 book = book,
                                 onClick = {
-                                    viewModel.playAudiobook(book)
+                                    viewModel.playAudiobookWithResolution(book)
                                     onBookClick(book)
                                 },
                                 onFavoriteToggle = { viewModel.toggleFavorite(book) }
@@ -567,7 +573,7 @@ fun LibraryScreen(
                         AudiobookShelfCard(
                             book = book,
                             onClick = {
-                                viewModel.playAudiobook(book)
+                                viewModel.playAudiobookWithResolution(book)
                                 onBookClick(book)
                             },
                             onFavoriteToggle = { viewModel.toggleFavorite(book) }

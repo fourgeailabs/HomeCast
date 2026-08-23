@@ -56,6 +56,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _publicDomainAudiobooks = MutableStateFlow<List<ArchiveDoc>>(emptyList())
     val publicDomainAudiobooks = _publicDomainAudiobooks.asStateFlow()
 
+    private val _publicDomainMusic = MutableStateFlow<List<ArchiveDoc>>(emptyList())
+    val publicDomainMusic = _publicDomainMusic.asStateFlow()
+
     private val _isCleaningUp = MutableStateFlow(false)
     val isCleaningUp = _isCleaningUp.asStateFlow()
 
@@ -64,8 +67,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            _publicDomainBooks.value = ArchiveOrgClient.fetchPublicDomain("gutenberg")
-            _publicDomainAudiobooks.value = ArchiveOrgClient.fetchPublicDomain("librivoxaudio")
+            // Fetch multiple varied collections for E-Books, Audiobooks, and Music!
+            val booksList = mutableListOf<ArchiveDoc>()
+            booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(gutenberg)"))
+            booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(smithsonian) AND mediatype:(texts)"))
+            booksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(opened_publications) AND mediatype:(texts)"))
+            _publicDomainBooks.value = booksList.distinctBy { it.identifier }
+
+            val audiobooksList = mutableListOf<ArchiveDoc>()
+            audiobooksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(librivoxaudio)"))
+            audiobooksList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(audio_bookspoetry)"))
+            _publicDomainAudiobooks.value = audiobooksList.distinctBy { it.identifier }
+
+            val musicList = mutableListOf<ArchiveDoc>()
+            musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(78rpm) AND (subject:(jazz) OR subject:(blues) OR subject:(classic))"))
+            musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(etree) AND (subject:(concert) OR subject:(acoustic) OR subject:(live))"))
+            musicList.addAll(ArchiveOrgClient.fetchPublicDomain("collection:(netlabels) AND (subject:(electronic) OR subject:(ambient) OR subject:(synth))"))
+            _publicDomainMusic.value = musicList.distinctBy { it.identifier }
         }
         viewModelScope.launch {
             kotlinx.coroutines.delay(1000)
@@ -141,7 +159,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         title = "The Adventures of Sherlock Holmes",
                         author = "Doyle, Arthur Conan, Sir, 1859-1930",
                         coverUrl = "placeholder",
-                        duration = 3600000L,
+                        duration = 3600L, // Corrected duration in seconds
                         serverId = "demo_server",
                         genre = "/bonevolume7ghost0000smit_r6d2",
                         narrator = "LibriVox Narrator",
@@ -152,7 +170,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         title = "Dracula",
                         author = "Stoker, Bram, 1847-1912",
                         coverUrl = "placeholder",
-                        duration = 5400000L,
+                        duration = 5400L, // Corrected duration in seconds
                         serverId = "demo_server",
                         genre = "Various",
                         narrator = "LibriVox Narrator",
@@ -1053,10 +1071,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun playAudiobookWithResolution(book: Audiobook, playlist: List<Audiobook>? = null) {
+        viewModelScope.launch {
+            var finalUrl = book.streamUrl
+            if (book.serverId == "pd_server" && (finalUrl.isBlank() || finalUrl.contains("_64kb.mp3"))) {
+                val resolved = resolveArchiveOrgStreamUrl(book.id, ".mp3")
+                if (resolved.isNotBlank()) {
+                    finalUrl = resolved
+                }
+            }
+            val resolvedBook = book.copy(streamUrl = finalUrl)
+            val resolvedPlaylist = playlist?.map { b ->
+                if (b.id == book.id) resolvedBook else b
+            }
+            playAudiobook(resolvedBook, resolvedPlaylist)
+        }
+    }
+
     fun playMusicTrack(track: MusicTrack, playlist: List<MusicTrack>? = null) {
         playbackManager.playMusicTrack(track, playlist ?: allMusic.value)
         viewModelScope.launch {
             repository.updateMusicLastPlayed(track.id)
+        }
+    }
+
+    fun playMusicTrackWithResolution(track: MusicTrack, playlist: List<MusicTrack>? = null) {
+        viewModelScope.launch {
+            var finalUrl = track.streamUrl
+            if (track.serverId == "pd_server" && (finalUrl.isBlank() || finalUrl.contains(".mp3"))) {
+                val resolved = resolveArchiveOrgStreamUrl(track.id, ".mp3")
+                if (resolved.isNotBlank()) {
+                    finalUrl = resolved
+                }
+            }
+            val resolvedTrack = track.copy(streamUrl = finalUrl)
+            val resolvedPlaylist = playlist?.map { t ->
+                if (t.id == track.id) resolvedTrack else t
+            }
+            playMusicTrack(resolvedTrack, resolvedPlaylist)
+        }
+    }
+
+    suspend fun resolveArchiveOrgStreamUrl(identifier: String, extension: String): String {
+        val files = ArchiveOrgClient.fetchFilesForIdentifier(identifier)
+        val matchingFile = files.firstOrNull { it.endsWith(extension, ignoreCase = true) }
+        return if (matchingFile != null) {
+            "https://archive.org/download/$identifier/$matchingFile"
+        } else {
+            ""
         }
     }
 

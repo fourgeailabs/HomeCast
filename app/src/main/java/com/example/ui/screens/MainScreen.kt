@@ -39,6 +39,7 @@ import com.example.ui.theme.LocalThemeMode
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 
 object Routes {
     const val Library = "library"
@@ -67,6 +68,7 @@ fun MainScreen(
     val activeTrack = playbackState.currentMusicTrack
     val hasActiveMedia = (activeBook != null || activeTrack != null)
 
+    val scope = rememberCoroutineScope()
     var isPlayerSlidUp by remember { mutableStateOf(false) }
     var activeEBook by remember { mutableStateOf<EBookData?>(null) }
     var activeComic by remember { mutableStateOf<ComicData?>(null) }
@@ -352,7 +354,89 @@ fun MainScreen(
                         type = type,
                         onBack = { navController.popBackStack() },
                         onCreatorClick = { navController.navigate(Routes.CreatorDetail(it)) },
-                        onPlayReadClick = { /* Handled contextually */ }
+                        onPlayReadClick = {
+                            if (type == "BOOK") {
+                                val standardGutenbergUrls = mapOf(
+                                    "The Time Machine" to "https://www.gutenberg.org/cache/epub/35/pg35.txt",
+                                    "Frankenstein" to "https://www.gutenberg.org/cache/epub/84/pg84.txt",
+                                    "The Art of War" to "https://www.gutenberg.org/cache/epub/132/pg132.txt",
+                                    "The Great Gatsby" to "https://www.gutenberg.org/cache/epub/64317/pg64317.txt",
+                                    "Metamorphosis" to "https://www.gutenberg.org/cache/epub/5200/pg5200.txt"
+                                )
+                                val matchedUrl = standardGutenbergUrls[title]
+                                if (matchedUrl != null) {
+                                    activeEBook = EBookData(
+                                        id = title.lowercase().replace(" ", "_"),
+                                        title = title,
+                                        author = creator,
+                                        totalChapters = 0,
+                                        chapters = emptyList(),
+                                        publicDomainUrl = matchedUrl
+                                    )
+                                } else {
+                                    val doc = viewModel.publicDomainBooks.value.firstOrNull { (it.title ?: "").contains(title, ignoreCase = true) }
+                                    val identifier = doc?.identifier ?: title.lowercase().replace(" ", "_")
+                                    scope.launch {
+                                        val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(identifier)
+                                        val matchingTxt = files.firstOrNull { it.endsWith("_djvu.txt", ignoreCase = true) || it.endsWith(".txt", ignoreCase = true) }
+                                        val txtUrl = if (matchingTxt != null) {
+                                            "https://archive.org/download/$identifier/$matchingTxt"
+                                        } else {
+                                            "https://archive.org/download/$identifier/${identifier}_djvu.txt"
+                                        }
+                                        activeEBook = EBookData(
+                                            id = identifier,
+                                            title = title,
+                                            author = creator,
+                                            totalChapters = 0,
+                                            chapters = emptyList(),
+                                            publicDomainUrl = txtUrl
+                                        )
+                                    }
+                                }
+                            } else if (type == "AUDIOBOOK") {
+                                val localAudiobook = viewModel.allBooks.value.firstOrNull { it.title.equals(title, ignoreCase = true) }
+                                if (localAudiobook != null) {
+                                    viewModel.playAudiobookWithResolution(localAudiobook)
+                                    isPlayerSlidUp = true
+                                } else {
+                                    val doc = viewModel.publicDomainAudiobooks.value.firstOrNull { (it.title ?: "").contains(title, ignoreCase = true) }
+                                    val id = doc?.identifier ?: title.lowercase().replace(" ", "_")
+                                    val audiobook = com.example.data.Audiobook(
+                                        id = id,
+                                        title = title,
+                                        author = creator,
+                                        duration = 3600L,
+                                        coverUrl = "https://archive.org/services/img/$id",
+                                        serverId = "pd_server",
+                                        streamUrl = "https://archive.org/download/$id/${id}_64kb.mp3"
+                                    )
+                                    viewModel.playAudiobookWithResolution(audiobook)
+                                    isPlayerSlidUp = true
+                                }
+                            } else if (type == "MUSIC") {
+                                val localTrack = viewModel.allMusic.value.firstOrNull { it.title.equals(title, ignoreCase = true) }
+                                if (localTrack != null) {
+                                    viewModel.playMusicTrackWithResolution(localTrack)
+                                    isPlayerSlidUp = true
+                                } else {
+                                    val doc = viewModel.publicDomainMusic.value.firstOrNull { (it.title ?: "").contains(title, ignoreCase = true) }
+                                    val id = doc?.identifier ?: title.lowercase().replace(" ", "_")
+                                    val track = com.example.data.MusicTrack(
+                                        id = id,
+                                        title = title,
+                                        artist = creator,
+                                        album = "Archive.org Classics",
+                                        coverUrl = "https://archive.org/services/img/$id",
+                                        duration = 180000L,
+                                        serverId = "pd_server",
+                                        streamUrl = ""
+                                    )
+                                    viewModel.playMusicTrackWithResolution(track)
+                                    isPlayerSlidUp = true
+                                }
+                            }
+                        }
                     )
                 }
                 composable(
