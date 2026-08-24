@@ -1863,6 +1863,44 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "5.08.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Story So Far AI Summarizer: Generates instant context summaries for long audiobooks, e-books, and podcasts without spoilers.",
+                    "24/7 AI Companion Assistant: In-context conversational helper on player and e-reader screens that answers questions tailored strictly to your current position.",
+                    "AI Media Concierge: Curates custom media blends and delivers narrative recommendations in the Discovery feed.",
+                    "Smart Sleep Timer & Sleep Assistant: Intelligent sleep timer with custom audio fade-out and AI-generated bedtime prompts.",
+                    "Dynamic Ambient Soundscape Synthesizer: Generates real-time ambient background audio (Rainfall, Fireplace, Ocean Waves, Cafe Ambient, Forest Birds, Cosmic Drone) synthesized directly on-device using PCM AudioTracks for immersive reading or listening.",
+                    "Stylized Quote Card Generator: Transforms book excerpts and bookmarks into beautifully designed quote cards with customizable color palettes, typography, and background patterns."
+                )
+            ),
+            UpdateNotice(
+                version = "5.07.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "High-Performance App Responsiveness: Resolved background UI thread locks and startup AI cleanup loops, eliminating app sluggishness.",
+                    "Restored Music & Podcast Playback: Fixed audio resolution logic and ExoPlayer initialization queues, ensuring podcasts and music play instantly.",
+                    "Seamless Backup Server Reconnection: Restoring settings or silent backups now automatically reloads server configurations and immediately triggers server reconnects."
+                )
+            ),
+            UpdateNotice(
+                version = "5.06.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Mini-Player Forehead Space Optimization: Shrunk top padding and outer margins on the mini-player card across all screens to eliminate gaps above the playback bar.",
+                    "Seamless Content-to-Player Alignment: Removed excessive bottom scroll padding across Audiobooks, Music, Bookshelf, Podcasts, and Discover screens for flush alignment directly against the mini-player."
+                )
+            ),
+            UpdateNotice(
+                version = "5.05.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Unified Glassmorphic UI & Layout System: Applied the sleek visual style of the Podcasts screen across Audiobooks, Music, Bookshelf, and Discover screens.",
+                    "Sleek Pill Segmented Switchers: Modernized all personal/public tab switchers with pill-shaped segmented controls and responsive color highlights.",
+                    "Consistent Dark Glass Canvas: Polished all top app bars, search inputs, and filter chips for a consistent dark glass design."
+                )
+            ),
+            UpdateNotice(
                 version = "5.04.00",
                 date = "August 2026",
                 highlights = listOf(

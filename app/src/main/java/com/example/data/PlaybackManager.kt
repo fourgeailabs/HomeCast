@@ -58,6 +58,8 @@ class PlaybackManager(private val context: Context) {
         }
     }
 
+    private var pendingStreamAction: (() -> Unit)? = null
+
     private val updateProgressRunnable = object : Runnable {
         override fun run() {
             try {
@@ -66,14 +68,18 @@ class PlaybackManager(private val context: Context) {
                     if (state == Player.STATE_READY || state == Player.STATE_BUFFERING || p.isPlaying) {
                         val pos = p.currentPosition.coerceAtLeast(0L)
                         val dur = p.duration.coerceAtLeast(0L)
-                        _playbackState.value = _playbackState.value.copy(
-                            currentPosition = pos,
-                            duration = if (dur > 0L) dur else _playbackState.value.duration,
-                            isPlaying = p.isPlaying
-                        )
+                        val currState = _playbackState.value
+
+                        if (Math.abs(pos - currState.currentPosition) >= 500L || currState.isPlaying != p.isPlaying || (dur > 0L && currState.duration != dur)) {
+                            _playbackState.value = currState.copy(
+                                currentPosition = pos,
+                                duration = if (dur > 0L) dur else currState.duration,
+                                isPlaying = p.isPlaying
+                            )
+                        }
                         
-                        // Throttle saving progress to every 2 seconds or significant seek
-                        if (Math.abs(pos - lastSavedPos) > 2000L || !p.isPlaying) {
+                        // Throttle saving progress to every 3 seconds or significant seek
+                        if (Math.abs(pos - lastSavedPos) > 3000L || !p.isPlaying) {
                             lastSavedPos = pos
                             onProgressUpdate?.invoke(
                                 _playbackState.value.currentAudiobook,
@@ -87,7 +93,7 @@ class PlaybackManager(private val context: Context) {
             } catch (e: Exception) {
                 Log.w("PlaybackManager", "Error in progress update loop", e)
             }
-            handler.postDelayed(this, 500)
+            handler.postDelayed(this, 1000)
         }
     }
 
@@ -100,16 +106,17 @@ class PlaybackManager(private val context: Context) {
         }
         handler.post(updateProgressRunnable)
         
-        // Polling to wait for player
-        handler.post(object : Runnable {
-            override fun run() {
-                if (player != null) {
-                    setupPlayer()
-                } else {
-                    handler.postDelayed(this, 100)
-                }
+        onPlayerReadyListener = {
+            runOnMainThread {
+                setupPlayer()
+                pendingStreamAction?.invoke()
+                pendingStreamAction = null
             }
-        })
+        }
+
+        if (player != null) {
+            setupPlayer()
+        }
     }
     
     private fun setupPlayer() {
@@ -205,6 +212,14 @@ class PlaybackManager(private val context: Context) {
         isAudiobook: Boolean = false,
         fallbackCandidate: Audiobook? = null
     ) {
+        if (player == null) {
+            Log.i("PlaybackManager", "Player not initialized yet; queueing pending stream action")
+            pendingStreamAction = {
+                startStream(url, metadata, startPositionMs, isAudiobook, fallbackCandidate)
+            }
+            return
+        }
+
         try {
             val finalUrl = if (url.isBlank()) {
                 "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3"
@@ -419,9 +434,12 @@ class PlaybackManager(private val context: Context) {
     companion object {
         var player: ExoPlayer? = null
         var mediaSession: MediaSession? = null
+        var onPlayerReadyListener: (() -> Unit)? = null
+
         fun setPlayer(p: ExoPlayer, ms: MediaSession) {
             player = p
             mediaSession = ms
+            onPlayerReadyListener?.invoke()
         }
     }
 }

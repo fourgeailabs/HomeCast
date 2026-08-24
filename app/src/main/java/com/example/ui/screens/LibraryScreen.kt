@@ -126,34 +126,40 @@ fun LibraryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        // Header Bar
+        // Top Header Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    "Audiobooks",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp,
-                    color = Color.White
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Headphones,
+                    contentDescription = null,
+                    tint = AccentIndigo,
+                    modifier = Modifier.size(28.dp)
                 )
-                Text(
-                    if (currentBooks.isNotEmpty()) "${currentBooks.size} titles in your bookshelf" else "Your Audiobookshelf Library",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "Audiobooks",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        if (currentBooks.isNotEmpty()) "${currentBooks.size} titles in your bookshelf" else "Your Audiobookshelf Library",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(
                     onClick = { viewModel.refreshPersonalMedia() },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(SurfaceGlass, CircleShape)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     if (isSyncing) {
                         CircularProgressIndicator(
@@ -162,85 +168,100 @@ fun LibraryScreen(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh & Sync", tint = AccentTeal)
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh & Sync", tint = Color.White)
                     }
                 }
                 IconButton(
                     onClick = { isGridView = !isGridView },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(SurfaceGlass, CircleShape)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
                         contentDescription = "Toggle View",
-                        tint = AccentTeal
+                        tint = Color.White
                     )
                 }
                 IconButton(
                     onClick = onNavigateToSettings,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(SurfaceGlass, CircleShape)
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentTeal)
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        TabRow(
-            selectedTabIndex = selectedSource,
-            containerColor = Color.Transparent,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
-                    color = AccentTeal
-                )
-            }
-        ) {
-            listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedSource == index,
-                    onClick = { selectedSource = index },
-                    text = {
-                        Text(
-                            text = title,
-                            fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
-                        )
-                    },
-                    selectedContentColor = AccentTeal,
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(14.dp))
-        
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search title, author, series, narrator...") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            placeholder = { Text("Search title, author, series, narrator...", fontSize = 13.sp) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = AccentTeal) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.White)
                     }
                 }
             },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = SurfaceGlass,
-                unfocusedContainerColor = SurfaceGlass,
-                focusedBorderColor = AccentTeal.copy(alpha = 0.8f),
+                focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                focusedBorderColor = AccentIndigo,
                 unfocusedBorderColor = SurfaceGlassBorder
             )
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Segmented Primary Pill Tab Switch
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.Black.copy(alpha = 0.3f))
+                .padding(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedSource == 0) AccentIndigo else Color.Transparent)
+                    .clickable { selectedSource = 0 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Personal Library",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.White
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedSource == 1) AccentTeal else Color.Transparent)
+                    .clickable { selectedSource = 1 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Public Domain",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = if (selectedSource == 1) Color.Black else Color.White
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -258,15 +279,16 @@ fun LibraryScreen(
                     onClick = {
                         selectedGenre = if (genre == "All") null else genre
                     },
-                    label = { Text(genre, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                    label = { Text(genre, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
-                        selectedLabelColor = AccentTeal
+                        selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
+                        selectedLabelColor = AccentIndigo,
+                        labelColor = Color.Gray
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = isSelected,
-                        borderColor = if (isSelected) AccentTeal else SurfaceGlassBorder
+                        borderColor = if (isSelected) AccentIndigo else SurfaceGlassBorder
                     )
                 )
             }
@@ -326,7 +348,7 @@ fun LibraryScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 90.dp),
+                    contentPadding = PaddingValues(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -408,7 +430,7 @@ fun LibraryScreen(
             // Horizontal sliding shelves
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 90.dp),
+                contentPadding = PaddingValues(bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
 

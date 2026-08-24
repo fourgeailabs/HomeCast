@@ -47,6 +47,20 @@ class SecureConfigManager(context: Context) {
         }
     }
 
+    fun reloadServers() {
+        val json = sharedPreferences.getString("servers", null)
+        if (json != null) {
+            try {
+                val servers = adapter.fromJson(json) ?: emptyList()
+                _serversFlow.value = servers
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        } else {
+            _serversFlow.value = emptyList()
+        }
+    }
+
     fun saveServer(server: ServerConfig) {
         val currentServers = _serversFlow.value.toMutableList()
         val index = currentServers.indexOfFirst { it.id == server.id }

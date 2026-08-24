@@ -299,7 +299,7 @@ fun PodcastsScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
-            contentPadding = PaddingValues(bottom = 90.dp)
+            contentPadding = PaddingValues(bottom = 12.dp)
         ) {
             item {
                 Spacer(modifier = Modifier.height(10.dp))
@@ -330,6 +330,16 @@ fun PodcastsScreen(
                             onClick = {
                                 val firstEp = displayChannels.flatMap { it.episodes }.firstOrNull()
                                 if (firstEp != null) {
+                                    val ab = Audiobook(
+                                        id = firstEp.id,
+                                        title = firstEp.title,
+                                        author = firstEp.publisher,
+                                        coverUrl = firstEp.coverUrl,
+                                        duration = firstEp.durationSeconds,
+                                        serverId = "podcast",
+                                        streamUrl = firstEp.audioUrl
+                                    )
+                                    viewModel.playAudiobookWithResolution(ab)
                                     onEpisodeClick(firstEp)
                                 }
                             },
@@ -395,7 +405,7 @@ fun PodcastsScreen(
                                                 serverId = channel.serverId,
                                                 streamUrl = ep.audioUrl
                                             )
-                                            viewModel.playbackManager.playAudiobook(ab)
+                                            viewModel.playAudiobookWithResolution(ab)
                                             onEpisodeClick(ep)
                                         }
                                         .padding(vertical = 6.dp, horizontal = 4.dp),
@@ -418,7 +428,7 @@ fun PodcastsScreen(
                                                 serverId = channel.serverId,
                                                 streamUrl = ep.audioUrl
                                             )
-                                            viewModel.playbackManager.playAudiobook(ab)
+                                            viewModel.playAudiobookWithResolution(ab)
                                             onEpisodeClick(ep)
                                         },
                                         modifier = Modifier.size(32.dp)

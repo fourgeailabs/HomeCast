@@ -170,6 +170,14 @@ fun EReaderScreen(
 
     // Bookmarks list for this specific book
     var bookBookmarks by remember { mutableStateOf<List<MediaBookmark>>(emptyList()) }
+    var showStorySoFarSheet by remember { mutableStateOf(false) }
+    var showCompanionSheet by remember { mutableStateOf(false) }
+    var activeQuoteStyle by remember { mutableStateOf<com.example.data.QuoteCardStyle?>(null) }
+
+    val storySoFarMap = viewModel?.storySoFarMap?.collectAsState()?.value ?: emptyMap()
+    val companionChats = viewModel?.companionChats?.collectAsState()?.value ?: emptyMap()
+    val ambientType by com.example.data.AmbientSoundscapeSynthesizer.currentSoundscape.collectAsState()
+    val ambientVol by com.example.data.AmbientSoundscapeSynthesizer.volume.collectAsState()
 
     fun refreshBookmarks() {
         bookBookmarks = if (viewModel != null) {
@@ -842,6 +850,27 @@ fun EReaderScreen(
                             )
                         }
 
+                        // AI Story So Far Button
+                        IconButton(onClick = {
+                            val curChapTitle = paginatedChapters.getOrNull(safeChapterIdx)?.firstOrNull()?.chapterTitle ?: "Chapter ${safeChapterIdx + 1}"
+                            viewModel?.fetchStorySoFarRecap(
+                                mediaId = eBook.id,
+                                title = eBook.title,
+                                creator = eBook.author,
+                                posMs = (safeChapterIdx + 1).toLong() * 60000L,
+                                durMs = paginatedChapters.size.toLong() * 60000L,
+                                notes = "Reading $curChapTitle"
+                            )
+                            showStorySoFarSheet = true
+                        }) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Story So Far", tint = currentTheme.accent)
+                        }
+
+                        // AI Companion Button
+                        IconButton(onClick = { showCompanionSheet = true }) {
+                            Icon(Icons.Default.QuestionAnswer, contentDescription = "AI Companion", tint = AccentIndigo)
+                        }
+
                         // Bookmarks Drawer Button
                         IconButton(onClick = {
                             refreshBookmarks()
@@ -1072,6 +1101,29 @@ fun EReaderScreen(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                    HorizontalDivider(color = currentTheme.text.copy(alpha = 0.12f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 5. Ambient Reading Soundscapes
+                    Text("✨ Ambient Reading Soundscape", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = currentTheme.text.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    com.example.ui.components.AmbientSoundscapeSelectorBar(
+                        currentType = ambientType,
+                        onSelectType = { st ->
+                            if (st == com.example.data.SoundscapeType.AUTO_DETECT) {
+                                val currentSnippet = paginatedChapters.getOrNull(safeChapterIdx)?.getOrNull(safePageIdx)?.textBlocks?.joinToString("\n") ?: ""
+                                viewModel?.detectAmbientMoodForBook(eBook.title, currentSnippet)
+                            } else {
+                                com.example.data.AmbientSoundscapeSynthesizer.startSoundscape(st)
+                            }
+                        },
+                        volume = ambientVol,
+                        onVolumeChange = { v ->
+                            com.example.data.AmbientSoundscapeSynthesizer.setVolume(v)
+                        }
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
                 }
@@ -1333,6 +1385,49 @@ fun EReaderScreen(
                 }
             }
         }
+    }
+
+    // --- AI Sheets & Dialogs ---
+    if (showStorySoFarSheet) {
+        val recap = storySoFarMap[eBook.id]
+        com.example.ui.components.StorySoFarSheet(
+            title = eBook.title,
+            creator = eBook.author,
+            recapText = recap,
+            isLoading = recap == null,
+            onDismiss = { showStorySoFarSheet = false }
+        )
+    }
+
+    if (showCompanionSheet) {
+        val chatHistory = companionChats[eBook.id] ?: emptyList()
+        val curChapTitle = paginatedChapters.getOrNull(safeChapterIdx)?.firstOrNull()?.chapterTitle ?: "Chapter ${safeChapterIdx + 1}"
+        val posStr = "$curChapTitle • Page ${safePageIdx + 1}"
+        com.example.ui.components.AiCompanionSheet(
+            title = eBook.title,
+            creator = eBook.author,
+            mediaType = "Book",
+            currentPosStr = posStr,
+            messages = chatHistory,
+            onSendMessage = { q ->
+                viewModel?.sendCompanionQuestion(
+                    mediaId = eBook.id,
+                    title = eBook.title,
+                    creator = eBook.author,
+                    mediaType = "Book",
+                    posStr = posStr,
+                    question = q
+                )
+            },
+            onDismiss = { showCompanionSheet = false }
+        )
+    }
+
+    activeQuoteStyle?.let { style ->
+        com.example.ui.components.AiQuoteCardDialog(
+            style = style,
+            onDismiss = { activeQuoteStyle = null }
+        )
     }
 }
 

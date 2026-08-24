@@ -336,51 +336,49 @@ fun MusicScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Top Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    "Music",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp,
-                    color = Color.White
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = AccentIndigo,
+                    modifier = Modifier.size(28.dp)
                 )
-                Text(
-                    if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • 100+ moods" else "Your Personal Music Cloud",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "Music",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • 100+ moods" else "Your Personal Music Cloud",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // Quick Remix AI Categories Button
                 IconButton(
                     onClick = { shuffleSeed++ },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(Icons.Default.Shuffle, contentDescription = "Remix AI Categories", tint = AccentIndigo)
+                    Icon(Icons.Default.Shuffle, contentDescription = "Remix AI Categories", tint = Color.White)
                 }
 
                 IconButton(
                     onClick = { viewModel.refreshPersonalMedia() },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     if (isSyncing) {
                         CircularProgressIndicator(
@@ -389,48 +387,16 @@ fun MusicScreen(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh & Sync", tint = AccentIndigo)
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh & Sync", tint = Color.White)
                     }
                 }
 
                 IconButton(
                     onClick = onNavigateToSettings,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceGlass)
-                        .border(1.dp, SurfaceGlassBorder, CircleShape)
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AccentIndigo)
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        TabRow(
-            selectedTabIndex = selectedSource,
-            containerColor = Color.Transparent,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
-                    color = AccentIndigo
-                )
-            }
-        ) {
-            listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedSource == index,
-                    onClick = { selectedSource = index },
-                    text = {
-                        Text(
-                            text = title,
-                            fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
-                        )
-                    },
-                    selectedContentColor = AccentIndigo,
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
 
@@ -440,25 +406,72 @@ fun MusicScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search songs, artists, albums, genres...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = AccentIndigo) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            placeholder = { Text("Search songs, artists, albums, genres...", fontSize = 13.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = AccentTeal) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.White)
                     }
                 }
             },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = SurfaceGlass,
-                unfocusedContainerColor = SurfaceGlass,
-                focusedBorderColor = AccentIndigo.copy(alpha = 0.8f),
+                focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                focusedBorderColor = AccentIndigo,
                 unfocusedBorderColor = SurfaceGlassBorder
             )
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Segmented Primary Pill Tab Switch
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.Black.copy(alpha = 0.3f))
+                .padding(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedSource == 0) AccentIndigo else Color.Transparent)
+                    .clickable { selectedSource = 0 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Personal Music",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.White
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedSource == 1) AccentTeal else Color.Transparent)
+                    .clickable { selectedSource = 1 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Public Domain",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = if (selectedSource == 1) Color.Black else Color.White
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -2472,7 +2485,7 @@ fun GenreDetailScreen(
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 90.dp, top = 8.dp),
+            contentPadding = PaddingValues(bottom = 12.dp, top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

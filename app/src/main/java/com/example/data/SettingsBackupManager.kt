@@ -273,6 +273,7 @@ class SettingsBackupManager(private val context: Context) {
             payload.servers.forEach { server ->
                 secureConfigManager.saveServer(server)
             }
+            secureConfigManager.reloadServers()
 
             // Save preferences
             val playbackPrefs = context.getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)
@@ -347,6 +348,7 @@ class SettingsBackupManager(private val context: Context) {
             payload.servers.forEach { server ->
                 secureConfigManager.saveServer(server)
             }
+            secureConfigManager.reloadServers()
 
             // Save preferences
             val playbackPrefs = context.getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)

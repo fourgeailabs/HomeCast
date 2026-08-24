@@ -144,7 +144,7 @@ fun MainScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 4.dp)
                                 .shadow(12.dp, RoundedCornerShape(16.dp))
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(SurfaceGlass)
@@ -174,7 +174,7 @@ fun MainScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp),
+                                    .padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                             if (mediaCover.isNotBlank()) {

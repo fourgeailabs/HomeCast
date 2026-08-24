@@ -135,6 +135,13 @@ fun PlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepTimerMenu by remember { mutableStateOf(false) }
     var showBookmarksSheet by remember { mutableStateOf(false) }
+    var showStorySoFarSheet by remember { mutableStateOf(false) }
+    var showCompanionSheet by remember { mutableStateOf(false) }
+    var activeQuoteStyle by remember { mutableStateOf<com.example.data.QuoteCardStyle?>(null) }
+
+    val storySoFarMap by viewModel.storySoFarMap.collectAsState()
+    val companionChats by viewModel.companionChats.collectAsState()
+
     var bookmarkNoteText by remember { mutableStateOf("") }
     var audioBookmarks by remember { mutableStateOf<List<MediaBookmark>>(emptyList()) }
     var lastSavedSpot by remember { mutableStateOf<MediaProgress?>(null) }
@@ -685,6 +692,49 @@ fun PlayerScreen(
                         }
                     }
 
+                    // AI Story So Far Catch-Up
+                    Surface(
+                        color = SurfaceGlass,
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                        modifier = Modifier.clickable {
+                            viewModel.fetchStorySoFarRecap(
+                                mediaId = mediaId,
+                                title = title,
+                                creator = subtitle,
+                                posMs = currentPositionMs,
+                                durMs = durationMs
+                            )
+                            showStorySoFarSheet = true
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Story So Far", modifier = Modifier.size(16.dp), tint = AccentTeal)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Recap", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    // AI Companion Q&A
+                    Surface(
+                        color = SurfaceGlass,
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
+                        modifier = Modifier.clickable { showCompanionSheet = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.QuestionAnswer, contentDescription = "AI Companion", modifier = Modifier.size(16.dp), tint = AccentIndigo)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Ask AI", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
                     // Sleep Timer Menu
                     Box {
                         Surface(
@@ -694,15 +744,15 @@ fun PlayerScreen(
                             modifier = Modifier.clickable { showSleepTimerMenu = true }
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Default.Timer, contentDescription = "Sleep Timer", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     "Timer",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -714,8 +764,8 @@ fun PlayerScreen(
                             DropdownMenuItem(text = { Text("Off") }, onClick = { showSleepTimerMenu = false })
                             DropdownMenuItem(text = { Text("15 Minutes") }, onClick = { showSleepTimerMenu = false })
                             DropdownMenuItem(text = { Text("30 Minutes") }, onClick = { showSleepTimerMenu = false })
-                            DropdownMenuItem(text = { Text("45 Minutes") }, onClick = { showSleepTimerMenu = false })
-                            DropdownMenuItem(text = { Text("60 Minutes") }, onClick = { showSleepTimerMenu = false })
+                            DropdownMenuItem(text = { Text("✨ Smart Fade-Out (15m)") }, onClick = { showSleepTimerMenu = false })
+                            DropdownMenuItem(text = { Text("✨ Smart Fade-Out (30m)") }, onClick = { showSleepTimerMenu = false })
                         }
                     }
                 }
@@ -1011,6 +1061,48 @@ fun PlayerScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    // --- AI Sheets & Dialogs ---
+    if (showStorySoFarSheet) {
+        val recap = storySoFarMap[mediaId]
+        com.example.ui.components.StorySoFarSheet(
+            title = title,
+            creator = subtitle,
+            recapText = recap,
+            isLoading = recap == null,
+            onDismiss = { showStorySoFarSheet = false }
+        )
+    }
+
+    if (showCompanionSheet) {
+        val chatHistory = companionChats[mediaId] ?: emptyList()
+        val posStr = formatTime(currentPositionMs)
+        com.example.ui.components.AiCompanionSheet(
+            title = title,
+            creator = subtitle,
+            mediaType = if (isAudiobook) "Audiobook" else "Music",
+            currentPosStr = posStr,
+            messages = chatHistory,
+            onSendMessage = { q ->
+                viewModel.sendCompanionQuestion(
+                    mediaId = mediaId,
+                    title = title,
+                    creator = subtitle,
+                    mediaType = if (isAudiobook) "Audiobook" else "Music",
+                    posStr = posStr,
+                    question = q
+                )
+            },
+            onDismiss = { showCompanionSheet = false }
+        )
+    }
+
+    activeQuoteStyle?.let { style ->
+        com.example.ui.components.AiQuoteCardDialog(
+            style = style,
+            onDismiss = { activeQuoteStyle = null }
+        )
     }
 }
 

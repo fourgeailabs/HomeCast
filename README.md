@@ -1,11 +1,43 @@
 # HomeCast
 
-**Version:** 5.04.00
+**Version:** 5.08.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, and podcast media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.04.00)
+## 🚀 Recent Updates (v5.08.00)
+- **Comprehensive AI Media Intelligence Suite**:
+  - **Story So Far AI Summarizer**: Provides instant chapter-level context recaps for long audiobooks, e-books, and podcasts without spoilers.
+  - **24/7 AI Companion Assistant**: In-context conversational assistant on player and e-reader screens that answers questions tailored strictly to your current listening or reading position.
+  - **AI Media Concierge**: Curates custom media blends and delivers narrative recommendations in the Discovery feed.
+  - **Smart Sleep Timer & Sleep Assistant**: Intelligent sleep timer with custom audio fade-out and AI-generated bedtime prompts.
+  - **Dynamic Ambient Soundscape Synthesizer**: Generates real-time ambient background audio (Rainfall, Fireplace, Ocean Waves, Cafe Ambient, Forest Birds, Cosmic Drone) synthesized directly on-device using PCM AudioTracks for immersive reading or listening.
+  - **Stylized Quote Card Generator**: Transforms book excerpts and bookmarks into beautifully designed quote cards with customizable color palettes, typography, and background patterns.
+
+## 🚀 Previous Updates (v5.07.00)
+- **High-Performance Responsiveness & Zero App Lag**:
+  - Eliminated app sluggishness on launch by throttling progress state polling to 1000ms, checking position delta before StateFlow emission, and enforcing daily checks on AI menu/category cleanup instead of blocking startup loops.
+- **Restored Music & Podcast Audio Streaming**:
+  - Fixed stream resolution logic for public domain and server audio items.
+  - Implemented an ExoPlayer initialization action queue in `PlaybackManager` to prevent playback calls made prior to service binding from failing silently.
+- **Instant Server Reconnection on Backup Restore**:
+  - Updated `SettingsBackupManager` and `SecureConfigManager` to reload server lists immediately upon backup import and trigger automatic background server syncs (`syncServer`).
+
+## 🚀 Previous Updates (v5.06.00)
+- **Mini-Player Forehead Space Optimization**:
+  - Removed top outer margins and reduced inner top padding on the floating Mini-Player card (`top = 0.dp`), eliminating unwanted whitespace above the player bar across all screens.
+- **Seamless Content-to-Player Alignment**:
+  - Streamlined bottom scroll padding across Audiobooks, Music, Bookshelf, Podcasts, and Discover feeds (`contentPadding = PaddingValues(bottom = 12.dp)`), allowing scroll content to align cleanly and directly against the mini-player.
+
+## 🚀 Previous Updates (v5.05.00)
+- **Unified Visual Styling Across All Main Media Screens**:
+  - Replicated the polished design system of the `PodcastsScreen` across all main media sections: `Audiobooks` (`LibraryScreen`), `Music` (`MusicScreen`), `Bookshelf` (`EBooksScreen`), and `Discover & Blends` (`DiscoveryScreen`).
+- **Sleek Pill Segmented Switchers**:
+  - Modernized the `Personal Library` vs `Public Domain` tab rows with rounded, pill-shaped segmented button containers, subtle dark background fills, bold white active typography, and vibrant accent highlights.
+- **Header & Search Bar Consistency**:
+  - Streamlined top header bars with clean section icons (`Headphones`, `MusicNote`, `MenuBook`, `Explore`), bold display titles, compact settings buttons, and translucent dark glass search bars with accent focus borders.
+
+## 🚀 Previous Updates (v5.04.00)
 - **New Podcast Navigation Hub & Directory**:
   - Integrated a dedicated "Podcasts" bottom navigation section with a personal/public toggle.
   - Personal section supports local device media vs personal server filtering (`All Personal`, `Local Device`, `Personal Server`).

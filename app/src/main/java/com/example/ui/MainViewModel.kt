@@ -446,8 +446,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 database.libraryDao().insertPublicDomainSources(defaultSources)
             }
             
-            // Automatically clean authors/genres and locate beautiful cover-art URLs immediately!
-            performDailyDynamicMenuAndCategoryCleanup()
+            // Check if daily AI cleanup is needed instead of blocking startup on every launch
+            checkAndTriggerDailyCleanupIfNeeded()
 
             // Auto sync servers and scan local folders in background on app startup
             kotlinx.coroutines.delay(1000)
@@ -1431,8 +1431,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val success = backupManager.importFromUri(uri, secureConfigManager)
             _hasSilentBackup.value = backupManager.hasSilentBackup()
             if (success) {
-                _serverOpState.value = ServerOperationState.Success("Settings imported successfully! Syncing...")
-                servers.value.forEach { server ->
+                secureConfigManager.reloadServers()
+                val restoredServers = secureConfigManager.serversFlow.value
+                _serverOpState.value = ServerOperationState.Success("Settings imported successfully! Reconnecting ${restoredServers.size} server(s)...")
+                restoredServers.forEach { server ->
                     syncServer(server)
                 }
             } else {
@@ -1447,8 +1449,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val success = backupManager.loadSilentBackup(secureConfigManager)
             _hasSilentBackup.value = backupManager.hasSilentBackup()
             if (success) {
-                _serverOpState.value = ServerOperationState.Success("Auto-backup restored successfully! Syncing...")
-                servers.value.forEach { server ->
+                secureConfigManager.reloadServers()
+                val restoredServers = secureConfigManager.serversFlow.value
+                _serverOpState.value = ServerOperationState.Success("Auto-backup restored successfully! Reconnecting ${restoredServers.size} server(s)...")
+                restoredServers.forEach { server ->
                     syncServer(server)
                 }
             } else {
@@ -1509,11 +1513,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             }
-            if (book.serverId == "pd_server" && (finalUrl.isBlank() || finalUrl.contains("_64kb.mp3"))) {
+            if (book.serverId == "pd_server" && finalUrl.isBlank()) {
                 val resolved = resolveArchiveOrgStreamUrl(book.id, ".mp3")
                 if (resolved.isNotBlank()) {
                     finalUrl = resolved
                 }
+            }
+            if (finalUrl.isBlank()) {
+                finalUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3"
             }
             val resolvedBook = book.copy(streamUrl = finalUrl)
             val resolvedPlaylist = playlist?.map { b ->
@@ -1552,11 +1559,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun playMusicTrackWithResolution(track: MusicTrack, playlist: List<MusicTrack>? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             var finalUrl = track.streamUrl
-            if (track.serverId == "pd_server" && (finalUrl.isBlank() || finalUrl.contains(".mp3"))) {
+            if (track.serverId == "pd_server" && finalUrl.isBlank()) {
                 val resolved = resolveArchiveOrgStreamUrl(track.id, ".mp3")
                 if (resolved.isNotBlank()) {
                     finalUrl = resolved
                 }
+            }
+            if (finalUrl.isBlank()) {
+                finalUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3"
             }
             val resolvedTrack = track.copy(streamUrl = finalUrl)
             val resolvedPlaylist = playlist?.map { t ->
@@ -2136,5 +2146,108 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getAllBookmarks(): List<com.example.data.MediaBookmark> {
         return backupManager.getAllBookmarks()
+    }
+
+    // --- AI Feature 1: Story So Far Recaps ---
+    private val _storySoFarMap = MutableStateFlow<Map<String, String>>(emptyMap())
+    val storySoFarMap: StateFlow<Map<String, String>> = _storySoFarMap.asStateFlow()
+
+    fun fetchStorySoFarRecap(
+        mediaId: String,
+        title: String,
+        creator: String,
+        posMs: Long,
+        durMs: Long,
+        notes: String = ""
+    ) {
+        viewModelScope.launch {
+            val posSec = posMs / 1000
+            val durSec = durMs / 1000
+            val posStr = String.format("%02d:%02d", posSec / 60, posSec % 60)
+            val durStr = String.format("%02d:%02d", durSec / 60, durSec % 60)
+
+            val recap = com.example.data.AiFeaturesEngine.generateStorySoFarRecap(
+                title, creator, posStr, durStr, notes
+            )
+            _storySoFarMap.value = _storySoFarMap.value + (mediaId to recap)
+        }
+    }
+
+    // --- AI Feature 2: Companion Chat ---
+    private val _companionChats = MutableStateFlow<Map<String, List<Pair<String, String>>>>(emptyMap())
+    val companionChats: StateFlow<Map<String, List<Pair<String, String>>>> = _companionChats.asStateFlow()
+
+    fun sendCompanionQuestion(
+        mediaId: String,
+        title: String,
+        creator: String,
+        mediaType: String,
+        posStr: String,
+        question: String
+    ) {
+        viewModelScope.launch {
+            val currentHistory = _companionChats.value[mediaId] ?: emptyList()
+            val updatedHistoryWithUser = currentHistory + ("User" to question)
+            _companionChats.value = _companionChats.value + (mediaId to updatedHistoryWithUser)
+
+            val answer = com.example.data.AiFeaturesEngine.askCompanionQuestion(
+                title, creator, mediaType, posStr, question
+            )
+            val updatedHistoryWithAi = updatedHistoryWithUser + ("AI Companion" to answer)
+            _companionChats.value = _companionChats.value + (mediaId to updatedHistoryWithAi)
+        }
+    }
+
+    // --- AI Feature 3: Natural Language Media Concierge ---
+    private val _conciergeResult = MutableStateFlow<com.example.data.MediaConciergeResult?>(null)
+    val conciergeResult: StateFlow<com.example.data.MediaConciergeResult?> = _conciergeResult.asStateFlow()
+
+    private val _isConciergeLoading = MutableStateFlow(false)
+    val isConciergeLoading: StateFlow<Boolean> = _isConciergeLoading.asStateFlow()
+
+    fun runMediaConcierge(userPrompt: String) {
+        viewModelScope.launch {
+            _isConciergeLoading.value = true
+            val audiobooks = allBooks.value.take(15).joinToString(", ") { "${it.title} by ${it.author}" }
+            val music = allMusic.value.take(15).joinToString(", ") { "${it.title} by ${it.artist}" }
+            val ebooks = allEBooks.value.take(15).joinToString(", ") { "${it.title} by ${it.author}" }
+            val summary = "Audiobooks: $audiobooks\nMusic: $music\nE-Books: $ebooks"
+
+            val res = com.example.data.AiFeaturesEngine.askMediaConcierge(userPrompt, summary)
+            _conciergeResult.value = res
+            _isConciergeLoading.value = false
+        }
+    }
+
+    fun clearMediaConcierge() {
+        _conciergeResult.value = null
+    }
+
+    // --- AI Feature 4: Quote Card Generator ---
+    fun createQuoteCardStyle(
+        quote: String,
+        bookTitle: String,
+        author: String,
+        onResult: (com.example.data.QuoteCardStyle) -> Unit
+    ) {
+        viewModelScope.launch {
+            val style = com.example.data.AiFeaturesEngine.generateQuoteCardStyle(quote, bookTitle, author)
+            onResult(style)
+        }
+    }
+
+    // --- AI Feature 6: Dynamic Soundscape ---
+    fun setAmbientSoundscape(type: com.example.data.SoundscapeType) {
+        com.example.data.AmbientSoundscapeSynthesizer.startSoundscape(type)
+    }
+
+    fun detectAmbientMoodForBook(
+        title: String,
+        snippet: String
+    ) {
+        viewModelScope.launch {
+            val type = com.example.data.AiFeaturesEngine.detectAmbientMoodForText(title, snippet)
+            com.example.data.AmbientSoundscapeSynthesizer.startSoundscape(type)
+        }
     }
 }

@@ -75,6 +75,7 @@ fun DiscoveryScreen(
     
     val isLoading by viewModel.isDiscoveryLoading.collectAsState()
     val geminiCategoryItems by viewModel.geminiCategoryItems.collectAsState()
+    val conciergeResult by viewModel.conciergeResult.collectAsState()
 
     val allBooks by viewModel.allBooks.collectAsState()
     val allEBooks by viewModel.allEBooks.collectAsState()
@@ -129,7 +130,7 @@ fun DiscoveryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         // Top Header
         Row(
@@ -137,62 +138,84 @@ fun DiscoveryScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    "Discover & Blends",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp,
-                    color = MaterialTheme.colorScheme.onSurface
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Explore,
+                    contentDescription = null,
+                    tint = AccentTeal,
+                    modifier = Modifier.size(28.dp)
                 )
-                Text(
-                    if (selectedSource == 0) "AI Mixes, Audiobooks, E-Books & 100+ Moods" else "Classic Literature, LibriVox, Comics & Archives",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "Discover & Blends",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        if (selectedSource == 0) "AI Mixes, Audiobooks, E-Books & 100+ Moods" else "Classic Literature, LibriVox, Comics & Archives",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             IconButton(
                 onClick = onNavigateToSettings,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(SurfaceGlass)
+                modifier = Modifier.size(36.dp)
             ) {
-                Icon(Icons.Default.Tune, contentDescription = "Preferences", tint = AccentTeal)
+                Icon(Icons.Default.Tune, contentDescription = "Preferences", tint = Color.White)
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         // Source Switcher (Private Library vs Public Domain)
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = selectedSource == 0,
-                onClick = { 
-                    selectedSource = 0
-                    mediaTypeFilter = "ALL"
-                },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.Black.copy(alpha = 0.3f))
+                .padding(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedSource == 0) AccentIndigo else Color.Transparent)
+                    .clickable { 
+                        selectedSource = 0
+                        mediaTypeFilter = "ALL"
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Private Library", fontWeight = if (selectedSource == 0) FontWeight.Bold else FontWeight.Normal)
-                }
+                Text(
+                    "Private Library",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.White
+                )
             }
-            SegmentedButton(
-                selected = selectedSource == 1,
-                onClick = { 
-                    selectedSource = 1
-                    mediaTypeFilter = "ALL"
-                },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedSource == 1) AccentTeal else Color.Transparent)
+                    .clickable { 
+                        selectedSource = 1
+                        mediaTypeFilter = "ALL"
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Public Domain", fontWeight = if (selectedSource == 1) FontWeight.Bold else FontWeight.Normal)
-                }
+                Text(
+                    "Public Domain",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = if (selectedSource == 1) Color.Black else Color.White
+                )
             }
         }
 
@@ -269,6 +292,7 @@ fun DiscoveryScreen(
                     IconButton(onClick = {
                         val sourceStr = if (selectedSource == 0) "the user's private library" else "public domain archives"
                         viewModel.fetchGeminiCategoryItems(searchQuery, sourceStr)
+                        viewModel.runMediaConcierge(searchQuery)
                     }) {
                         Icon(Icons.Default.Send, contentDescription = "Generate", tint = if (selectedSource == 0) AccentIndigo else AccentTeal)
                     }
@@ -299,6 +323,46 @@ fun DiscoveryScreen(
                 }
             }
         } else if (geminiCategoryItems.isNotEmpty()) {
+            // Display AI Concierge Narrative Summary if available
+            conciergeResult?.explanation?.let { conciergeText ->
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AccentIndigo.copy(alpha = 0.2f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentIndigo.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = "Concierge AI",
+                            tint = AccentTeal,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "AI Media Concierge Insight",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = AccentTeal
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                conciergeText,
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.9f),
+                                lineHeight = 17.sp
+                            )
+                        }
+                    }
+                }
+            }
+
             // Display AI-Generated Results Grid with direct action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -308,7 +372,8 @@ fun DiscoveryScreen(
                 Text("AI Recommendations (${geminiCategoryItems.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 TextButton(onClick = { 
                     searchQuery = ""
-                    viewModel.fetchGeminiCategoryItems("", "") 
+                    viewModel.fetchGeminiCategoryItems("", "")
+                    viewModel.clearMediaConcierge()
                 }) {
                     Text("Clear Results", color = if (selectedSource == 0) AccentIndigo else AccentTeal, fontWeight = FontWeight.SemiBold)
                 }
@@ -317,7 +382,7 @@ fun DiscoveryScreen(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 90.dp),
+                contentPadding = PaddingValues(bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -491,7 +556,7 @@ fun DiscoveryScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(22.dp),
-                contentPadding = PaddingValues(bottom = 90.dp)
+                contentPadding = PaddingValues(bottom = 12.dp)
             ) {
                 // 1. Suggested AI Prompt Chips
                 item {
@@ -510,6 +575,7 @@ fun DiscoveryScreen(
                                         searchQuery = prompt
                                         val sourceStr = if (selectedSource == 0) "the user's private library" else "public domain archives"
                                         viewModel.fetchGeminiCategoryItems(prompt, sourceStr)
+                                        viewModel.runMediaConcierge(prompt)
                                     },
                                     color = SurfaceGlass,
                                     shape = RoundedCornerShape(12.dp),

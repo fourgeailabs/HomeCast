@@ -317,41 +317,41 @@ fun EBooksScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Header Bar
+            // Top Header Bar
             Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        "Bookshelf",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp,
-                        color = Color.White
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.MenuBook,
+                        contentDescription = null,
+                        tint = AccentIndigo,
+                        modifier = Modifier.size(28.dp)
                     )
-                    Text(
-                        "E-Books • Graphic Novels • Manga",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            "Bookshelf",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        Text(
+                            "E-Books • Graphic Novels • Manga",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(
                         onClick = { viewModel.refreshPersonalMedia() },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceGlass)
-                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         if (isSyncing) {
                             CircularProgressIndicator(
@@ -363,96 +363,107 @@ fun EBooksScreen(
                             Icon(
                                 Icons.Default.Refresh,
                                 contentDescription = "Refresh & Sync",
-                                tint = AccentTeal
+                                tint = Color.White
                             )
                         }
                     }
 
                     IconButton(
                         onClick = { isGridViewOpen = !isGridViewOpen },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceGlass)
-                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             if (isGridViewOpen) Icons.Default.ViewAgenda else Icons.Default.GridView,
                             contentDescription = "Toggle Grid / Shelf View",
-                            tint = AccentTeal
+                            tint = Color.White
                         )
                     }
 
                     IconButton(
                         onClick = onNavigateToSettings,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceGlass)
-                            .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = AccentTeal
+                            tint = Color.White
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            androidx.compose.material3.TabRow(
-                selectedTabIndex = selectedSource,
-                containerColor = Color.Transparent,
-                indicator = { tabPositions ->
-                    androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedSource]),
-                        color = AccentIndigo
-                    )
-                }
-            ) {
-                listOf("Personal Library", "Public Domain").forEachIndexed { index, title ->
-                    androidx.compose.material3.Tab(
-                        selected = selectedSource == index,
-                        onClick = { selectedSource = index },
-                        text = {
-                            Text(
-                                text = title,
-                                fontWeight = if (selectedSource == index) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        selectedContentColor = AccentIndigo,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Search and Genre Filters
+            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(SurfaceGlass),
-                placeholder = { Text("Search books, graphic novels, manga...") },
+                    .height(50.dp),
+                placeholder = { Text("Search books, graphic novels, manga...", fontSize = 13.sp) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AccentTeal) },
                 trailingIcon = {
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.White)
                         }
                     }
                 },
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentTeal,
+                    focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                    unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                    focusedBorderColor = AccentIndigo,
                     unfocusedBorderColor = SurfaceGlassBorder
                 )
             )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Segmented Primary Pill Tab Switch
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .padding(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selectedSource == 0) AccentIndigo else Color.Transparent)
+                        .clickable { selectedSource = 0 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Personal Library",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Color.White
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selectedSource == 1) AccentTeal else Color.Transparent)
+                        .clickable { selectedSource = 1 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Public Domain",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = if (selectedSource == 1) Color.Black else Color.White
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -516,7 +527,7 @@ fun EBooksScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 90.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
@@ -529,7 +540,7 @@ fun EBooksScreen(
                 // FROSTED GLASS BOOKSHELF STYLIZED VIEW
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 96.dp),
+                    contentPadding = PaddingValues(bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(22.dp)
                 ) {
                     // Shelf 1: Currently Reading
