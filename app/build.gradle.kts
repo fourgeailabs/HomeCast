@@ -30,8 +30,8 @@ android {
     applicationId = "com.fourgeailabs.homecast"
     minSdk = 24
     targetSdk = 36
-    versionCode = 61
-    versionName = "5.11.00"
+    versionCode = 62
+    versionName = "5.12.00"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

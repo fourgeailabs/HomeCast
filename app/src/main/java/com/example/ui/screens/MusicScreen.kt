@@ -94,11 +94,10 @@ fun MusicScreen(
     val personalTabLabel = remember(servers) {
         val types = servers.map { it.type.lowercase() }
         when {
-            types.any { it.contains("plex") } && types.any { it.contains("jellyfin") } -> "Plex / Jellyfin"
-            types.any { it.contains("plex") } -> "Plex"
             types.any { it.contains("jellyfin") } -> "Jellyfin"
+            types.any { it.contains("plex") } -> "Plex"
             types.any { it.contains("audiobookshelf") } -> "Audiobookshelf"
-            else -> "Plex / Jellyfin"
+            else -> "Plex"
         }
     }
     var selectedTab by remember { mutableStateOf(MusicNavTab.SHELVES) }
@@ -364,13 +363,13 @@ fun MusicScreen(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        "Music & Video",
+                        "Media",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
                     Text(
-                        if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • Plex/Jellyfin ready" else "Your Personal Media & Video Cloud",
+                        if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • $personalTabLabel ready" else "Your Personal $personalTabLabel Media Cloud",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

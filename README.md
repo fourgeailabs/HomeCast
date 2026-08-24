@@ -1,11 +1,20 @@
 # HomeCast
 
-**Version:** 5.11.00
+**Version:** 5.12.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, and podcast media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.11.00)
+## 🚀 Recent Updates (v5.12.00)
+- **Resolved Audio & Video Media Playback Stream Engine**:
+  - Fixed ExoPlayer network request headers by removing conflicting authentication interceptors that triggered `400 Bad Request` or `403 Forbidden` errors on signed URLs (Google Cloud Storage, Archive.org, LibriVox, RSS feeds, and CDN endpoints).
+  - All public domain audiobooks, music tracks, podcasts, video podcasts, and self-hosted server streams play reliably and instantly.
+- **Strict Single-Server Labeling (Plex or Jellyfin)**:
+  - Dynamically evaluates connected servers and strictly displays EITHER `Plex Library` or `Jellyfin Library` (never joined with slashes) based on connected server instances.
+- **Clean Space-Constrained Bottom Navigation Labeling**:
+  - Updated navigation bar label to **Media** — a concise, clean 5-letter label that fits within screen constraints without wrapping or truncation.
+
+## 🚀 Previous Updates (v5.11.00)
 - **High-Performance Embedded Video Player for Podcasts & Video Media**:
   - Integrated Media3 `PlayerView` and `ExoPlayer` powered by `OptimizedNetworkEngine` for high-throughput video streaming.
   - Features aspect-ratio switching (Fit, Zoom, Fill), timeline scrubbing slider with exact timestamps, fast-forward/rewind 10s controls, auto-hiding HUD controls, and backdrop blur dismissals.

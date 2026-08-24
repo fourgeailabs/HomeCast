@@ -26,44 +26,44 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        val tokenInterceptor = okhttp3.Interceptor { chain ->
-            val original = chain.request()
-            val url = original.url
-            val tokenParam = url.queryParameter("token") 
-                ?: url.queryParameter("apiKey") 
-                ?: url.queryParameter("access_token")
-                ?: url.queryParameter("X-Plex-Token")
-
-            val requestBuilder = original.newBuilder()
-                .header("User-Agent", "HomeCast-Android/5.04")
-                .header("Accept", "*/*")
-
-            if (!tokenParam.isNullOrBlank()) {
-                val cleanToken = if (tokenParam.startsWith("Bearer ", ignoreCase = true)) {
-                    tokenParam.substring(7).trim()
-                } else tokenParam.trim()
-
-                if (original.header("Authorization") == null) {
-                    requestBuilder.header("Authorization", "Bearer $cleanToken")
+        // Create a permissive OkHttpClient for ExoPlayer audio/video streaming
+        val streamingOkHttpClient = try {
+            val trustAllCerts = arrayOf<TrustManager>(
+                object : X509TrustManager {
+                    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
                 }
-                if (original.header("x-auth-token") == null) {
-                    requestBuilder.header("x-auth-token", cleanToken)
-                }
-                if (original.header("X-Plex-Token") == null && (url.host.contains("plex", ignoreCase = true) || url.port == 32400 || url.queryParameter("X-Plex-Token") != null)) {
-                    requestBuilder.header("X-Plex-Token", cleanToken)
-                }
-            }
+            )
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAllCerts, SecureRandom())
 
-            chain.proceed(requestBuilder.build())
+            OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                .hostnameVerifier { _, _ -> true }
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .header("User-Agent", "HomeCast-Android/5.11")
+                        .build()
+                    chain.proceed(request)
+                }
+                .build()
+        } catch (_: Exception) {
+            OkHttpClient.Builder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .build()
         }
 
-        // Use OptimizedNetworkEngine for ExoPlayer audio/video streaming
-        val permissiveOkHttpClient = OptimizedNetworkEngine.client.newBuilder()
-            .addInterceptor(tokenInterceptor)
-            .build()
-
-        val httpDataSourceFactory = OkHttpDataSource.Factory(permissiveOkHttpClient)
-            .setUserAgent("HomeCast-Android/5.0")
+        val httpDataSourceFactory = OkHttpDataSource.Factory(streamingOkHttpClient)
+            .setUserAgent("HomeCast-Android/5.11")
 
         val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)

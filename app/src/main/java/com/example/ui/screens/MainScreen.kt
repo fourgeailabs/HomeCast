@@ -264,8 +264,8 @@ fun MainScreen(
                                     restoreState = false
                                 }
                             },
-                            icon = { Icon(Icons.Default.MusicVideo, contentDescription = "Music & Video") },
-                            label = { Text("Music & Video", maxLines = 1) },
+                            icon = { Icon(Icons.Default.MusicVideo, contentDescription = "Media") },
+                            label = { Text("Media", maxLines = 1) },
                             colors = navColors
                         )
                         NavigationBarItem(
