@@ -95,9 +95,13 @@ data class AbsAudioFile(
 data class PlexPinResponse(
     val id: Long? = null,
     val code: String? = null,
-    val authToken: String? = null,
-    val expiresAt: String? = null
-)
+    @field:Json(name = "authToken") val authToken: String? = null,
+    @field:Json(name = "auth_token") val authTokenSnake: String? = null,
+    @field:Json(name = "expiresAt") val expiresAt: String? = null
+) {
+    val resolvedAuthToken: String?
+        get() = authToken?.takeIf { it.isNotBlank() } ?: authTokenSnake?.takeIf { it.isNotBlank() }
+}
 
 @JsonClass(generateAdapter = true)
 data class PlexDevice(

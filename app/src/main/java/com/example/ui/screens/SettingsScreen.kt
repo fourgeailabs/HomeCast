@@ -1132,6 +1132,10 @@ fun PlexConfigCard(
     var showManualSetup by remember { mutableStateOf(false) }
     var connectionMode by remember { mutableStateOf("local") }
 
+    var plexLoginUsername by remember { mutableStateOf("") }
+    var plexLoginPassword by remember { mutableStateOf("") }
+    var plexAuthMode by remember { mutableStateOf("web") } // "web" or "direct"
+
     val plexDiagnosticResult by viewModel.plexDiagnosticResult.collectAsState()
     val isDiagnosingPlex by viewModel.isDiagnosingPlex.collectAsState()
     val plexPinCode by viewModel.plexPinCode.collectAsState()
@@ -1184,7 +1188,7 @@ fun PlexConfigCard(
                 Column {
                     Spacer(modifier = Modifier.height(14.dp))
 
-            // Primary 1-Tap Cloud Account Sign-In Card
+            // Primary Cloud Account Sign-In Card
             Surface(
                 color = AccentIndigo.copy(alpha = 0.12f),
                 shape = RoundedCornerShape(12.dp),
@@ -1195,38 +1199,119 @@ fun PlexConfigCard(
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CloudSync, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(22.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Zero-Config Account Login",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = AccentIndigo
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudSync, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Plex Account Login",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = AccentIndigo
+                            )
+                        }
+                    }
+
+                    // Mode Toggle (Browser 1-Tap vs Direct User/Pass)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = plexAuthMode == "web",
+                            onClick = { plexAuthMode = "web" },
+                            label = { Text("🌐 1-Tap Browser Auth", fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AccentIndigo.copy(alpha = 0.25f),
+                                selectedLabelColor = AccentIndigo
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = plexAuthMode == "direct",
+                            onClick = { plexAuthMode = "direct" },
+                            label = { Text("🔑 Username & Password", fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AccentTeal.copy(alpha = 0.25f),
+                                selectedLabelColor = AccentTeal
+                            ),
+                            modifier = Modifier.weight(1f)
                         )
                     }
 
-                    Text(
-                        "Sign in once in your browser. HomeCast automatically discovers your owned Plex Media Server and auto-searches and syncs your music library directly.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
+                    if (plexAuthMode == "web") {
+                        Text(
+                            "Sign in once via your browser. HomeCast auto-discovers your owned Plex Media Server and syncs your music and video libraries directly.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
 
-                    Button(
-                        onClick = { viewModel.requestPlexPin() },
-                        enabled = !isRequestingPin && !isDiscoveringPlexServers && !isLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (isRequestingPin || isDiscoveringPlexServers) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (isRequestingPin) "Generating Code..." else "Discovering Servers...", fontSize = 13.sp)
-                        } else {
-                            Icon(Icons.Default.VpnKey, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Sign In with Plex Account", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Button(
+                            onClick = { viewModel.requestPlexPin() },
+                            enabled = !isRequestingPin && !isDiscoveringPlexServers && !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isRequestingPin || isDiscoveringPlexServers) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(if (isRequestingPin) "Generating Code..." else "Discovering Servers...", fontSize = 13.sp)
+                            } else {
+                                Icon(Icons.Default.VpnKey, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sign In with Plex Web", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    } else {
+                        Text(
+                            "Enter your Plex account credentials directly to sign in and auto-connect your servers.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedTextField(
+                            value = plexLoginUsername,
+                            onValueChange = { plexLoginUsername = it },
+                            label = { Text("Plex Username or Email", fontSize = 12.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = plexLoginPassword,
+                            onValueChange = { plexLoginPassword = it },
+                            label = { Text("Plex Password", fontSize = 12.sp) },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Button(
+                            onClick = {
+                                if (plexLoginUsername.isNotBlank() && plexLoginPassword.isNotBlank()) {
+                                    viewModel.loginWithPlexCredentials(plexLoginUsername, plexLoginPassword)
+                                } else {
+                                    Toast.makeText(context, "Please enter both username/email and password.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = !isRequestingPin && !isDiscoveringPlexServers && !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isRequestingPin || isDiscoveringPlexServers) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Signing in...", fontSize = 13.sp)
+                            } else {
+                                Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sign In Directly", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -1555,7 +1640,23 @@ fun PlexConfigCard(
                         }
                     }
 
-                    // Quick Copy & Browser Links
+                    // 1-Tap Browser Auth Button
+                    Button(
+                        onClick = {
+                            val authUrl = "https://app.plex.tv/auth#?clientID=${com.example.data.network.PlexClient.CLIENT_ID}&code=$code&context%5Bdevice%5D%5Bproduct%5D=HomeCast&context%5Bdevice%5D%5Bplatform%5D=Android"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                    ) {
+                        Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("1-Tap Open Plex Web Sign-In", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Secondary Copy Code & Manual Link Options
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1566,26 +1667,25 @@ fun PlexConfigCard(
                                 Toast.makeText(context, "Code '$code' copied to clipboard!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Copy Code", fontSize = 12.sp)
+                            Text("Copy Code", fontSize = 11.sp)
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = {
                                 val linkUrl = "https://plex.tv/link?code=$code"
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(linkUrl))
                                 context.startActivity(intent)
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
-                            modifier = Modifier.weight(1.3f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Open plex.tv/link", fontSize = 12.sp)
+                            Text("plex.tv/link", fontSize = 11.sp)
                         }
                     }
 

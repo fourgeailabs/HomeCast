@@ -10,6 +10,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -22,7 +23,7 @@ import javax.net.ssl.X509TrustManager
 
 object PlexClient {
     private const val TAG = "PlexClient"
-    private const val CLIENT_ID = "HomeCast-Android-Client"
+    const val CLIENT_ID = "HomeCast-Android-Client"
     private const val PRODUCT_NAME = "HomeCast"
     private const val VERSION = "1.8"
 
@@ -110,13 +111,25 @@ object PlexClient {
                 return@withContext Result.failure(Exception("Failed to create PIN: HTTP ${response.code}"))
             }
 
-            val adapter = moshi.adapter(PlexPinResponse::class.java)
-            val pin = adapter.fromJson(body)
-            if (pin?.code != null && pin.id != null) {
-                // Ensure code is formatted cleanly (4 uppercase characters)
-                Result.success(pin.copy(code = pin.code.uppercase()))
+            // Dual parsing: JSONObject + Moshi
+            var pinCode: String? = null
+            var pinId: Long? = null
+            try {
+                val json = org.json.JSONObject(body)
+                if (json.has("code") && !json.isNull("code")) pinCode = json.getString("code")
+                if (json.has("id") && !json.isNull("id")) pinId = json.getLong("id")
+            } catch (_: Exception) {}
+
+            if (pinCode != null && pinId != null) {
+                Result.success(PlexPinResponse(id = pinId, code = pinCode.uppercase()))
             } else {
-                Result.failure(Exception("Invalid PIN response from Plex"))
+                val adapter = moshi.adapter(PlexPinResponse::class.java)
+                val pin = adapter.fromJson(body)
+                if (pin?.code != null && pin.id != null) {
+                    Result.success(pin.copy(code = pin.code.uppercase()))
+                } else {
+                    Result.failure(Exception("Invalid PIN response from Plex"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -140,9 +153,84 @@ object PlexClient {
                 return@withContext Result.failure(Exception("HTTP ${response.code}"))
             }
 
-            val adapter = moshi.adapter(PlexPinResponse::class.java)
-            val pin = adapter.fromJson(body)
-            Result.success(pin?.authToken)
+            var token: String? = null
+            try {
+                val json = org.json.JSONObject(body)
+                if (json.has("authToken") && !json.isNull("authToken")) {
+                    token = json.getString("authToken")
+                } else if (json.has("auth_token") && !json.isNull("auth_token")) {
+                    token = json.getString("auth_token")
+                }
+            } catch (_: Exception) {}
+
+            if (token.isNullOrBlank()) {
+                val adapter = moshi.adapter(PlexPinResponse::class.java)
+                val pin = adapter.fromJson(body)
+                token = pin?.resolvedAuthToken
+            }
+
+            Result.success(token?.takeIf { it.isNotBlank() })
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Direct sign-in using Plex username/email & password to retrieve authToken directly.
+     */
+    suspend fun loginWithCredentials(usernameOrEmail: String, password: String): Result<String> = withContext(Dispatchers.IO) {
+        if (usernameOrEmail.isBlank() || password.isBlank()) {
+            return@withContext Result.failure(Exception("Username/email and password cannot be empty."))
+        }
+
+        val formBody = FormBody.Builder()
+            .add("user[login]", usernameOrEmail.trim())
+            .add("user[password]", password)
+            .add("login", usernameOrEmail.trim())
+            .add("password", password)
+            .build()
+
+        val request = Request.Builder()
+            .url("https://plex.tv/users/sign_in.json")
+            .post(formBody)
+            .apply { buildStandardHeaders(this, "") }
+            .build()
+
+        try {
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                if (response.code == 401) {
+                    return@withContext Result.failure(Exception("Invalid Plex username or password."))
+                }
+                return@withContext Result.failure(Exception("Plex sign-in failed: HTTP ${response.code}"))
+            }
+
+            var token: String? = null
+            try {
+                val json = org.json.JSONObject(body)
+                if (json.has("user")) {
+                    val userObj = json.getJSONObject("user")
+                    if (userObj.has("authToken") && !userObj.isNull("authToken")) {
+                        token = userObj.getString("authToken")
+                    } else if (userObj.has("authentication_token") && !userObj.isNull("authentication_token")) {
+                        token = userObj.getString("authentication_token")
+                    }
+                }
+                if (token.isNullOrBlank()) {
+                    if (json.has("authToken") && !json.isNull("authToken")) {
+                        token = json.getString("authToken")
+                    } else if (json.has("auth_token") && !json.isNull("auth_token")) {
+                        token = json.getString("auth_token")
+                    }
+                }
+            } catch (_: Exception) {}
+
+            if (!token.isNullOrBlank()) {
+                Result.success(token)
+            } else {
+                Result.failure(Exception("Sign-in succeeded but no authentication token was returned by Plex."))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -1080,6 +1080,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _plexDiagnosticResult.value = null
     }
 
+    fun loginWithPlexCredentials(usernameOrEmail: String, password: String) {
+        viewModelScope.launch {
+            _isRequestingPin.value = true
+            _serverOpState.value = ServerOperationState.Loading
+            try {
+                val res = PlexClient.loginWithCredentials(usernameOrEmail, password)
+                if (res.isSuccess) {
+                    val token = res.getOrNull() ?: ""
+                    _plexAuthToken.value = token
+                    _serverOpState.value = ServerOperationState.Success("Signed into Plex! Discovering your servers...")
+                    discoverAndAutoConnectPlex(token)
+                } else {
+                    _serverOpState.value = ServerOperationState.Error(res.exceptionOrNull()?.message ?: "Plex Sign In failed")
+                }
+            } catch (e: Exception) {
+                _serverOpState.value = ServerOperationState.Error("Error: ${e.message}")
+            } finally {
+                _isRequestingPin.value = false
+            }
+        }
+    }
+
     fun requestPlexPin() {
         pinPollJob?.cancel()
         viewModelScope.launch {
