@@ -26,7 +26,7 @@ object ComicContentFetcher {
 
     /**
      * Resolves real comic pages (either extracted from CBZ/ZIP, from Komga/Kavita/Audiobookshelf server,
-     * or from Archive.org image lists).
+     * from Archive.org files/pages, or local directories/archives).
      */
     suspend fun fetchComicPages(
         context: Context,
@@ -64,50 +64,80 @@ object ComicContentFetcher {
                 }
             }
 
-            // Case 2: CBZ / ZIP Archive Download & Local Extraction
-            val archiveUrl = when {
-                downloadUrl.isNotBlank() -> downloadUrl
-                coverUrl.contains("archive.org") -> {
-                    val identifier = coverUrl.substringAfter("img/").substringBefore("/")
-                    "https://archive.org/download/$identifier/${identifier}.cbz"
-                }
+            // Case 2: Local Storage File or Directory
+            val localPath = when {
+                downloadUrl.startsWith("/") || downloadUrl.startsWith("file://") -> downloadUrl.removePrefix("file://")
+                coverUrl.startsWith("/") || coverUrl.startsWith("file://") -> coverUrl.removePrefix("file://")
                 else -> ""
             }
-
-            if (archiveUrl.isNotBlank() && (archiveUrl.endsWith(".cbz", ignoreCase = true) || archiveUrl.endsWith(".zip", ignoreCase = true) || archiveUrl.contains("/download"))) {
-                val extractedPages = downloadAndExtractCbz(context, comicId, archiveUrl, serverApiKey)
-                if (extractedPages.isNotEmpty()) {
-                    return@withContext extractedPages
+            if (localPath.isNotBlank()) {
+                val localFile = File(localPath)
+                if (localFile.isDirectory) {
+                    val loaded = loadExtractedPagesFromDir(localFile)
+                    if (loaded.isNotEmpty()) return@withContext loaded
+                } else if (localFile.exists() && (localPath.endsWith(".cbz", true) || localPath.endsWith(".zip", true))) {
+                    localFile.inputStream().use { stream ->
+                        val extracted = extractFromInputStream(context, comicId, stream)
+                        if (extracted.isNotEmpty()) return@withContext extracted
+                    }
                 }
             }
 
-            // Case 3: Archive.org image pages lookup
-            if (coverUrl.contains("archive.org")) {
-                val identifier = coverUrl.substringAfter("img/").substringBefore("/")
-                val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(identifier)
-                val imageFiles = files.filter { 
-                    it.name.endsWith(".jpg", ignoreCase = true) || 
-                    it.name.endsWith(".jpeg", ignoreCase = true) || 
-                    it.name.endsWith(".png", ignoreCase = true) ||
-                    it.name.endsWith(".webp", ignoreCase = true)
-                }.sortedBy { it.name }
+            // Case 3: Archive.org Identifier Resolution & Extraction
+            val archiveId = extractArchiveIdentifier(coverUrl, downloadUrl, comicId)
+            if (archiveId.isNotBlank()) {
+                Log.d(TAG, "Fetching Archive.org files for identifier: $archiveId")
+                val files = com.example.data.network.ArchiveOrgClient.fetchFilesForIdentifier(archiveId)
+                
+                // 3a. Look for actual CBZ or ZIP archive file on Archive.org
+                val cbzFile = files.firstOrNull { 
+                    it.name.endsWith(".cbz", ignoreCase = true) || 
+                    it.name.endsWith(".zip", ignoreCase = true) 
+                }
+                if (cbzFile != null) {
+                    val cbzUrl = "https://archive.org/download/$archiveId/${cbzFile.name}"
+                    val extracted = downloadAndExtractCbz(context, comicId, cbzUrl, serverApiKey)
+                    if (extracted.isNotEmpty()) return@withContext extracted
+                }
+
+                // 3b. Look for direct page image files in Archive.org metadata
+                val imageFiles = files.filter { file ->
+                    val name = file.name.lowercase()
+                    (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp") || name.endsWith(".jp2")) &&
+                    !name.contains("_thumb") && !name.contains("_small")
+                }.sortedWith(Comparator { a, b ->
+                    extractNumber(a.name).compareTo(extractNumber(b.name))
+                })
 
                 if (imageFiles.isNotEmpty()) {
                     imageFiles.forEachIndexed { index, file ->
                         pages.add(
                             ComicPage(
                                 pageNumber = index + 1,
-                                fullPageArtUrl = "https://archive.org/download/$identifier/${file.name}",
+                                fullPageArtUrl = "https://archive.org/download/$archiveId/${file.name}",
                                 pageTitle = "Page ${index + 1}"
                             )
                         )
                     }
                     return@withContext pages
                 }
+
+                // 3c. Archive.org Book/Comic Reader Page Stream fallback
+                val targetPages = if (pageCount > 0) pageCount else 32
+                for (i in 0 until targetPages) {
+                    pages.add(
+                        ComicPage(
+                            pageNumber = i + 1,
+                            fullPageArtUrl = "https://archive.org/download/$archiveId/page/n$i.jpg",
+                            pageTitle = "Page ${i + 1}"
+                        )
+                    )
+                }
+                if (pages.isNotEmpty()) return@withContext pages
             }
 
-            // Case 4: Audiobookshelf / Server Item file endpoint
-            if (downloadUrl.isNotBlank()) {
+            // Case 4: Audiobookshelf / Direct Remote Stream
+            if (downloadUrl.isNotBlank() && (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://"))) {
                 val reqBuilder = Request.Builder().url(downloadUrl)
                 if (serverApiKey.isNotBlank()) {
                     reqBuilder.header("Authorization", if (serverApiKey.startsWith("Bearer ")) serverApiKey else "Bearer $serverApiKey")
@@ -115,7 +145,7 @@ object ComicContentFetcher {
                 val resp = client.newCall(reqBuilder.build()).execute()
                 if (resp.isSuccessful && resp.body != null) {
                     val contentType = resp.header("Content-Type") ?: ""
-                    if (contentType.contains("zip", true) || contentType.contains("comic", true) || contentType.contains("octet-stream", true)) {
+                    if (contentType.contains("zip", true) || contentType.contains("comic", true) || contentType.contains("octet-stream", true) || downloadUrl.contains(".cbz", true) || downloadUrl.contains(".zip", true)) {
                         val extracted = extractFromInputStream(context, comicId, resp.body!!.byteStream())
                         if (extracted.isNotEmpty()) {
                             return@withContext extracted
@@ -128,7 +158,7 @@ object ComicContentFetcher {
             Log.e(TAG, "Failed to fetch comic pages for $title", e)
         }
 
-        // Fallback: If only cover is available, return cover as Page 1
+        // Fallback: Return cover URL if available
         if (coverUrl.isNotBlank()) {
             val count = if (pageCount > 0) pageCount else 1
             for (i in 1..count) {
@@ -143,6 +173,25 @@ object ComicContentFetcher {
         }
 
         pages
+    }
+
+    private fun extractArchiveIdentifier(coverUrl: String, downloadUrl: String, comicId: String): String {
+        val candidates = listOf(downloadUrl, coverUrl)
+        for (url in candidates) {
+            if (url.contains("archive.org")) {
+                val id = url.substringAfter("img/")
+                    .substringAfter("details/")
+                    .substringAfter("download/")
+                    .substringBefore("/")
+                    .substringBefore("?")
+                    .trim()
+                if (id.isNotBlank() && !id.contains(".")) return id
+            }
+        }
+        if (comicId.isNotBlank() && !comicId.contains("/") && !comicId.contains("\\") && !comicId.startsWith("http")) {
+            return comicId
+        }
+        return ""
     }
 
     private fun downloadAndExtractCbz(
@@ -183,7 +232,7 @@ object ComicContentFetcher {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     val name = entry.name.lowercase()
-                    if (!entry.isDirectory && (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp"))) {
+                    if (!entry.isDirectory && (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp") || name.endsWith(".jp2"))) {
                         val sanitizedName = File(entry.name).name
                         val outputFile = File(cacheDir, sanitizedName)
                         FileOutputStream(outputFile).use { out ->
@@ -204,7 +253,7 @@ object ComicContentFetcher {
     private fun loadExtractedPagesFromDir(cacheDir: File): List<ComicPage> {
         val imageFiles = cacheDir.listFiles { file ->
             val name = file.name.lowercase()
-            file.isFile && (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp"))
+            file.isFile && (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp") || name.endsWith(".jp2"))
         }?.sortedWith(Comparator { a, b ->
             extractNumber(a.name).compareTo(extractNumber(b.name))
         }) ?: emptyList()
@@ -223,3 +272,4 @@ object ComicContentFetcher {
         return digits.toIntOrNull() ?: 0
     }
 }
+

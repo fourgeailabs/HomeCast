@@ -1,11 +1,29 @@
 # HomeCast
 
-**Version:** 5.08.00
+**Version:** 5.10.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, and podcast media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.08.00)
+## 🚀 Recent Updates (v5.10.00)
+- **Expanded Public Domain & Global Podcast Engine**:
+  - **30+ Curated Public Domain Audio Series**: Added a comprehensive curated catalog featuring classic Old Time Radio dramas (*The Shadow*, *Dragnet*, *Sherlock Holmes*, *X Minus One*), science & space exploration (*NASA Science Casts*, *Astronomy Cast*), history & culture (*In Our Time*, *Echoes of History*), philosophy (*Philosophize This!*, *LibriVox Serials*), news, and independent creator feeds (*PlayPodcast*, *RSS.com*, *GetPodcast*).
+  - **Live iTunes Podcast Search API**: Enabled real-time search and directory browsing across thousands of global public podcasts directly from the Podcasts screen.
+  - **Live RSS & iTunes Episode Extractor**: Automatically parses XML feeds and iTunes metadata to fetch live episode audio streams, full descriptions, publication dates, and artwork.
+  - **Interactive Category Filtering**: Fast navigation across 8 categories (Old Time Radio, Science & Tech, History & Culture, Philosophy & Books, News & Ideas, Audio Serials, Indie & Community).
+  - **Personal Podcast Subscriptions**: Easily bookmark and save public channels into your Personal Podcasts collection.
+
+## 🚀 Previous Updates (v5.09.00)
+- **AI Capabilities & Features Dropdown Notice**:
+  - Added an interactive accordion dialog in the About section of Settings detailing all 9 intelligent AI models and smart features built into HomeCast by FourgeAI LABS.
+  - Features expandable cards with category tags, detailed descriptions, and feature bullet points that start closed and expand on tap.
+- **Restored Comic Archive & Page Streaming Engine**:
+  - Resolved comic file and identifier loading issues across Archive.org public domain comics, CBZ/ZIP local archives, and self-hosted servers (Komga/Kavita/Booklore).
+  - Enhanced `ComicContentFetcher` with multi-tier extraction: checks for direct archive files, parses page metadata, falls back to Archive.org page stream rendering (`page/n$i.jpg`), and processes local CBZ/ZIP directories.
+  - Injected custom `User-Agent` headers into Coil's `ImageRequest` builders to ensure remote comic pages and Archive.org images load reliably without server blockages.
+  - Delivered seamless Western LTR, Manga RTL, and Webtoon vertical continuous scroll reading modes with multi-touch zoom and guided panel transitions.
+
+## 🚀 Previous Updates (v5.08.00)
 - **Comprehensive AI Media Intelligence Suite**:
   - **Story So Far AI Summarizer**: Provides instant chapter-level context recaps for long audiobooks, e-books, and podcasts without spoilers.
   - **24/7 AI Companion Assistant**: In-context conversational assistant on player and e-reader screens that answers questions tailored strictly to your current listening or reading position.

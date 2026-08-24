@@ -330,6 +330,7 @@ fun ComicReaderScreen(
                         AsyncImage(
                             model = ImageRequest.Builder(context)
                                 .data(page.fullPageArtUrl)
+                                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                                 .crossfade(true)
                                 .build(),
                             contentDescription = "Page ${index + 1}",
@@ -388,6 +389,7 @@ fun ComicReaderScreen(
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(safeCurrentPage.fullPageArtUrl)
+                            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                             .crossfade(true)
                             .build(),
                         contentDescription = "Page ${safeCurrentPage.pageNumber}",

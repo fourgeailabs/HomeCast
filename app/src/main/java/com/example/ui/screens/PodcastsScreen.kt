@@ -32,11 +32,14 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.Audiobook
+import com.example.data.PublicDomainPodcastsCatalog
+import com.example.data.network.PodcastClient
 import com.example.ui.MainViewModel
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
+import kotlinx.coroutines.launch
 
 data class PodcastChannel(
     val id: String,
@@ -71,71 +74,44 @@ fun PodcastsScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val context = LocalContext.current
-    var selectedSection by remember { mutableIntStateOf(0) } // 0: Personal, 1: Public Directory
+    val scope = rememberCoroutineScope()
+
+    var selectedSection by remember { mutableIntStateOf(1) } // 0: Personal, 1: Public Catalog & Search
     var personalFilter by remember { mutableIntStateOf(0) } // 0: All Personal, 1: Local Device, 2: Personal Server
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
 
     val servers by viewModel.servers.collectAsState()
 
-    // Curated Public Podcast Directories requested by user
-    val publicDirectories = remember {
-        listOf(
-            PodcastChannel(
-                id = "pub_playpodcast",
-                title = "PlayPodcast.net Directory",
-                publisher = "PlayPodcast Network",
-                coverUrl = "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&q=80",
-                description = "Discover trending independent podcasts, audio series, and daily news.",
-                category = "Directory",
-                feedUrl = "https://www.playpodcast.net/",
-                isPublic = true,
-                episodes = listOf(
-                    PodcastEpisode("ep_play1", "The Tech Tomorrow Show #142", "PlayPodcast.net Directory", "PlayPodcast Network", 2400L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&q=80", "Today", "Daily breakthroughs in AI and consumer hardware."),
-                    PodcastEpisode("ep_play2", "Mindset & Performance Digest", "PlayPodcast.net Directory", "PlayPodcast Network", 1800L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&q=80", "Yesterday", "Cognitive psychology for modern creators.")
-                )
-            ),
-            PodcastChannel(
-                id = "pub_rss_community",
-                title = "RSS.com Community Showcase",
-                publisher = "RSS.com Podcasting",
-                coverUrl = "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&q=80",
-                description = "Global creator community featuring stories, culture, and indie broadcasts.",
-                category = "Community",
-                feedUrl = "https://rss.com/community/",
-                isPublic = true,
-                episodes = listOf(
-                    PodcastEpisode("ep_rss1", "Indie Creator Stories Vol. 8", "RSS.com Community Showcase", "RSS.com Podcasting", 2100L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&q=80", "3 days ago", "How independent podcasters built active listener communities."),
-                    PodcastEpisode("ep_rss2", "Acoustic & Ambient Soundscapes", "RSS.com Community Showcase", "RSS.com Podcasting", 3600L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&q=80", "5 days ago", "Immersive audio journeys recorded around the globe.")
-                )
-            ),
-            PodcastChannel(
-                id = "pub_getpodcast",
-                title = "GetPodcast Global Charts",
-                publisher = "GetPodcast Platform",
-                coverUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
-                description = "Top charting global audio programs, investigative journalism, and science.",
-                category = "Global Charts",
-                feedUrl = "https://getpodcast.com/",
-                isPublic = true,
-                episodes = listOf(
-                    PodcastEpisode("ep_get1", "The Science of Deep Focus", "GetPodcast Global Charts", "GetPodcast Platform", 2800L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80", "This Week", "Neuroscience-backed tools for sustained attention."),
-                    PodcastEpisode("ep_get2", "Cosmic Wonders & Astrophysics", "GetPodcast Global Charts", "GetPodcast Platform", 3200L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80", "Last Week", "Exploring deep space telemetry and exoplanets.")
-                )
-            )
-        )
+    var publicChannels by remember { mutableStateOf(PublicDomainPodcastsCatalog.curatedPodcasts) }
+    var isLoadingPublic by remember { mutableStateOf(false) }
+    var expandedChannelId by remember { mutableStateOf<String?>(null) }
+    var channelEpisodesMap by remember { mutableStateOf<Map<String, List<PodcastEpisode>>>(emptyMap()) }
+    var loadingEpisodesChannelId by remember { mutableStateOf<String?>(null) }
+
+    // Subscribed / Saved personal channels
+    var subscribedChannelIds by remember { mutableStateOf(setOf<String>()) }
+
+    // Live search & category filter for public feeds
+    LaunchedEffect(searchQuery, selectedCategory, selectedSection) {
+        if (selectedSection == 1) {
+            isLoadingPublic = true
+            val results = PodcastClient.searchPodcasts(searchQuery, selectedCategory)
+            publicChannels = results
+            isLoadingPublic = false
+        }
     }
 
     // Dynamic Personal Podcast Feeds
-    val personalChannels = remember(servers) {
-        listOf(
+    val basePersonalChannels = remember(servers, subscribedChannelIds) {
+        val defaultPersonal = listOf(
             PodcastChannel(
                 id = "pod_tech",
                 title = "Silicon Valley Tech Daily",
                 publisher = "FourgeAI Labs Audio",
                 coverUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80",
                 description = "Your morning brief on software engineering, cloud computing, and AI developments.",
-                category = "Technology",
+                category = "Science & Tech",
                 serverId = "local",
                 episodes = listOf(
                     PodcastEpisode("pod_ep1", "Ep. 88: Generative Models & On-Device AI", "Silicon Valley Tech Daily", "FourgeAI Labs Audio", 2100L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80", "Today", "An in-depth look at Android neural acceleration.")
@@ -147,18 +123,20 @@ fun PodcastsScreen(
                 publisher = "Archive Cultural Media",
                 coverUrl = "https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=600&q=80",
                 description = "Uncovering the pivotal moments, thinkers, and movements that shaped human civilization.",
-                category = "History",
+                category = "History & Culture",
                 serverId = if (servers.isNotEmpty()) servers.first().id else "local",
                 episodes = listOf(
                     PodcastEpisode("pod_ep2", "Chapter 12: The Renaissance Builders", "Echoes of History", "Archive Cultural Media", 3400L, "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__Fly_Paper.mp3", "https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=600&q=80", "2 days ago", "How architectural revolutions sparked artistic enlightenment.")
                 )
             )
         )
+        val addedFromPublic = PublicDomainPodcastsCatalog.curatedPodcasts.filter { subscribedChannelIds.contains(it.id) }
+        defaultPersonal + addedFromPublic
     }
 
     // Filter personal feeds by switch
-    val filteredPersonalChannels = remember(personalChannels, personalFilter, searchQuery) {
-        personalChannels.filter { channel ->
+    val filteredPersonalChannels = remember(basePersonalChannels, personalFilter, searchQuery) {
+        basePersonalChannels.filter { channel ->
             val matchesFilter = when (personalFilter) {
                 1 -> channel.serverId == "local" || channel.serverId.isBlank()
                 2 -> channel.serverId != "local" && channel.serverId.isNotBlank()
@@ -169,7 +147,7 @@ fun PodcastsScreen(
         }.distinctBy { "${it.title.lowercase().trim()}___${it.publisher.lowercase().trim()}" }
     }
 
-    val displayChannels = if (selectedSection == 0) filteredPersonalChannels else publicDirectories
+    val displayChannels = if (selectedSection == 0) filteredPersonalChannels else publicChannels
 
     Scaffold(
         topBar = {
@@ -259,6 +237,31 @@ fun PodcastsScreen(
                     }
                 }
 
+                // If Public Directory, display Category Filter Chips
+                if (selectedSection == 1) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp)
+                    ) {
+                        items(PublicDomainPodcastsCatalog.categories) { cat ->
+                            val isSelected = selectedCategory == cat
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedCategory = cat },
+                                label = { Text(cat, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = AccentTeal,
+                                    selectedLabelColor = Color.Black,
+                                    containerColor = Color.Black.copy(alpha = 0.25f),
+                                    labelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+
                 // If Personal Section, display Local vs Personal Server filter switch
                 if (selectedSection == 0) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -323,7 +326,7 @@ fun PodcastsScreen(
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text("Daily Podcast Briefing", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
-                            Text("Fresh episodes curated from your subscribed feeds & directories", fontSize = 11.sp, color = Color.White.copy(alpha = 0.9f))
+                            Text("Fresh episodes curated from your subscribed feeds & global directories", fontSize = 11.sp, color = Color.White.copy(alpha = 0.9f))
                         }
 
                         IconButton(
@@ -354,8 +357,20 @@ fun PodcastsScreen(
                 }
             }
 
+            if (isLoadingPublic) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AccentTeal)
+                    }
+                }
+            }
+
             // Podcast Channels List
             items(displayChannels, key = { it.id }) { channel ->
+                val isExpanded = expandedChannelId == channel.id
+                val isSubscribed = subscribedChannelIds.contains(channel.id)
+                val episodesList = channelEpisodesMap[channel.id] ?: channel.episodes
+
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
@@ -364,7 +379,23 @@ fun PodcastsScreen(
                         .border(1.dp, SurfaceGlassBorder, RoundedCornerShape(18.dp))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val newExpanded = if (isExpanded) null else channel.id
+                                    expandedChannelId = newExpanded
+                                    if (newExpanded != null && !channelEpisodesMap.containsKey(channel.id)) {
+                                        scope.launch {
+                                            loadingEpisodesChannelId = channel.id
+                                            val fetched = PodcastClient.fetchChannelEpisodes(channel)
+                                            channelEpisodesMap = channelEpisodesMap + (channel.id to fetched)
+                                            loadingEpisodesChannelId = null
+                                        }
+                                    }
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context).data(channel.coverUrl).crossfade(true).build(),
                                 contentDescription = channel.title,
@@ -375,22 +406,58 @@ fun PodcastsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(channel.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(channel.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                    Surface(color = AccentIndigo.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
+                                        Text(channel.category, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = AccentTeal, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                }
                                 Text(channel.publisher, fontSize = 12.sp, color = AccentTeal, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(channel.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
+                                Text(channel.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (isExpanded) 4 else 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
+                            }
+
+                            IconButton(onClick = {
+                                subscribedChannelIds = if (isSubscribed) subscribedChannelIds - channel.id else subscribedChannelIds + channel.id
+                            }) {
+                                Icon(
+                                    imageVector = if (isSubscribed) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Subscribe",
+                                    tint = if (isSubscribed) AccentTeal else Color.Gray
+                                )
                             }
                         }
 
-                        if (channel.episodes.isNotEmpty()) {
+                        if (loadingEpisodesChannelId == channel.id) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = AccentTeal, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Fetching full broadcast episodes...", fontSize = 11.sp, color = AccentTeal)
+                            }
+                        } else if (episodesList.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Divider(color = SurfaceGlassBorder)
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            Text("Recent Episodes", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Episodes (${episodesList.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (isExpanded) "Show Less" else "Expand All", fontSize = 11.sp, color = AccentTeal, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+                                    expandedChannelId = if (isExpanded) null else channel.id
+                                })
+                            }
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            channel.episodes.forEach { ep ->
+                            val showCount = if (isExpanded) episodesList.size else 2
+                            episodesList.take(showCount).forEach { ep ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()

@@ -109,6 +109,7 @@ private fun MainSettingsMenu(
     val hasSilentBackup by viewModel.hasSilentBackup.collectAsState()
     val context = LocalContext.current
     var showWhatsNewDialog by remember { mutableStateOf(false) }
+    var showAiNoticeDialog by remember { mutableStateOf(false) }
 
     val exportBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -408,18 +409,18 @@ private fun MainSettingsMenu(
                     Text("© 2026", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("AI-Powered Features", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "✨ Public Domain Source Verifier\nInspects and fixes open-access media links using Gemini before adding.\n\n" +
-                        "✨ Local Media Scanner & Enricher\nRetrieves high-res cover art and author/artist biographies for offline storage files.\n\n" +
-                        "✨ Dynamic Daily Menus & Themes\nRotates category bookshelves automatically at midnight to keep collections fresh daily.\n\n" +
-                        "✨ Intelligent Author Cleaning\nRefines messy catalog indexing into clean human author names.\n\n" +
-                        "✨ AI Discovery Blends\nGenerate bespoke thematic playlists and discovery mixes in the Discovery tab.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { showAiNoticeDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "AI Notice", tint = Color.Black)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("AI Capabilities & Features Notice", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     Button(
                         onClick = { showWhatsNewDialog = true },
@@ -451,6 +452,10 @@ private fun MainSettingsMenu(
 
     if (showWhatsNewDialog) {
         WhatsNewDialog(onDismiss = { showWhatsNewDialog = false })
+    }
+
+    if (showAiNoticeDialog) {
+        AiFeaturesNoticeDialog(onDismiss = { showAiNoticeDialog = false })
     }
 }
 
@@ -1863,6 +1868,27 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "5.10.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Expanded Public Domain Podcast Catalog: Added a comprehensive curated catalog with 30+ top public domain, open-access, and public broadcasting audio series.",
+                    "Live iTunes Podcast Search API: Real-time discovery across thousands of global audio feeds, independent creator broadcasts, and top podcasts.",
+                    "Live RSS & iTunes Episode Extractor: Automatically parses XML feeds and iTunes episode metadata to extract live audio enclosures, titles, and release dates.",
+                    "Interactive Category Filtering: Browse feeds by Old Time Radio, Science & Tech, History & Culture, Philosophy & Books, News & Ideas, Audio Serials, and Indie & Community.",
+                    "Personal Podcast Subscriptions: Bookmark and save public feeds directly into your Personal Podcasts collection."
+                )
+            ),
+            UpdateNotice(
+                version = "5.09.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "AI Capabilities & Features Dropdown Notice: Added an interactive accordion dialog in the About section detailing all 9 AI capabilities built into HomeCast.",
+                    "Restored Comic Archive & Page Streaming Engine: Upgraded comic identifier parsing, multi-tier archive file extraction, direct Archive.org page image streams, and local CBZ/ZIP directory support.",
+                    "Coil User-Agent Header Injection: Ensured high-resolution remote comic pages and Archive.org images load seamlessly without server blockages.",
+                    "Enhanced Comic Reader Responsiveness: Seamless Western LTR, Manga RTL, and Webtoon vertical reading modes with multi-touch zoom and guided panel transitions."
+                )
+            ),
+            UpdateNotice(
                 version = "5.08.00",
                 date = "August 2026",
                 highlights = listOf(
@@ -2191,3 +2217,220 @@ data class UpdateNotice(
     val date: String,
     val highlights: List<String>
 )
+
+data class AiFeatureItem(
+    val title: String,
+    val category: String,
+    val description: String,
+    val highlights: List<String>
+)
+
+@Composable
+fun AiFeaturesNoticeDialog(onDismiss: () -> Unit) {
+    val aiFeatures = remember {
+        listOf(
+            AiFeatureItem(
+                title = "Story So Far AI Summarizer",
+                category = "Reading & Listening Progress AI",
+                description = "Provides instant chapter-level and context-aware story recaps for long audiobooks, e-books, and podcast episodes without spoiling upcoming events.",
+                highlights = listOf(
+                    "Generates spoiler-free recaps matching your exact chapter or playback timestamp.",
+                    "Available on both the full-screen player and e-reader HUD menus.",
+                    "Keeps track of complex character arcs, plot twists, and key lore."
+                )
+            ),
+            AiFeatureItem(
+                title = "24/7 In-Context AI Companion Assistant",
+                category = "Interactive Media Assistant",
+                description = "Conversational assistant integrated directly into player and e-reader screens that answers questions tailored strictly to what you are currently reading or listening to.",
+                highlights = listOf(
+                    "Clarifies difficult vocabulary, historical setting details, or character relationships.",
+                    "Provides instant answers without leaving your current book or track.",
+                    "Respects privacy and operates with context isolation."
+                )
+            ),
+            AiFeatureItem(
+                title = "AI Media Concierge & Bespoke Blends",
+                category = "Discovery & Personalization",
+                description = "Curates tailored media recommendation blends and delivers narrative commentary in the Discovery feed based on your taste and listening history.",
+                highlights = listOf(
+                    "Generates custom thematic mixes and media pairings.",
+                    "Explains why each recommended book, comic, or album matches your vibe.",
+                    "Supports interactive prompt chips for custom genre exploration."
+                )
+            ),
+            AiFeatureItem(
+                title = "Public Domain Endpoint Verifier & Link Repair",
+                category = "Catalog & Network Intelligence",
+                description = "Automatically inspects, verifies, and repairs open-access catalog feeds and archive endpoints before adding them to your home library.",
+                highlights = listOf(
+                    "Performs live URL health checks and automatic protocol repairs.",
+                    "Detects supported media formats (CBZ, EPUB, MP3, FLAC) from raw feeds.",
+                    "Guarantees broken or dead catalog links are fixed before saving."
+                )
+            ),
+            AiFeatureItem(
+                title = "Local Media Scanner & Bio Enricher",
+                category = "Library Curation & Enrichment",
+                description = "Scans imported device folders and connected servers to retrieve high-resolution cover art, clean messy folder tags, and fetch authentic biographies.",
+                highlights = listOf(
+                    "Sources verified author portraits and multi-paragraph biographies live from Wikipedia and historical archives.",
+                    "Cleans ugly directory folder names into proper English titles and creator names.",
+                    "Automatically matches local audiobooks and e-books with public domain catalogs."
+                )
+            ),
+            AiFeatureItem(
+                title = "Dynamic Midnight Bookshelf & Mood Rotator",
+                category = "Automated Daily Curation",
+                description = "Automatically reorganizes category bookshelves, featured masterworks, and 100+ vibe moods daily at midnight to keep your collection fresh.",
+                highlights = listOf(
+                    "Rotates featured authors and genre shelves every night.",
+                    "Adapts 'For You' mixes based on time of day (Morning, Midday, Midnight).",
+                    "Supports 1-tap manual category remixing in preferences."
+                )
+            ),
+            AiFeatureItem(
+                title = "Smart Sleep Assistant & Auto-Fade",
+                category = "Playback & Audio Intelligence",
+                description = "Intelligent sleep timer featuring smooth exponential volume fade-out curves and soothing AI-generated bedtime prompts for night listening.",
+                highlights = listOf(
+                    "Gradually decreases audio volume over 15, 30, 45, or 60 minutes.",
+                    "Displays relaxing bedtime prompts tailored for night reading.",
+                    "Automatically pauses ExoPlayer playback when timer expires."
+                )
+            ),
+            AiFeatureItem(
+                title = "Dynamic Ambient Soundscape Synthesizer",
+                category = "Atmospheric Audio Engine",
+                description = "Synthesizes real-time ambient background audio (Rainfall, Fireplace, Ocean Waves, Cafe Ambient, Forest Birds, Cosmic Drone) on-device using PCM AudioTracks.",
+                highlights = listOf(
+                    "Auto-detects story mood from current page text to select matching ambience.",
+                    "Generates zero-latency procedural audio without streaming network data.",
+                    "Independent background volume control overlaid with main player."
+                )
+            ),
+            AiFeatureItem(
+                title = "Stylized Quote Card Generator",
+                category = "Social Sharing & Creative Tooling",
+                description = "Transforms book excerpts and saved bookmarks into shareable quote cards with customizable color palettes, typography, and background patterns.",
+                highlights = listOf(
+                    "Converts highlights or book passages into visual cards.",
+                    "Customizable card themes, font pairings, and canvas styles.",
+                    "Includes author attribution and book title formatting."
+                )
+            )
+        )
+    }
+
+    var expandedIndex by remember { mutableStateOf<Int?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = AccentTeal,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("AI Capabilities & Features", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Explore the intelligent AI models and smart features built into HomeCast by FourgeAI LABS.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                aiFeatures.forEachIndexed { index, feature ->
+                    val isExpanded = expandedIndex == index
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isExpanded) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else SurfaceGlass
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                expandedIndex = if (isExpanded) null else index
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        feature.title,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = if (isExpanded) AccentTeal else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        feature.category,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AccentIndigo
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                    tint = if (isExpanded) AccentTeal else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            AnimatedVisibility(visible = isExpanded) {
+                                Column {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = feature.description,
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    feature.highlights.forEach { highlight ->
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 3.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text("✦ ", fontWeight = FontWeight.Bold, color = AccentTeal)
+                                            Text(
+                                                text = highlight,
+                                                fontSize = 12.sp,
+                                                lineHeight = 16.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+            ) {
+                Text("Got It", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
