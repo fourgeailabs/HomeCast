@@ -34,10 +34,7 @@ data class ArchiveFile(
 )
 
 object ArchiveOrgClient {
-    private val client = OkHttpClient.Builder()
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    private val client = OptimizedNetworkEngine.client
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
 
     suspend fun fetchPublicDomain(query: String): List<ArchiveDoc> = withContext(Dispatchers.IO) {

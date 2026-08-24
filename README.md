@@ -1,11 +1,26 @@
 # HomeCast
 
-**Version:** 5.10.00
+**Version:** 5.11.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, and podcast media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.10.00)
+## 🚀 Recent Updates (v5.11.00)
+- **High-Performance Embedded Video Player for Podcasts & Video Media**:
+  - Integrated Media3 `PlayerView` and `ExoPlayer` powered by `OptimizedNetworkEngine` for high-throughput video streaming.
+  - Features aspect-ratio switching (Fit, Zoom, Fill), timeline scrubbing slider with exact timestamps, fast-forward/rewind 10s controls, auto-hiding HUD controls, and backdrop blur dismissals.
+  - Automatically identifies video podcast feeds and episode media types (`.mp4`, `.m4v`, `.webm`, `.mov`), displaying high-visibility `[VIDEO]` badges and instant video playback.
+- **Dynamic Plex & Jellyfin Server Tab Labeling**:
+  - Automatically detects connected personal servers (Plex, Jellyfin, Audiobookshelf) and dynamically updates section labels (e.g. `Plex Library`, `Jellyfin Library`, `Plex / Jellyfin Library`).
+  - Renamed music navigation section to **Music & Video** to prepare for unified media, movies, and TV show collections from self-hosted servers.
+- **AI Capabilities & Notice Accordion Menu in About**:
+  - Full-featured dropdown menu inside the About section of Settings detailing all 9 intelligent AI features built by FourgeAI LABS.
+  - Every update notice and AI capability starts closed and expands on user interaction, automatically closing any previously opened card.
+- **High-Speed Network & SSL Engine Optimization**:
+  - Centralized network clients across `PlexClient`, `AudiobookshelfClient`, `ArchiveOrgClient`, `BookloreClient`, and `ComicContentFetcher` under `OptimizedNetworkEngine`.
+  - Configured 32-connection HTTP/2 pooling, 120MB disk caching, and permissive SSL handling for low-latency streaming from local self-hosted instances.
+
+## 🚀 Previous Updates (v5.10.00)
 - **Expanded Public Domain & Global Podcast Engine**:
   - **30+ Curated Public Domain Audio Series**: Added a comprehensive curated catalog featuring classic Old Time Radio dramas (*The Shadow*, *Dragnet*, *Sherlock Holmes*, *X Minus One*), science & space exploration (*NASA Science Casts*, *Astronomy Cast*), history & culture (*In Our Time*, *Echoes of History*), philosophy (*Philosophize This!*, *LibriVox Serials*), news, and independent creator feeds (*PlayPodcast*, *RSS.com*, *GetPodcast*).
   - **Live iTunes Podcast Search API**: Enabled real-time search and directory browsing across thousands of global public podcasts directly from the Podcasts screen.

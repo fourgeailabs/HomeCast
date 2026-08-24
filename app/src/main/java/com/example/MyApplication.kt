@@ -1,30 +1,35 @@
 package com.example
 
 import android.app.Application
-import android.content.Intent
-import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import okhttp3.OkHttpClient
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import com.example.data.network.OptimizedNetworkEngine
 
 class MyApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
+        OptimizedNetworkEngine.initialize(this)
     }
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
-            .okHttpClient {
-                OkHttpClient.Builder()
-                    .addInterceptor { chain ->
-                        val request = chain.request().newBuilder()
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
-                            .build()
-                        chain.proceed(request)
-                    }
+            .okHttpClient { OptimizedNetworkEngine.client }
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.25) // 25% available app memory for instant image rendering
                     .build()
             }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("coil_image_cache"))
+                    .maxSizeBytes(250 * 1024 * 1024L) // 250MB image disk cache
+                    .build()
+            }
+            .respectCacheHeaders(false) // Force cache cover arts even if server headers omit explicit max-age
             .build()
     }
 }
+
 

@@ -12,17 +12,12 @@ import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
+import com.example.data.network.OptimizedNetworkEngine
+
 object ComicContentFetcher {
     private const val TAG = "ComicContentFetcher"
 
-    private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
-    }
+    private val client: OkHttpClient get() = OptimizedNetworkEngine.client
 
     /**
      * Resolves real comic pages (either extracted from CBZ/ZIP, from Komga/Kavita/Audiobookshelf server,

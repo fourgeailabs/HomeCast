@@ -54,10 +54,7 @@ object BookloreClient {
     private const val TAG = "BookloreClient"
     
     private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .build()
+        OptimizedNetworkEngine.client
     }
 
     private val moshi = Moshi.Builder()

@@ -91,6 +91,16 @@ fun MusicScreen(
     val playbackState by viewModel.playbackState.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+    val personalTabLabel = remember(servers) {
+        val types = servers.map { it.type.lowercase() }
+        when {
+            types.any { it.contains("plex") } && types.any { it.contains("jellyfin") } -> "Plex / Jellyfin"
+            types.any { it.contains("plex") } -> "Plex"
+            types.any { it.contains("jellyfin") } -> "Jellyfin"
+            types.any { it.contains("audiobookshelf") } -> "Audiobookshelf"
+            else -> "Plex / Jellyfin"
+        }
+    }
     var selectedTab by remember { mutableStateOf(MusicNavTab.SHELVES) }
     var selectedSource by remember { mutableIntStateOf(viewModel.initialMusicSource) } // 0 = Personal, 1 = Public Domain
 
@@ -346,7 +356,7 @@ fun MusicScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.MusicNote,
+                    Icons.Default.MusicVideo,
                     contentDescription = null,
                     tint = AccentIndigo,
                     modifier = Modifier.size(28.dp)
@@ -354,13 +364,13 @@ fun MusicScreen(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        "Music",
+                        "Music & Video",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
                     Text(
-                        if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • 100+ moods" else "Your Personal Music Cloud",
+                        if (currentMusic.isNotEmpty()) "${currentMusic.size} tracks • ${albumGroups.size} albums • Plex/Jellyfin ready" else "Your Personal Media & Video Cloud",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -448,7 +458,7 @@ fun MusicScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "Personal Music",
+                    "$personalTabLabel Library",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = Color.White

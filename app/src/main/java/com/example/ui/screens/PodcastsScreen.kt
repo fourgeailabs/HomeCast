@@ -35,6 +35,7 @@ import com.example.data.Audiobook
 import com.example.data.PublicDomainPodcastsCatalog
 import com.example.data.network.PodcastClient
 import com.example.ui.MainViewModel
+import com.example.ui.components.VideoPlayerDialog
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.SurfaceGlass
@@ -63,7 +64,8 @@ data class PodcastEpisode(
     val audioUrl: String,
     val coverUrl: String,
     val publishDate: String = "Recent",
-    val description: String = ""
+    val description: String = "",
+    val isVideo: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,8 +91,18 @@ fun PodcastsScreen(
     var channelEpisodesMap by remember { mutableStateOf<Map<String, List<PodcastEpisode>>>(emptyMap()) }
     var loadingEpisodesChannelId by remember { mutableStateOf<String?>(null) }
 
-    // Subscribed / Saved personal channels
+    var activeVideoEpisode by remember { mutableStateOf<PodcastEpisode?>(null) }
     var subscribedChannelIds by remember { mutableStateOf(setOf<String>()) }
+
+    // Video Player Dialog overlay for Video Podcasts
+    activeVideoEpisode?.let { ep ->
+        VideoPlayerDialog(
+            videoUrl = ep.audioUrl,
+            title = ep.title,
+            subtitle = ep.podcastTitle,
+            onDismiss = { activeVideoEpisode = null }
+        )
+    }
 
     // Live search & category filter for public feeds
     LaunchedEffect(searchQuery, selectedCategory, selectedSection) {
@@ -458,49 +470,81 @@ fun PodcastsScreen(
 
                             val showCount = if (isExpanded) episodesList.size else 2
                             episodesList.take(showCount).forEach { ep ->
+                                val isVideoEp = ep.isVideo || ep.audioUrl.contains(".mp4") || ep.audioUrl.contains(".m4v") || ep.audioUrl.contains(".webm") || ep.audioUrl.contains(".mov")
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .clickable {
-                                            val ab = Audiobook(
-                                                id = ep.id,
-                                                title = ep.title,
-                                                author = ep.publisher,
-                                                coverUrl = ep.coverUrl,
-                                                duration = ep.durationSeconds,
-                                                serverId = channel.serverId,
-                                                streamUrl = ep.audioUrl
-                                            )
-                                            viewModel.playAudiobookWithResolution(ab)
-                                            onEpisodeClick(ep)
+                                            if (isVideoEp) {
+                                                activeVideoEpisode = ep
+                                            } else {
+                                                val ab = Audiobook(
+                                                    id = ep.id,
+                                                    title = ep.title,
+                                                    author = ep.publisher,
+                                                    coverUrl = ep.coverUrl,
+                                                    duration = ep.durationSeconds,
+                                                    serverId = channel.serverId,
+                                                    streamUrl = ep.audioUrl
+                                                )
+                                                viewModel.playAudiobookWithResolution(ab)
+                                                onEpisodeClick(ep)
+                                            }
                                         }
                                         .padding(vertical = 6.dp, horizontal = 4.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(ep.title, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(ep.title, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                            if (isVideoEp) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    color = AccentIndigo,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Videocam, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text("VIDEO", fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                                    }
+                                                }
+                                            }
+                                        }
                                         Text("${ep.publishDate} • ${ep.durationSeconds / 60} mins", fontSize = 10.sp, color = Color.Gray)
                                     }
 
                                     IconButton(
                                         onClick = {
-                                            val ab = Audiobook(
-                                                id = ep.id,
-                                                title = ep.title,
-                                                author = ep.publisher,
-                                                coverUrl = ep.coverUrl,
-                                                duration = ep.durationSeconds,
-                                                serverId = channel.serverId,
-                                                streamUrl = ep.audioUrl
-                                            )
-                                            viewModel.playAudiobookWithResolution(ab)
-                                            onEpisodeClick(ep)
+                                            if (isVideoEp) {
+                                                activeVideoEpisode = ep
+                                            } else {
+                                                val ab = Audiobook(
+                                                    id = ep.id,
+                                                    title = ep.title,
+                                                    author = ep.publisher,
+                                                    coverUrl = ep.coverUrl,
+                                                    duration = ep.durationSeconds,
+                                                    serverId = channel.serverId,
+                                                    streamUrl = ep.audioUrl
+                                                )
+                                                viewModel.playAudiobookWithResolution(ab)
+                                                onEpisodeClick(ep)
+                                            }
                                         },
                                         modifier = Modifier.size(32.dp)
                                     ) {
-                                        Icon(Icons.Default.PlayCircleFilled, contentDescription = "Play", tint = AccentIndigo, modifier = Modifier.size(26.dp))
+                                        Icon(
+                                            if (isVideoEp) Icons.Default.PlayCircleFilled else Icons.Default.PlayCircleFilled,
+                                            contentDescription = "Play",
+                                            tint = if (isVideoEp) AccentTeal else AccentIndigo,
+                                            modifier = Modifier.size(26.dp)
+                                        )
                                     }
                                 }
                             }

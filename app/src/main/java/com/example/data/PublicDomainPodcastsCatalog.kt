@@ -7,6 +7,7 @@ object PublicDomainPodcastsCatalog {
 
     val categories = listOf(
         "All",
+        "Video Podcasts",
         "Old Time Radio",
         "Science & Tech",
         "History & Culture",
@@ -17,6 +18,79 @@ object PublicDomainPodcastsCatalog {
     )
 
     val curatedPodcasts: List<PodcastChannel> = listOf(
+        // Video Podcasts (High-Definition Video Enclosures)
+        PodcastChannel(
+            id = "pod_video_nasa",
+            title = "NASA HD Video Telemetry & Missions",
+            publisher = "NASA Public Domain Video Feed",
+            coverUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
+            description = "High-definition video podcast broadcasts featuring rocket launches, spacewalks, Mars rover missions, and deep space cosmos rendering.",
+            category = "Video Podcasts",
+            feedUrl = "https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss",
+            isPublic = true,
+            episodes = listOf(
+                PodcastEpisode(
+                    id = "ep_vid_nasa_1",
+                    title = "Artemis & Deep Space Exploration (HD Video)",
+                    podcastTitle = "NASA HD Video Telemetry",
+                    publisher = "NASA Video",
+                    durationSeconds = 600L,
+                    audioUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                    coverUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
+                    publishDate = "Today",
+                    description = "Full HD video coverage of lunar orbit insertion, crew module telemetry, and space architecture tests.",
+                    isVideo = true
+                ),
+                PodcastEpisode(
+                    id = "ep_vid_nasa_2",
+                    title = "James Webb Deep Field Universe Scan (Video)",
+                    podcastTitle = "NASA HD Video Telemetry",
+                    publisher = "NASA Video",
+                    durationSeconds = 596L,
+                    audioUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                    coverUrl = "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=600&q=80",
+                    publishDate = "Yesterday",
+                    description = "High resolution infrared imagery flythrough of distant galaxies rendered in 4K HDR.",
+                    isVideo = true
+                )
+            )
+        ),
+        PodcastChannel(
+            id = "pod_video_blender",
+            title = "Open Culture HD Cinema & Video Serials",
+            publisher = "Blender Foundation & Public Cinema",
+            coverUrl = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80",
+            description = "Open-access cinema, 3D animated film shorts, CGI breakthroughs, and public domain video serials in full 1080p video.",
+            category = "Video Podcasts",
+            feedUrl = "https://peach.blender.org/feed/",
+            isPublic = true,
+            episodes = listOf(
+                PodcastEpisode(
+                    id = "ep_vid_blender_1",
+                    title = "Sintel: Open Video Cinema Short (1080p)",
+                    podcastTitle = "Open Culture HD Cinema",
+                    publisher = "Blender Open Video",
+                    durationSeconds = 888L,
+                    audioUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                    coverUrl = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80",
+                    publishDate = "Public Domain",
+                    description = "A lonely young warrior girl searches for a baby dragon in a visually captivating fantasy world.",
+                    isVideo = true
+                ),
+                PodcastEpisode(
+                    id = "ep_vid_blender_2",
+                    title = "Tears of Steel: VFX Sci-Fi Short (1080p)",
+                    podcastTitle = "Open Culture HD Cinema",
+                    publisher = "Blender Open Video",
+                    durationSeconds = 734L,
+                    audioUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                    coverUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80",
+                    publishDate = "Public Domain",
+                    description = "Set in a dystopian future in Amsterdam where a group of rebels attempt to save the world from robotics.",
+                    isVideo = true
+                )
+            )
+        ),
         // Old Time Radio & Classic Audio Drama
         PodcastChannel(
             id = "pod_otr_shadow",

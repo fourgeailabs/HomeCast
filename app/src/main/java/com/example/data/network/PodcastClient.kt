@@ -15,11 +15,15 @@ import java.util.concurrent.TimeUnit
 object PodcastClient {
     private const val TAG = "PodcastClient"
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val okHttpClient = OptimizedNetworkEngine.client
+
+    private fun isVideoUrl(url: String, rawType: String = ""): Boolean {
+        val lowerUrl = url.lowercase()
+        val lowerType = rawType.lowercase()
+        return lowerUrl.endsWith(".mp4") || lowerUrl.endsWith(".m4v") || lowerUrl.endsWith(".webm") ||
+                lowerUrl.endsWith(".mov") || lowerUrl.endsWith(".mkv") || lowerUrl.contains("/video/") ||
+                lowerType.contains("video") || lowerType.contains("mp4")
+    }
 
     /**
      * Live search across iTunes Public Podcasts, Archive.org Audio Podcasts,
@@ -235,6 +239,7 @@ object PodcastClient {
                         val dateStr = obj.optString("releaseDate", "Recent").take(10)
 
                         if (streamUrl.isNotBlank()) {
+                            val isVid = isVideoUrl(streamUrl, obj.optString("episodeContentType", ""))
                             list.add(
                                 PodcastEpisode(
                                     id = "itunes_ep_${collectionId}_$epId",
@@ -245,7 +250,8 @@ object PodcastClient {
                                     audioUrl = streamUrl,
                                     coverUrl = channel.coverUrl,
                                     publishDate = dateStr,
-                                    description = desc
+                                    description = desc,
+                                    isVideo = isVid
                                 )
                             )
                         }
@@ -267,7 +273,7 @@ object PodcastClient {
                 val xmlStr = resp.body!!.string()
                 val itemRegex = Regex("<item>(.*?)</item>", RegexOption.DOT_MATCHES_ALL)
                 val titleRegex = Regex("<title>(.*?)</title>")
-                val enclosureRegex = Regex("<enclosure[^>]+url=[\"']([^\"']+)[\"']")
+                val enclosureRegex = Regex("<enclosure[^>]+url=[\"']([^\"']+)[\"'](?:[^>]*type=[\"']([^\"']+)[\"'])?")
                 val pubDateRegex = Regex("<pubDate>(.*?)</pubDate>")
 
                 var count = 0
@@ -275,10 +281,13 @@ object PodcastClient {
                     if (count >= 25) break
                     val itemText = match.groupValues[1]
                     val title = titleRegex.find(itemText)?.groupValues?.get(1)?.replace("<![CDATA[", "")?.replace("]]>", "")?.trim() ?: "Episode ${count + 1}"
-                    val audioUrl = enclosureRegex.find(itemText)?.groupValues?.get(1) ?: ""
+                    val enclosureMatch = enclosureRegex.find(itemText)
+                    val audioUrl = enclosureMatch?.groupValues?.get(1) ?: ""
+                    val mimeType = enclosureMatch?.groupValues?.getOrNull(2) ?: ""
                     val pubDate = pubDateRegex.find(itemText)?.groupValues?.get(1)?.take(16) ?: "Recent"
 
                     if (audioUrl.isNotBlank()) {
+                        val isVid = isVideoUrl(audioUrl, mimeType)
                         list.add(
                             PodcastEpisode(
                                 id = "rss_ep_${channel.id}_$count",
@@ -289,7 +298,8 @@ object PodcastClient {
                                 audioUrl = audioUrl,
                                 coverUrl = channel.coverUrl,
                                 publishDate = pubDate,
-                                description = "From ${channel.title} feed"
+                                description = "From ${channel.title} feed",
+                                isVideo = isVid
                             )
                         )
                         count++

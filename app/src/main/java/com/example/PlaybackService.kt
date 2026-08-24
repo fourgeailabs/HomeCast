@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.example.data.PlaybackManager
+import com.example.data.network.OptimizedNetworkEngine
 import okhttp3.OkHttpClient
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -56,36 +57,10 @@ class PlaybackService : MediaSessionService() {
             chain.proceed(requestBuilder.build())
         }
 
-        // Create a permissive OkHttpClient for ExoPlayer to stream from personal servers with self-signed SSL or reverse proxies
-        val permissiveOkHttpClient = try {
-            val trustAllCerts = arrayOf<TrustManager>(
-                object : X509TrustManager {
-                    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-                }
-            )
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, trustAllCerts, SecureRandom())
-
-            OkHttpClient.Builder()
-                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-                .hostnameVerifier { _, _ -> true }
-                .addInterceptor(tokenInterceptor)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .build()
-        } catch (_: Exception) {
-            OkHttpClient.Builder()
-                .addInterceptor(tokenInterceptor)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .build()
-        }
+        // Use OptimizedNetworkEngine for ExoPlayer audio/video streaming
+        val permissiveOkHttpClient = OptimizedNetworkEngine.client.newBuilder()
+            .addInterceptor(tokenInterceptor)
+            .build()
 
         val httpDataSourceFactory = OkHttpDataSource.Factory(permissiveOkHttpClient)
             .setUserAgent("HomeCast-Android/5.0")
