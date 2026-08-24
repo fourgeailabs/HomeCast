@@ -1346,6 +1346,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     val syncRes = repository.syncPlex(server, candidateUrls)
                     fetchPlexVideos()
+                    refreshPersonalMedia()
                     if (syncRes.isSuccess) {
                         val count = syncRes.getOrNull() ?: 0
                         _serverOpState.value = ServerOperationState.Success(

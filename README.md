@@ -1,11 +1,17 @@
 # HomeCast
 
-**Version:** 5.14.00
+**Version:** 5.15.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.14.00)
+## 🚀 Recent Updates (v5.15.00)
+- **Universal Single & Multi-Object Plex JSON Parser**:
+  - Engineered dual-mode JSON object and array parsing for `fetchAccountServers`, `fetchMusicTracks`, and `fetchVideoItems` in `PlexClient`.
+  - Fixes library loading stalls where single Plex `Directory`, `Metadata`, `Media`, or `Part` JSON objects caused strict array deserializers to fail.
+  - Guarantees instant auto-discovery, section querying, track/video sync, and state updates immediately upon logging in via 1-Tap Auth or Direct Credentials.
+
+## 🚀 Previous Updates (v5.14.00)
 - **Enhanced Plex Authentication & Dual Sign-In Options**:
   - **1-Tap Browser Auth & Direct Link**: Integrated official 1-tap browser auth link (`app.plex.tv/auth#...`) allowing instant authorization via Google, Apple, or Plex web login with auto-claimed PIN codes.
   - **Direct Plex Credentials Sign-In**: Added dedicated tab for direct Plex Username/Email & Password sign-in, obtaining `authToken` directly without leaving the app.

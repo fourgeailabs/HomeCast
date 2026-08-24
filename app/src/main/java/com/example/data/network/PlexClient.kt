@@ -93,6 +93,33 @@ object PlexClient {
         }
     }
 
+    fun optJsonList(parent: org.json.JSONObject, key: String): List<org.json.JSONObject> {
+        if (!parent.has(key) || parent.isNull(key)) return emptyList()
+        val list = mutableListOf<org.json.JSONObject>()
+        val item = parent.get(key)
+        if (item is org.json.JSONArray) {
+            for (i in 0 until item.length()) {
+                val obj = item.optJSONObject(i)
+                if (obj != null) list.add(obj)
+            }
+        } else if (item is org.json.JSONObject) {
+            list.add(item)
+        }
+        return list
+    }
+
+    fun parseJsonArrayOrObjectList(jsonStr: String, rootKey: String = "MediaContainer", listKey: String): List<org.json.JSONObject> {
+        if (jsonStr.isBlank()) return emptyList()
+        try {
+            val rootObj = org.json.JSONObject(jsonStr)
+            val container = if (rootObj.has(rootKey)) rootObj.optJSONObject(rootKey) else rootObj
+            if (container != null) {
+                return optJsonList(container, listKey)
+            }
+        } catch (_: Exception) {}
+        return emptyList()
+    }
+
     /**
      * Creates a Plex PIN for web authorization (plex.tv/link).
      * Uses strong=false to generate a clean 4-character code for plex.tv/link.
@@ -255,40 +282,49 @@ object PlexClient {
                 return@withContext Result.failure(Exception("Failed to fetch Plex servers: HTTP ${response.code}"))
             }
 
-            val listType = Types.newParameterizedType(List::class.java, PlexDevice::class.java)
-            val adapter = moshi.adapter<List<PlexDevice>>(listType)
-            val devices = adapter.fromJson(body) ?: emptyList()
-
-            // Filter all media servers accessible to this account (owned or shared)
-            val servers = devices.filter {
-                it.provides?.contains("server", ignoreCase = true) == true
-            }
-            if (servers.isEmpty()) {
-                return@withContext Result.success(emptyList())
+            // Dual parsing: Moshi + JSONObject/JSONArray fallback
+            val deviceJsonList = mutableListOf<org.json.JSONObject>()
+            val rawArray = try { org.json.JSONArray(body) } catch (_: Exception) { null }
+            if (rawArray != null) {
+                for (i in 0 until rawArray.length()) {
+                    val item = rawArray.optJSONObject(i)
+                    if (item != null) deviceJsonList.add(item)
+                }
+            } else {
+                val rawObj = try { org.json.JSONObject(body) } catch (_: Exception) { null }
+                if (rawObj != null) {
+                    val innerList = optJsonList(rawObj, "Device")
+                    if (innerList.isNotEmpty()) deviceJsonList.addAll(innerList) else deviceJsonList.add(rawObj)
+                }
             }
 
             val discoveredList = mutableListOf<DiscoveredPlexServer>()
 
-            for (server in servers) {
-                val serverName = server.name ?: "Plex Server"
-                val serverToken = if (!server.accessToken.isNullOrBlank()) server.accessToken else authToken
-                val connections = server.connections ?: emptyList()
+            for (device in deviceJsonList) {
+                val provides = device.optString("provides", "")
+                if (!provides.contains("server", ignoreCase = true)) continue
 
-                // Generate candidate URIs from connections
+                val serverName = device.optString("name", "Plex Server").ifBlank { "Plex Server" }
+                val clientIdentifier = device.optString("clientIdentifier", serverName)
+                val serverToken = device.optString("accessToken", authToken).ifBlank { authToken }
+                val owned = device.optBoolean("owned", true)
+
+                val connJsonList = optJsonList(device, "connections")
+
                 val candidateUris = mutableListOf<String>()
-                for (conn in connections) {
-                    if (!conn.uri.isNullOrBlank()) {
-                        candidateUris.add(conn.uri)
-                    }
-                    if (!conn.address.isNullOrBlank() && conn.port != null) {
-                        val httpUri = "http://${conn.address}:${conn.port}"
-                        val httpsUri = "https://${conn.address}:${conn.port}"
+                for (conn in connJsonList) {
+                    val uri = conn.optString("uri", "")
+                    if (uri.isNotBlank()) candidateUris.add(uri)
+                    val address = conn.optString("address", "")
+                    val port = if (conn.has("port")) conn.optInt("port") else 32400
+                    if (address.isNotBlank()) {
+                        val httpUri = "http://$address:$port"
+                        val httpsUri = "https://$address:$port"
                         if (!candidateUris.contains(httpUri)) candidateUris.add(httpUri)
                         if (!candidateUris.contains(httpsUri)) candidateUris.add(httpsUri)
                     }
                 }
 
-                // Sort candidate URIs: local LAN first (e.g. 192.168.x.x:32400), then local HTTPS, then remote, then relay
                 val sortedCandidates = candidateUris.distinct().sortedWith(
                     compareByDescending<String> { it.contains("192.168.") || it.contains("10.") || it.contains("172.") }
                         .thenByDescending { it.startsWith("http://") && !it.contains("relay.plex.services") }
@@ -296,7 +332,6 @@ object PlexClient {
                         .thenBy { it.contains("relay.plex.services") }
                 )
 
-                // Concurrent parallel connection probing across candidates for instant response
                 val activeUri = findFastestReachableUri(sortedCandidates, serverToken)
                 val isLocal = activeUri.contains("192.168.") || activeUri.contains("10.") || activeUri.contains("172.") || activeUri.contains("localhost")
 
@@ -304,13 +339,12 @@ object PlexClient {
                     discoveredList.add(
                         DiscoveredPlexServer(
                             name = serverName,
-                            clientIdentifier = server.clientIdentifier ?: serverName,
+                            clientIdentifier = clientIdentifier,
                             token = serverToken,
                             preferredUri = activeUri,
                             isLocal = isLocal,
-                            allConnections = connections,
                             candidateUris = sortedCandidates,
-                            owned = server.owned != false,
+                            owned = owned,
                             isReachable = true
                         )
                     )
@@ -460,7 +494,7 @@ object PlexClient {
             .distinct()
 
         var workingRoot = ""
-        var sections = emptyList<PlexDirectory>()
+        var directoryList = emptyList<org.json.JSONObject>()
         var lastError: Exception? = null
 
         // Step 1: Find working candidate URL and fetch library sections
@@ -476,16 +510,10 @@ object PlexClient {
                 val secBody = secRes.body?.string() ?: ""
 
                 if (secRes.isSuccessful && secBody.isNotBlank()) {
-                    val secAdapter = moshi.adapter(PlexSectionsResponse::class.java)
-                    val parsed = secAdapter.fromJson(secBody)
-                    val dirs = parsed?.mediaContainer?.directory ?: emptyList()
-                    if (dirs.isNotEmpty()) {
-                        workingRoot = candidate
-                        sections = dirs
-                        break
-                    } else {
-                        workingRoot = candidate
-                        sections = emptyList()
+                    val parsedDirs = parseJsonArrayOrObjectList(secBody, "MediaContainer", "Directory")
+                    workingRoot = candidate
+                    directoryList = parsedDirs
+                    if (parsedDirs.isNotEmpty()) {
                         break
                     }
                 } else {
@@ -500,25 +528,22 @@ object PlexClient {
             return@withContext Result.failure(lastError ?: Exception("Could not connect to Plex server library."))
         }
 
-        // Filter for music/audio sections or fallback to all sections
-        val musicSections = sections.filter { dir ->
-            val type = dir.type?.lowercase() ?: ""
-            val title = dir.title?.lowercase() ?: ""
-            type == "artist" || type == "music" || type == "audio" || type == "track" ||
-                title.contains("music") || title.contains("song") || title.contains("audio") || title.contains("track")
-        }.ifEmpty {
-            sections
-        }
+        val musicSections = directoryList.filter { dir ->
+            val type = dir.optString("type", "").lowercase()
+            val title = dir.optString("title", "").lowercase()
+            type == "artist" || type == "music" || type == "audio" || type == "track" || type == "album" ||
+                title.contains("music") || title.contains("song") || title.contains("audio") || title.contains("track") || title.contains("book") || title.contains("podcast")
+        }.ifEmpty { directoryList }
 
         val tracksList = mutableListOf<MusicTrack>()
 
-        // Step 2: Fetch tracks from each music section
+        // Step 2: Fetch tracks from each section
         for (sec in musicSections) {
-            val key = (sec.key ?: "").removePrefix("/library/sections/").trim()
+            val key = sec.optString("key", "").removePrefix("/library/sections/").trim()
             if (key.isBlank()) continue
+            val secTitle = sec.optString("title", "Music")
 
-            // Try type=10 (tracks) first
-            var metadataItems: List<PlexTrackMetadata> = emptyList()
+            var metadataItems: List<org.json.JSONObject> = emptyList()
             val queryUrls = listOf(
                 "$workingRoot/library/sections/$key/all?type=10&X-Plex-Token=$cleanToken",
                 "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
@@ -535,8 +560,7 @@ object PlexClient {
                     val tracksRes = client.newCall(tracksReq).execute()
                     if (tracksRes.isSuccessful) {
                         val body = tracksRes.body?.string() ?: ""
-                        val tracksAdapter = moshi.adapter(PlexTracksResponse::class.java)
-                        val items = tracksAdapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        val items = parseJsonArrayOrObjectList(body, "MediaContainer", "Metadata")
                         if (items.isNotEmpty()) {
                             metadataItems = items
                             break
@@ -546,33 +570,32 @@ object PlexClient {
             }
 
             for (item in metadataItems) {
-                val ratingKey = item.ratingKey ?: item.key?.substringAfterLast("/") ?: continue
-                val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                val ratingKey = item.optString("ratingKey", item.optString("key", "").substringAfterLast("/"))
+                if (ratingKey.isBlank()) continue
+
+                val mediaList = optJsonList(item, "Media")
+                val firstMedia = mediaList.firstOrNull()
+                val partList = if (firstMedia != null) optJsonList(firstMedia, "Part") else emptyList()
+                val partKey = partList.firstOrNull()?.optString("key", "") ?: ""
+
                 val streamUrl = if (partKey.isNotBlank()) {
                     val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
                     "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
-                } else {
-                    ""
-                }
+                } else ""
 
-                val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb ?: ""
+                val thumbPath = item.optString("thumb", item.optString("parentThumb", item.optString("grandparentThumb", "")))
                 val coverUrl = if (thumbPath.isNotBlank()) {
                     val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
                     "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
-                } else {
-                    ""
-                }
+                } else ""
 
-                val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() } ?: "Music"
-                val trackIndex = item.index ?: (tracksList.size + 1)
-                val trackTitle = item.title?.takeIf { it.isNotBlank() } ?: "Track $trackIndex"
-                val artistName = item.grandparentTitle?.takeIf { it.isNotBlank() }
-                    ?: item.parentTitle?.takeIf { it.isNotBlank() }
-                    ?: sec.title?.takeIf { it.isNotBlank() }
-                    ?: "Plex Artist"
-                val albumName = item.parentTitle?.takeIf { it.isNotBlank() }
-                    ?: sec.title?.takeIf { it.isNotBlank() }
-                    ?: "Plex Album"
+                val genreList = optJsonList(item, "Genre")
+                val genreTag = genreList.firstOrNull()?.optString("tag", "")?.takeIf { it.isNotBlank() } ?: "Music"
+                val trackIndex = if (item.has("index")) item.optInt("index") else (tracksList.size + 1)
+                val trackTitle = item.optString("title", "Track $trackIndex")
+                val artistName = item.optString("grandparentTitle", item.optString("originalTitle", item.optString("parentTitle", secTitle))).ifBlank { "Plex Artist" }
+                val albumName = item.optString("parentTitle", secTitle).ifBlank { "Plex Album" }
+                val duration = item.optLong("duration", 0L)
 
                 tracksList.add(
                     MusicTrack(
@@ -581,7 +604,7 @@ object PlexClient {
                         artist = artistName,
                         album = albumName,
                         coverUrl = coverUrl,
-                        duration = item.duration ?: 0L,
+                        duration = duration,
                         serverId = serverId,
                         streamUrl = streamUrl,
                         ratingKey = ratingKey,
@@ -596,7 +619,7 @@ object PlexClient {
         if (tracksList.isEmpty()) {
             val globalQueries = listOf(
                 "$workingRoot/library/all?type=10&X-Plex-Token=$cleanToken",
-                "$workingRoot/hubs/search?query=&type=10&X-Plex-Token=$cleanToken"
+                "$workingRoot/library/all?X-Plex-Token=$cleanToken"
             )
 
             for (globalUrl in globalQueries) {
@@ -610,34 +633,35 @@ object PlexClient {
                     val tracksRes = client.newCall(tracksReq).execute()
                     if (tracksRes.isSuccessful) {
                         val body = tracksRes.body?.string() ?: ""
-                        val tracksAdapter = moshi.adapter(PlexTracksResponse::class.java)
-                        val items = tracksAdapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        val items = parseJsonArrayOrObjectList(body, "MediaContainer", "Metadata")
 
                         for (item in items) {
-                            val ratingKey = item.ratingKey ?: item.key?.substringAfterLast("/") ?: continue
-                            val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                            val ratingKey = item.optString("ratingKey", item.optString("key", "").substringAfterLast("/"))
+                            if (ratingKey.isBlank()) continue
+
+                            val mediaList = optJsonList(item, "Media")
+                            val firstMedia = mediaList.firstOrNull()
+                            val partList = if (firstMedia != null) optJsonList(firstMedia, "Part") else emptyList()
+                            val partKey = partList.firstOrNull()?.optString("key", "") ?: ""
+
                             val streamUrl = if (partKey.isNotBlank()) {
                                 val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
                                 "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
-                            } else {
-                                ""
-                            }
+                            } else ""
 
-                            val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb ?: ""
+                            val thumbPath = item.optString("thumb", item.optString("parentThumb", item.optString("grandparentThumb", "")))
                             val coverUrl = if (thumbPath.isNotBlank()) {
                                 val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
                                 "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
-                            } else {
-                                ""
-                            }
+                            } else ""
 
-                            val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() } ?: "Music"
-                            val trackIndex = item.index ?: (tracksList.size + 1)
-                            val trackTitle = item.title?.takeIf { it.isNotBlank() } ?: "Track $trackIndex"
-                            val artistName = item.grandparentTitle?.takeIf { it.isNotBlank() }
-                                ?: item.parentTitle?.takeIf { it.isNotBlank() }
-                                ?: "Plex Artist"
-                            val albumName = item.parentTitle?.takeIf { it.isNotBlank() } ?: "Plex Album"
+                            val genreList = optJsonList(item, "Genre")
+                            val genreTag = genreList.firstOrNull()?.optString("tag", "")?.takeIf { it.isNotBlank() } ?: "Music"
+                            val trackIndex = if (item.has("index")) item.optInt("index") else (tracksList.size + 1)
+                            val trackTitle = item.optString("title", "Track $trackIndex")
+                            val artistName = item.optString("grandparentTitle", item.optString("originalTitle", item.optString("parentTitle", "Plex Artist"))).ifBlank { "Plex Artist" }
+                            val albumName = item.optString("parentTitle", "Plex Album").ifBlank { "Plex Album" }
+                            val duration = item.optLong("duration", 0L)
 
                             tracksList.add(
                                 MusicTrack(
@@ -646,7 +670,7 @@ object PlexClient {
                                     artist = artistName,
                                     album = albumName,
                                     coverUrl = coverUrl,
-                                    duration = item.duration ?: 0L,
+                                    duration = duration,
                                     serverId = serverId,
                                     streamUrl = streamUrl,
                                     ratingKey = ratingKey,
@@ -685,7 +709,7 @@ object PlexClient {
         }
 
         var workingRoot = ""
-        var sections: List<PlexDirectory> = emptyList()
+        var directoryList = emptyList<org.json.JSONObject>()
 
         for (root in allCandidates) {
             val secReqUrl = "$root/library/sections?X-Plex-Token=$cleanToken"
@@ -699,11 +723,10 @@ object PlexClient {
                 val secRes = client.newCall(secReq).execute()
                 if (secRes.isSuccessful) {
                     val secBody = secRes.body?.string() ?: ""
-                    val secAdapter = moshi.adapter(PlexSectionsResponse::class.java)
-                    val parsed = secAdapter.fromJson(secBody)?.mediaContainer?.directory ?: emptyList()
-                    if (parsed.isNotEmpty()) {
-                        workingRoot = root
-                        sections = parsed
+                    val parsedDirs = parseJsonArrayOrObjectList(secBody, "MediaContainer", "Directory")
+                    workingRoot = root
+                    directoryList = parsedDirs
+                    if (parsedDirs.isNotEmpty()) {
                         break
                     }
                 }
@@ -714,17 +737,18 @@ object PlexClient {
             return@withContext Result.failure(Exception("Could not connect to Plex server library."))
         }
 
-        val videoSections = sections.filter { dir ->
-            val type = dir.type?.lowercase() ?: ""
+        val videoSections = directoryList.filter { dir ->
+            val type = dir.optString("type", "").lowercase()
             type == "movie" || type == "show"
-        }.ifEmpty { sections }
+        }.ifEmpty { directoryList }
 
         val videoList = mutableListOf<PlexVideoItem>()
 
         for (sec in videoSections) {
-            val key = (sec.key ?: "").removePrefix("/library/sections/").trim()
+            val key = sec.optString("key", "").removePrefix("/library/sections/").trim()
             if (key.isBlank()) continue
-            val secType = sec.type?.lowercase() ?: ""
+            val secType = sec.optString("type", "").lowercase()
+            val secTitle = sec.optString("title", "Videos")
 
             val queryUrls = when {
                 secType == "movie" -> listOf(
@@ -733,6 +757,7 @@ object PlexClient {
                 )
                 secType == "show" -> listOf(
                     "$workingRoot/library/sections/$key/all?type=4&X-Plex-Token=$cleanToken",
+                    "$workingRoot/library/sections/$key/all?type=2&X-Plex-Token=$cleanToken",
                     "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
                 )
                 else -> listOf(
@@ -740,7 +765,7 @@ object PlexClient {
                 )
             }
 
-            var items: List<PlexTrackMetadata> = emptyList()
+            var items: List<org.json.JSONObject> = emptyList()
             for (qUrl in queryUrls) {
                 try {
                     val req = Request.Builder()
@@ -751,8 +776,7 @@ object PlexClient {
                     val res = client.newCall(req).execute()
                     if (res.isSuccessful) {
                         val body = res.body?.string() ?: ""
-                        val adapter = moshi.adapter(PlexTracksResponse::class.java)
-                        val parsed = adapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        val parsed = parseJsonArrayOrObjectList(body, "MediaContainer", "Metadata")
                         if (parsed.isNotEmpty()) {
                             items = parsed
                             break
@@ -762,39 +786,47 @@ object PlexClient {
             }
 
             for (item in items) {
-                val ratingKey = item.ratingKey ?: item.key?.substringAfterLast("/") ?: continue
-                val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                val ratingKey = item.optString("ratingKey", item.optString("key", "").substringAfterLast("/"))
+                if (ratingKey.isBlank()) continue
+
+                val mediaList = optJsonList(item, "Media")
+                val firstMedia = mediaList.firstOrNull()
+                val partList = if (firstMedia != null) optJsonList(firstMedia, "Part") else emptyList()
+                val partKey = partList.firstOrNull()?.optString("key", "") ?: ""
+
                 val videoUrl = if (partKey.isNotBlank()) {
                     val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
                     "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
                 } else ""
 
-                val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb ?: ""
+                val thumbPath = item.optString("thumb", item.optString("parentThumb", item.optString("grandparentThumb", "")))
                 val coverUrl = if (thumbPath.isNotBlank()) {
                     val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
                     "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
                 } else ""
 
-                val artPath = item.art ?: ""
+                val artPath = item.optString("art", "")
                 val bannerUrl = if (artPath.isNotBlank()) {
                     val cleanArt = if (artPath.startsWith("/")) artPath else "/$artPath"
                     "$workingRoot$cleanArt?X-Plex-Token=$cleanToken"
                 } else ""
 
-                val itemType = item.type?.lowercase() ?: if (secType == "movie") "movie" else "episode"
-                val title = item.title?.takeIf { it.isNotBlank() } ?: "Plex Video"
-                val showTitle = item.grandparentTitle?.takeIf { it.isNotBlank() }
-                    ?: sec.title?.takeIf { it.isNotBlank() }
-                    ?: "Plex Show"
+                val itemType = item.optString("type", if (secType == "movie") "movie" else "episode").lowercase()
+                val title = item.optString("title", "Plex Video").ifBlank { "Plex Video" }
+                val showTitle = item.optString("grandparentTitle", secTitle).ifBlank { "Plex Show" }
 
-                val seasonEp = if (item.parentIndex != null && item.index != null) {
-                    "S${item.parentIndex}E${item.index}"
-                } else if (item.parentTitle != null) {
-                    item.parentTitle
-                } else ""
+                val parentIdx = if (item.has("parentIndex")) item.optInt("parentIndex") else null
+                val idx = if (item.has("index")) item.optInt("index") else null
 
-                val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() }
+                val seasonEp = if (parentIdx != null && idx != null) {
+                    "S${parentIdx}E${idx}"
+                } else item.optString("parentTitle", "")
+
+                val genreList = optJsonList(item, "Genre")
+                val genreTag = genreList.firstOrNull()?.optString("tag", "")?.takeIf { it.isNotBlank() }
                     ?: if (itemType == "movie") "Movie" else "TV Show"
+
+                val yearVal = if (item.has("year")) item.optInt("year") else if (item.has("parentYear")) item.optInt("parentYear") else null
 
                 videoList.add(
                     PlexVideoItem(
@@ -803,9 +835,9 @@ object PlexClient {
                         type = itemType,
                         showTitle = showTitle,
                         seasonEpisodeLabel = seasonEp,
-                        summary = item.summary ?: "",
-                        year = item.year ?: item.parentYear,
-                        duration = item.duration ?: 0L,
+                        summary = item.optString("summary", ""),
+                        year = yearVal,
+                        duration = item.optLong("duration", 0L),
                         coverUrl = coverUrl,
                         bannerUrl = bannerUrl,
                         videoUrl = videoUrl,
@@ -820,7 +852,8 @@ object PlexClient {
         if (videoList.isEmpty()) {
             val globalUrls = listOf(
                 "$workingRoot/library/all?type=1&X-Plex-Token=$cleanToken",
-                "$workingRoot/library/all?type=4&X-Plex-Token=$cleanToken"
+                "$workingRoot/library/all?type=4&X-Plex-Token=$cleanToken",
+                "$workingRoot/library/all?X-Plex-Token=$cleanToken"
             )
             for (gUrl in globalUrls) {
                 try {
@@ -832,16 +865,22 @@ object PlexClient {
                     val res = client.newCall(req).execute()
                     if (res.isSuccessful) {
                         val body = res.body?.string() ?: ""
-                        val adapter = moshi.adapter(PlexTracksResponse::class.java)
-                        val items = adapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        val items = parseJsonArrayOrObjectList(body, "MediaContainer", "Metadata")
                         for (item in items) {
-                            val ratingKey = item.ratingKey ?: continue
-                            val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                            val ratingKey = item.optString("ratingKey", item.optString("key", "").substringAfterLast("/"))
+                            if (ratingKey.isBlank()) continue
+
+                            val mediaList = optJsonList(item, "Media")
+                            val firstMedia = mediaList.firstOrNull()
+                            val partList = if (firstMedia != null) optJsonList(firstMedia, "Part") else emptyList()
+                            val partKey = partList.firstOrNull()?.optString("key", "") ?: ""
+
                             val videoUrl = if (partKey.isNotBlank()) {
                                 val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
                                 "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
                             } else ""
-                            val thumbPath = item.thumb ?: item.parentThumb ?: ""
+
+                            val thumbPath = item.optString("thumb", item.optString("parentThumb", ""))
                             val coverUrl = if (thumbPath.isNotBlank()) {
                                 val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
                                 "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
@@ -850,13 +889,13 @@ object PlexClient {
                             videoList.add(
                                 PlexVideoItem(
                                     id = "plex_vid_${serverId}_$ratingKey",
-                                    title = item.title ?: "Plex Video",
-                                    type = item.type?.lowercase() ?: "movie",
-                                    showTitle = item.grandparentTitle ?: "",
-                                    seasonEpisodeLabel = if (item.parentIndex != null && item.index != null) "S${item.parentIndex}E${item.index}" else "",
-                                    summary = item.summary ?: "",
-                                    year = item.year,
-                                    duration = item.duration ?: 0L,
+                                    title = item.optString("title", "Plex Video"),
+                                    type = item.optString("type", "movie").lowercase(),
+                                    showTitle = item.optString("grandparentTitle", ""),
+                                    seasonEpisodeLabel = if (item.has("parentIndex") && item.has("index")) "S${item.optInt("parentIndex")}E${item.optInt("index")}" else "",
+                                    summary = item.optString("summary", ""),
+                                    year = if (item.has("year")) item.optInt("year") else null,
+                                    duration = item.optLong("duration", 0L),
                                     coverUrl = coverUrl,
                                     videoUrl = videoUrl,
                                     ratingKey = ratingKey,
