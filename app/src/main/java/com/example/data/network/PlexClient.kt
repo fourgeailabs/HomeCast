@@ -578,6 +578,213 @@ object PlexClient {
     }
 
     /**
+     * Fetches Movies and TV Shows/Episodes from Plex server library sections.
+     */
+    suspend fun fetchVideoItems(
+        serverUrl: String,
+        token: String = "",
+        serverId: String = "",
+        candidateUrls: List<String> = emptyList()
+    ): Result<List<PlexVideoItem>> = withContext(Dispatchers.IO) {
+        val cleanToken = token.trim()
+        val allCandidates = (listOf(serverUrl) + candidateUrls)
+            .map { normalizeUrl(it) }
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        if (allCandidates.isEmpty()) {
+            return@withContext Result.failure(Exception("Server URL is empty."))
+        }
+
+        var workingRoot = ""
+        var sections: List<PlexDirectory> = emptyList()
+
+        for (root in allCandidates) {
+            val secReqUrl = "$root/library/sections?X-Plex-Token=$cleanToken"
+            try {
+                val secReq = Request.Builder()
+                    .url(secReqUrl)
+                    .get()
+                    .apply { buildStandardHeaders(this, cleanToken) }
+                    .build()
+
+                val secRes = client.newCall(secReq).execute()
+                if (secRes.isSuccessful) {
+                    val secBody = secRes.body?.string() ?: ""
+                    val secAdapter = moshi.adapter(PlexSectionsResponse::class.java)
+                    val parsed = secAdapter.fromJson(secBody)?.mediaContainer?.directory ?: emptyList()
+                    if (parsed.isNotEmpty()) {
+                        workingRoot = root
+                        sections = parsed
+                        break
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (workingRoot.isBlank()) {
+            return@withContext Result.failure(Exception("Could not connect to Plex server library."))
+        }
+
+        val videoSections = sections.filter { dir ->
+            val type = dir.type?.lowercase() ?: ""
+            type == "movie" || type == "show"
+        }.ifEmpty { sections }
+
+        val videoList = mutableListOf<PlexVideoItem>()
+
+        for (sec in videoSections) {
+            val key = (sec.key ?: "").removePrefix("/library/sections/").trim()
+            if (key.isBlank()) continue
+            val secType = sec.type?.lowercase() ?: ""
+
+            val queryUrls = when {
+                secType == "movie" -> listOf(
+                    "$workingRoot/library/sections/$key/all?type=1&X-Plex-Token=$cleanToken",
+                    "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
+                )
+                secType == "show" -> listOf(
+                    "$workingRoot/library/sections/$key/all?type=4&X-Plex-Token=$cleanToken",
+                    "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
+                )
+                else -> listOf(
+                    "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
+                )
+            }
+
+            var items: List<PlexTrackMetadata> = emptyList()
+            for (qUrl in queryUrls) {
+                try {
+                    val req = Request.Builder()
+                        .url(qUrl)
+                        .get()
+                        .apply { buildStandardHeaders(this, cleanToken) }
+                        .build()
+                    val res = client.newCall(req).execute()
+                    if (res.isSuccessful) {
+                        val body = res.body?.string() ?: ""
+                        val adapter = moshi.adapter(PlexTracksResponse::class.java)
+                        val parsed = adapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        if (parsed.isNotEmpty()) {
+                            items = parsed
+                            break
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            for (item in items) {
+                val ratingKey = item.ratingKey ?: item.key?.substringAfterLast("/") ?: continue
+                val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                val videoUrl = if (partKey.isNotBlank()) {
+                    val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
+                    "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
+                } else ""
+
+                val thumbPath = item.thumb ?: item.parentThumb ?: item.grandparentThumb ?: ""
+                val coverUrl = if (thumbPath.isNotBlank()) {
+                    val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
+                    "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
+                } else ""
+
+                val artPath = item.art ?: ""
+                val bannerUrl = if (artPath.isNotBlank()) {
+                    val cleanArt = if (artPath.startsWith("/")) artPath else "/$artPath"
+                    "$workingRoot$cleanArt?X-Plex-Token=$cleanToken"
+                } else ""
+
+                val itemType = item.type?.lowercase() ?: if (secType == "movie") "movie" else "episode"
+                val title = item.title?.takeIf { it.isNotBlank() } ?: "Plex Video"
+                val showTitle = item.grandparentTitle?.takeIf { it.isNotBlank() }
+                    ?: sec.title?.takeIf { it.isNotBlank() }
+                    ?: "Plex Show"
+
+                val seasonEp = if (item.parentIndex != null && item.index != null) {
+                    "S${item.parentIndex}E${item.index}"
+                } else if (item.parentTitle != null) {
+                    item.parentTitle
+                } else ""
+
+                val genreTag = item.genreList?.firstOrNull()?.tag?.takeIf { it.isNotBlank() }
+                    ?: if (itemType == "movie") "Movie" else "TV Show"
+
+                videoList.add(
+                    PlexVideoItem(
+                        id = "plex_vid_${serverId}_$ratingKey",
+                        title = title,
+                        type = itemType,
+                        showTitle = showTitle,
+                        seasonEpisodeLabel = seasonEp,
+                        summary = item.summary ?: "",
+                        year = item.year ?: item.parentYear,
+                        duration = item.duration ?: 0L,
+                        coverUrl = coverUrl,
+                        bannerUrl = bannerUrl,
+                        videoUrl = videoUrl,
+                        ratingKey = ratingKey,
+                        genre = genreTag,
+                        serverId = serverId
+                    )
+                )
+            }
+        }
+
+        if (videoList.isEmpty()) {
+            val globalUrls = listOf(
+                "$workingRoot/library/all?type=1&X-Plex-Token=$cleanToken",
+                "$workingRoot/library/all?type=4&X-Plex-Token=$cleanToken"
+            )
+            for (gUrl in globalUrls) {
+                try {
+                    val req = Request.Builder()
+                        .url(gUrl)
+                        .get()
+                        .apply { buildStandardHeaders(this, cleanToken) }
+                        .build()
+                    val res = client.newCall(req).execute()
+                    if (res.isSuccessful) {
+                        val body = res.body?.string() ?: ""
+                        val adapter = moshi.adapter(PlexTracksResponse::class.java)
+                        val items = adapter.fromJson(body)?.mediaContainer?.metadata ?: emptyList()
+                        for (item in items) {
+                            val ratingKey = item.ratingKey ?: continue
+                            val partKey = item.media?.firstOrNull()?.part?.firstOrNull()?.key ?: ""
+                            val videoUrl = if (partKey.isNotBlank()) {
+                                val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
+                                "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
+                            } else ""
+                            val thumbPath = item.thumb ?: item.parentThumb ?: ""
+                            val coverUrl = if (thumbPath.isNotBlank()) {
+                                val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
+                                "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
+                            } else ""
+
+                            videoList.add(
+                                PlexVideoItem(
+                                    id = "plex_vid_${serverId}_$ratingKey",
+                                    title = item.title ?: "Plex Video",
+                                    type = item.type?.lowercase() ?: "movie",
+                                    showTitle = item.grandparentTitle ?: "",
+                                    seasonEpisodeLabel = if (item.parentIndex != null && item.index != null) "S${item.parentIndex}E${item.index}" else "",
+                                    summary = item.summary ?: "",
+                                    year = item.year,
+                                    duration = item.duration ?: 0L,
+                                    coverUrl = coverUrl,
+                                    videoUrl = videoUrl,
+                                    ratingKey = ratingKey,
+                                    serverId = serverId
+                                )
+                            )
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        Result.success(videoList)
+    }
+
+    /**
      * Executes comprehensive diagnostic checks against the Plex server URL,
      * verifying network reachability, identity endpoint, token authorization,
      * and music libraries discovery.

@@ -1,11 +1,20 @@
 # HomeCast
 
-**Version:** 5.12.00
-**Description:** A premium, all-in-one local network audiobook, e-book, music, comic, and podcast media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
+**Version:** 5.13.00
+**Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.12.00)
+## 🚀 Recent Updates (v5.13.00)
+- **Full Plex Server Video Library Support (Movies, Shows, Music)**:
+  - Added full support for personal Plex Movies (type 1) and TV Show episodes (type 4) alongside music tracks (type 10).
+  - Built dedicated `Movies & Shows` media view tab featuring poster artwork, year/season metadata, and 1-tap playback in embedded HD `VideoPlayerDialog`.
+- **Remote Access Plex Pass Disclaimer**:
+  - Added explicit notice in the About section of Settings stating that a Plex Pass subscription is required for remote access outside your home network.
+- **Concurrent Server Discovery & Parallel URL Probing**:
+  - Accelerated Plex server discovery and authentication using concurrent multi-URL probing, avoiding hangs on unreachable candidate URLs.
+
+## 🚀 Previous Updates (v5.12.00)
 - **Resolved Audio & Video Media Playback Stream Engine**:
   - Fixed ExoPlayer network request headers by removing conflicting authentication interceptors that triggered `400 Bad Request` or `403 Forbidden` errors on signed URLs (Google Cloud Storage, Archive.org, LibriVox, RSS feeds, and CDN endpoints).
   - All public domain audiobooks, music tracks, podcasts, video podcasts, and self-hosted server streams play reliably and instantly.

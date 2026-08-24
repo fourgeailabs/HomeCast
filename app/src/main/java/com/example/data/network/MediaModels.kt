@@ -136,6 +136,23 @@ data class DiscoveredPlexServer(
     val isReachable: Boolean = true
 )
 
+data class PlexVideoItem(
+    val id: String,
+    val title: String,
+    val type: String, // "movie", "episode", or "show"
+    val showTitle: String = "",
+    val seasonEpisodeLabel: String = "",
+    val summary: String = "",
+    val year: Int? = null,
+    val duration: Long = 0L,
+    val coverUrl: String = "",
+    val bannerUrl: String = "",
+    val videoUrl: String = "",
+    val ratingKey: String = "",
+    val genre: String = "Video",
+    val serverId: String = ""
+)
+
 @JsonClass(generateAdapter = true)
 data class PlexSectionsResponse(
     @Json(name = "MediaContainer") val mediaContainer: PlexMediaContainer? = null
@@ -169,15 +186,20 @@ data class PlexTracksContainer(
 data class PlexTrackMetadata(
     val ratingKey: String? = null,
     val key: String? = null,
+    val type: String? = null,
     val title: String? = null,
-    val grandparentTitle: String? = null, // Artist
-    val parentTitle: String? = null, // Album
+    val grandparentTitle: String? = null, // Artist or Show Title
+    val parentTitle: String? = null, // Album or Season Title
     val thumb: String? = null,
+    val art: String? = null,
     val parentThumb: String? = null,
     val grandparentThumb: String? = null,
     val duration: Long? = null,
     val index: Int? = null,
+    val parentIndex: Int? = null,
+    val year: Int? = null,
     val parentYear: Int? = null,
+    val summary: String? = null,
     @Json(name = "Genre") val genreList: List<PlexTagItem>? = null,
     @Json(name = "Media") val media: List<PlexMediaItem>? = null
 )

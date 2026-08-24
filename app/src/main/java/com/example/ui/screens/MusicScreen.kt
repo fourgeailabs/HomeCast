@@ -40,8 +40,11 @@ import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
 import java.util.Locale
 
+import com.example.ui.components.VideoPlayerDialog
+import com.example.data.network.PlexVideoItem
+
 enum class MusicNavTab {
-    SHELVES, MOODS, GENRES, ARTISTS, ALBUMS, SONGS
+    SHELVES, MOVIES_SHOWS, MOODS, GENRES, ARTISTS, ALBUMS, SONGS
 }
 
 data class GenreItem(
@@ -89,6 +92,12 @@ fun MusicScreen(
     val servers by viewModel.servers.collectAsState()
     val isSyncing by viewModel.isSyncingPersonalMedia.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
+    val plexVideos by viewModel.plexVideoItems.collectAsState()
+    var activeVideoItem by remember { mutableStateOf<PlexVideoItem?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.fetchPlexVideos()
+    }
 
     var searchQuery by remember { mutableStateOf("") }
     val personalTabLabel = remember(servers) {
@@ -779,6 +788,7 @@ fun MusicScreen(
                         Text(
                             when (tab) {
                                 MusicNavTab.SHELVES -> "Shelves"
+                                MusicNavTab.MOVIES_SHOWS -> "Movies & Shows (${plexVideos.size})"
                                 MusicNavTab.MOODS -> "Moods (100)"
                                 MusicNavTab.GENRES -> "Genres"
                                 MusicNavTab.ARTISTS -> "Artists"
@@ -792,6 +802,7 @@ fun MusicScreen(
                         Icon(
                             when (tab) {
                                 MusicNavTab.SHELVES -> Icons.Default.ViewCarousel
+                                MusicNavTab.MOVIES_SHOWS -> Icons.Default.Movie
                                 MusicNavTab.MOODS -> Icons.Default.Mood
                                 MusicNavTab.GENRES -> Icons.Default.Category
                                 MusicNavTab.ARTISTS -> Icons.Default.Person
@@ -833,6 +844,14 @@ fun MusicScreen(
                         viewModel.playMusicTrackWithResolution(track)
                         onTrackClick(track)
                     }
+                )
+            }
+
+            MusicNavTab.MOVIES_SHOWS -> {
+                PlexVideoView(
+                    plexVideos = plexVideos,
+                    onPlayVideo = { vid -> activeVideoItem = vid },
+                    onRefresh = { viewModel.fetchPlexVideos() }
                 )
             }
 
@@ -882,6 +901,15 @@ fun MusicScreen(
                     item { Spacer(modifier = Modifier.height(24.dp)) }
                 }
             }
+        }
+
+        activeVideoItem?.let { vid ->
+            VideoPlayerDialog(
+                videoUrl = vid.videoUrl,
+                title = vid.title,
+                subtitle = if (vid.type == "episode") "${vid.showTitle} • ${vid.seasonEpisodeLabel}" else "${vid.year ?: "Plex Movie"} • ${vid.genre}",
+                onDismiss = { activeVideoItem = null }
+            )
         }
     }
 }
@@ -2564,4 +2592,276 @@ private fun formatMillis(millis: Long): String {
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
     return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+}
+
+@Composable
+fun PlexVideoView(
+    plexVideos: List<PlexVideoItem>,
+    onPlayVideo: (PlexVideoItem) -> Unit,
+    onRefresh: () -> Unit
+) {
+    if (plexVideos.isEmpty()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Movie,
+                    contentDescription = null,
+                    tint = AccentIndigo,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Plex Personal Videos & Movies",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "No Plex video library items synced yet. Connect your Plex server with Movie or TV Show libraries and click below to load them.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onRefresh,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sync / Refresh Plex Videos")
+                }
+            }
+        }
+    } else {
+        val movies = remember(plexVideos) { plexVideos.filter { it.type == "movie" } }
+        val episodes = remember(plexVideos) { plexVideos.filter { it.type != "movie" } }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            if (movies.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Movies (${movies.size})",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = onRefresh) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = AccentIndigo)
+                        }
+                    }
+                }
+
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(movies, key = { it.id }) { vid ->
+                            PlexVideoCard(video = vid, onClick = { onPlayVideo(vid) })
+                        }
+                    }
+                }
+            }
+
+            if (episodes.isNotEmpty()) {
+                item {
+                    Text(
+                        "TV Shows & Episodes (${episodes.size})",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                items(episodes, key = { it.id }) { vid ->
+                    PlexEpisodeRow(video = vid, onClick = { onPlayVideo(vid) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlexVideoCard(
+    video: PlexVideoItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
+                    .background(Color.Black)
+            ) {
+                if (video.coverUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = video.coverUrl,
+                        contentDescription = video.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Movie,
+                        contentDescription = null,
+                        tint = AccentIndigo,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .align(Alignment.Center)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .align(Alignment.Center)
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                video.year?.let { y ->
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.75f),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .align(Alignment.TopEnd)
+                    ) {
+                        Text(
+                            "$y",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    video.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    video.genre,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PlexEpisodeRow(
+    video: PlexVideoItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 90.dp, height = 60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                if (video.coverUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = video.coverUrl,
+                        contentDescription = video.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.Tv, contentDescription = null, tint = AccentIndigo)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    video.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    if (video.showTitle.isNotBlank()) "${video.showTitle} ${if (video.seasonEpisodeLabel.isNotBlank()) "• ${video.seasonEpisodeLabel}" else ""}"
+                    else video.seasonEpisodeLabel.ifBlank { "Episode" },
+                    fontSize = 12.sp,
+                    color = AccentIndigo,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (video.summary.isNotBlank()) {
+                    Text(
+                        video.summary,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
 }

@@ -1007,7 +1007,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showServerPicker = MutableStateFlow(false)
     val showServerPicker = _showServerPicker.asStateFlow()
 
+    private val _plexVideoItems = MutableStateFlow<List<PlexVideoItem>>(emptyList())
+    val plexVideoItems = _plexVideoItems.asStateFlow()
+
     private var pinPollJob: kotlinx.coroutines.Job? = null
+
+    fun fetchPlexVideos() {
+        viewModelScope.launch {
+            val plexServers = servers.value.filter { it.type == "plex" }
+            val allVideos = mutableListOf<PlexVideoItem>()
+            for (server in plexServers) {
+                val candidateUrls = if (server.hostUrl.isNotBlank()) listOf(server.hostUrl) else emptyList()
+                val res = PlexClient.fetchVideoItems(server.hostUrl, server.apiKey, server.id, candidateUrls)
+                if (res.isSuccess) {
+                    allVideos.addAll(res.getOrNull() ?: emptyList())
+                }
+            }
+            _plexVideoItems.value = allVideos
+        }
+    }
 
     fun diagnoseAudiobookshelf(baseUrl: String, username: String = "", password: String = "", token: String = "") {
         viewModelScope.launch {
@@ -1305,6 +1323,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.addOrUpdateServer(server)
 
                     val syncRes = repository.syncPlex(server, candidateUrls)
+                    fetchPlexVideos()
                     if (syncRes.isSuccess) {
                         val count = syncRes.getOrNull() ?: 0
                         _serverOpState.value = ServerOperationState.Success(
@@ -1384,6 +1403,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> repository.syncPlex(server)
             }
             if (res.isSuccess) {
+                if (server.type == "plex") {
+                    fetchPlexVideos()
+                }
                 _serverOpState.value = ServerOperationState.Success("Synced ${res.getOrNull()} items successfully.")
                 // Run AI dynamic cleanup and category optimization on the new items!
                 launch {
