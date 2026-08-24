@@ -1163,11 +1163,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val servers = result.getOrNull() ?: emptyList()
                     if (servers.isEmpty()) {
                         _serverOpState.value = ServerOperationState.Error(
-                            "Signed into Plex account, but no Plex Media Server owned by your account was found (shared servers are excluded)."
+                            "Signed into Plex account, but no Plex Media Server associated with your account was found."
                         )
                     } else if (servers.size == 1) {
                         val server = servers.first()
-                        _serverOpState.value = ServerOperationState.Success("Found owned server '${server.name}'! Auto-connecting and searching music library...")
+                        _serverOpState.value = ServerOperationState.Success("Found server '${server.name}'! Auto-connecting and searching music library...")
                         saveAndConnectPlexServer(
                             name = server.name,
                             hostUrl = server.preferredUri,
@@ -1177,7 +1177,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         _discoveredPlexServers.value = servers
                         _showServerPicker.value = true
-                        _serverOpState.value = ServerOperationState.Success("Plex account linked! Found ${servers.size} owned servers.")
+                        _serverOpState.value = ServerOperationState.Success("Plex account linked! Found ${servers.size} servers.")
                     }
                 } else {
                     _serverOpState.value = ServerOperationState.Error(

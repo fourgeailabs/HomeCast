@@ -1422,7 +1422,7 @@ fun PlexConfigCard(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "We found ${discoveredPlexServers.size} owned servers linked to your Plex account (shared servers excluded). Choose which one to connect:",
+                        "We found ${discoveredPlexServers.size} servers linked to your Plex account. Choose which one to connect:",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

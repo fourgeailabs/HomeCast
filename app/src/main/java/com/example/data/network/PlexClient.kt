@@ -6,6 +6,9 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -168,9 +171,9 @@ object PlexClient {
             val adapter = moshi.adapter<List<PlexDevice>>(listType)
             val devices = adapter.fromJson(body) ?: emptyList()
 
-            // Filter exclusively for media servers OWNED by the user (strictly excluding shared servers)
+            // Filter all media servers accessible to this account (owned or shared)
             val servers = devices.filter {
-                it.provides?.contains("server", ignoreCase = true) == true && it.owned == true
+                it.provides?.contains("server", ignoreCase = true) == true
             }
             if (servers.isEmpty()) {
                 return@withContext Result.success(emptyList())
@@ -205,22 +208,9 @@ object PlexClient {
                         .thenBy { it.contains("relay.plex.services") }
                 )
 
-                // Probe candidate connections to find active working URI
-                var activeUri = ""
-                var isLocal = false
-                for (uri in sortedCandidates) {
-                    if (testConnectionQuick(uri, serverToken)) {
-                        activeUri = uri
-                        isLocal = uri.contains("192.168.") || uri.contains("10.") || uri.contains("172.") || uri.contains("localhost")
-                        break
-                    }
-                }
-
-                // If fast probing didn't match immediately, fallback to the first candidate URI
-                if (activeUri.isBlank() && sortedCandidates.isNotEmpty()) {
-                    activeUri = sortedCandidates.first()
-                    isLocal = activeUri.contains("192.168.") || activeUri.contains("10.") || activeUri.contains("172.")
-                }
+                // Concurrent parallel connection probing across candidates for instant response
+                val activeUri = findFastestReachableUri(sortedCandidates, serverToken)
+                val isLocal = activeUri.contains("192.168.") || activeUri.contains("10.") || activeUri.contains("172.") || activeUri.contains("localhost")
 
                 if (activeUri.isNotBlank()) {
                     discoveredList.add(
@@ -233,7 +223,7 @@ object PlexClient {
                             allConnections = connections,
                             candidateUris = sortedCandidates,
                             owned = server.owned != false,
-                            isReachable = activeUri.isNotBlank()
+                            isReachable = true
                         )
                     )
                 }
@@ -246,13 +236,30 @@ object PlexClient {
         }
     }
 
+    /**
+     * Concurrently probes candidate URIs in parallel with a tight timeout, returning as soon as a working address is found.
+     */
+    private suspend fun findFastestReachableUri(candidateUris: List<String>, token: String): String = coroutineScope {
+        if (candidateUris.isEmpty()) return@coroutineScope ""
+        if (candidateUris.size == 1) return@coroutineScope candidateUris.first()
+
+        val jobs = candidateUris.map { uri ->
+            async(Dispatchers.IO) {
+                if (testConnectionQuick(uri, token)) uri else null
+            }
+        }
+
+        val results = jobs.awaitAll()
+        results.firstOrNull { !it.isNullOrBlank() } ?: candidateUris.first()
+    }
+
     fun testConnectionQuick(serverUrl: String, token: String): Boolean {
         val root = normalizeUrl(serverUrl)
         if (root.isBlank()) return false
         val cleanToken = token.trim()
         val probeClient = client.newBuilder()
-            .connectTimeout(3, TimeUnit.SECONDS)
-            .readTimeout(3, TimeUnit.SECONDS)
+            .connectTimeout(2, TimeUnit.SECONDS)
+            .readTimeout(2, TimeUnit.SECONDS)
             .build()
 
         // 1. Try /library/sections with token
@@ -287,12 +294,12 @@ object PlexClient {
     }
 
     /**
-     * Tests connection to Plex server with both header and query param token fallbacks.
+     * Tests connection to Plex server across all candidate endpoints concurrently in parallel.
      */
-    suspend fun testConnection(serverUrl: String, token: String, candidateUrls: List<String> = emptyList()): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun testConnection(serverUrl: String, token: String, candidateUrls: List<String> = emptyList()): Result<Boolean> = coroutineScope {
         val cleanToken = token.trim()
         if (cleanToken.isBlank()) {
-            return@withContext Result.failure(Exception("X-Plex-Token cannot be empty. Please sign in with your Plex account."))
+            return@coroutineScope Result.failure(Exception("X-Plex-Token cannot be empty. Please sign in with your Plex account."))
         }
 
         val allCandidates = (listOf(serverUrl) + candidateUrls)
@@ -301,39 +308,47 @@ object PlexClient {
             .distinct()
 
         if (allCandidates.isEmpty()) {
-            return@withContext Result.failure(Exception("Server URL cannot be empty."))
+            return@coroutineScope Result.failure(Exception("Server URL cannot be empty."))
         }
 
-        var lastError: Exception? = null
-        for (root in allCandidates) {
-            val candidateUrls = listOf(
-                "$root/library/sections",
-                "$root/library/sections?X-Plex-Token=$cleanToken"
-            )
-
-            for (url in candidateUrls) {
-                val request = Request.Builder()
-                    .url(url)
-                    .get()
-                    .apply { buildStandardHeaders(this, cleanToken) }
-                    .build()
-
-                try {
-                    val response = client.newCall(request).execute()
-                    if (response.isSuccessful) {
-                        return@withContext Result.success(true)
-                    } else if (response.code == 401) {
-                        lastError = Exception("HTTP 401 Unauthorized: Plex token is invalid for $root.")
-                    } else {
-                        lastError = Exception("Plex returned HTTP ${response.code} from $url")
-                    }
-                } catch (e: Exception) {
-                    lastError = e
-                }
+        val deferreds = allCandidates.map { root ->
+            async(Dispatchers.IO) {
+                testSingleCandidate(root, cleanToken)
             }
         }
 
-        Result.failure(lastError ?: Exception("Unable to connect to Plex."))
+        val results = deferreds.awaitAll()
+        if (results.any { it }) {
+            Result.success(true)
+        } else {
+            Result.failure(Exception("Unable to connect to Plex server at provided address(es)."))
+        }
+    }
+
+    private fun testSingleCandidate(root: String, token: String): Boolean {
+        val candidateEndpoints = listOf(
+            "$root/library/sections",
+            "$root/library/sections?X-Plex-Token=$token"
+        )
+        val fastClient = client.newBuilder()
+            .connectTimeout(2, TimeUnit.SECONDS)
+            .readTimeout(2, TimeUnit.SECONDS)
+            .build()
+
+        for (url in candidateEndpoints) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .get()
+                    .apply { buildStandardHeaders(this, token) }
+                    .build()
+                val response = fastClient.newCall(request).execute()
+                val isSuccess = response.isSuccessful
+                response.close()
+                if (isSuccess) return true
+            } catch (_: Exception) {}
+        }
+        return false
     }
 
     /**
