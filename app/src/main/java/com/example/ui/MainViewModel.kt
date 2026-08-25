@@ -51,6 +51,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val servers = repository.servers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val publicDomainSources = repository.allPublicDomainSources.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val localFolders = repository.allLocalFolders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val recentPrograms = repository.recentPrograms.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _plexMovies = MutableStateFlow<List<PlexMovieItem>>(emptyList())
+    val plexMovies = _plexMovies.asStateFlow()
+
+    private val _plexShows = MutableStateFlow<List<PlexShowItem>>(emptyList())
+    val plexShows = _plexShows.asStateFlow()
+
+    private val _plexVideoItems = MutableStateFlow<List<PlexVideoItem>>(emptyList())
+    val plexVideoItems = _plexVideoItems.asStateFlow()
+
+    private val _isFetchingPlexVideos = MutableStateFlow(false)
+    val isFetchingPlexVideos = _isFetchingPlexVideos.asStateFlow()
 
     val playbackState = playbackManager.playbackState
 
@@ -1007,25 +1020,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showServerPicker = MutableStateFlow(false)
     val showServerPicker = _showServerPicker.asStateFlow()
 
-    private val _plexVideoItems = MutableStateFlow<List<PlexVideoItem>>(emptyList())
-    val plexVideoItems = _plexVideoItems.asStateFlow()
-
     private var pinPollJob: kotlinx.coroutines.Job? = null
-
-    fun fetchPlexVideos() {
-        viewModelScope.launch {
-            val plexServers = servers.value.filter { it.type == "plex" }
-            val allVideos = mutableListOf<PlexVideoItem>()
-            for (server in plexServers) {
-                val candidateUrls = if (server.hostUrl.isNotBlank()) listOf(server.hostUrl) else emptyList()
-                val res = PlexClient.fetchVideoItems(server.hostUrl, server.apiKey, server.id, candidateUrls)
-                if (res.isSuccess) {
-                    allVideos.addAll(res.getOrNull() ?: emptyList())
-                }
-            }
-            _plexVideoItems.value = allVideos
-        }
-    }
 
     fun diagnoseAudiobookshelf(baseUrl: String, username: String = "", password: String = "", token: String = "") {
         viewModelScope.launch {
@@ -1635,6 +1630,88 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "https://archive.org/download/$identifier/$encodedFile"
         } else {
             ""
+        }
+    }
+
+    fun fetchPlexVideos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isFetchingPlexVideos.value = true
+            try {
+                val plexServers = servers.value.filter { it.type == "plex" && it.isConnected }
+                val allMovies = mutableListOf<PlexMovieItem>()
+                val allShows = mutableListOf<PlexShowItem>()
+                val allVideos = mutableListOf<PlexVideoItem>()
+
+                for (server in plexServers) {
+                    val moviesRes = PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id)
+                    moviesRes.getOrNull()?.let { allMovies.addAll(it) }
+
+                    val showsRes = PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id)
+                    showsRes.getOrNull()?.let { allShows.addAll(it) }
+
+                    val videoRes = PlexClient.fetchVideoItems(server.hostUrl, server.apiKey, server.id)
+                    videoRes.getOrNull()?.let { allVideos.addAll(it) }
+                }
+
+                _plexMovies.value = allMovies
+                _plexShows.value = allShows
+                _plexVideoItems.value = allVideos
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Error fetching rich plex videos", e)
+            } finally {
+                _isFetchingPlexVideos.value = false
+            }
+        }
+    }
+
+    fun recordRecentProgram(
+        id: String,
+        programType: String,
+        title: String,
+        subtitle: String = "",
+        coverUrl: String = "",
+        bannerUrl: String = "",
+        duration: Long = 0L,
+        progress: Long = 0L,
+        streamUrl: String = "",
+        ratingKey: String = "",
+        serverId: String = "",
+        showTitle: String = "",
+        seasonNumber: Int = 0,
+        episodeNumber: Int = 0
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.insertRecentProgram(
+                RecentProgramEntity(
+                    id = id,
+                    programType = programType,
+                    title = title,
+                    subtitle = subtitle,
+                    coverUrl = coverUrl,
+                    bannerUrl = bannerUrl,
+                    duration = duration,
+                    progress = progress,
+                    lastPlayed = System.currentTimeMillis(),
+                    streamUrl = streamUrl,
+                    ratingKey = ratingKey,
+                    serverId = serverId,
+                    showTitle = showTitle,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber
+                )
+            )
+        }
+    }
+
+    fun updateProgramProgress(id: String, progress: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateProgramProgress(id, progress)
+        }
+    }
+
+    fun deleteRecentProgram(id: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteRecentProgram(id)
         }
     }
 

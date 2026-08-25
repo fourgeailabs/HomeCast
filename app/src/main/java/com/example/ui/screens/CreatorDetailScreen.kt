@@ -44,6 +44,7 @@ import com.example.data.MusicTrack
 import com.example.data.network.InternetCreatorBioFetcher
 import com.example.ui.MainViewModel
 import com.example.ui.components.MediaCoverArt
+import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
@@ -56,7 +57,8 @@ fun CreatorDetailScreen(
     onBack: () -> Unit,
     onReadEBook: (EBookData) -> Unit = {},
     onPlayAudiobook: (Audiobook) -> Unit = {},
-    onPlayMusicTrack: (MusicTrack) -> Unit = {}
+    onPlayMusicTrack: (MusicTrack) -> Unit = {},
+    onOpenProgram: (id: String, type: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     var details by remember(creatorName) {
@@ -71,19 +73,64 @@ fun CreatorDetailScreen(
     val pdAudiobooks by viewModel.publicDomainAudiobooks.collectAsState()
     val localEBooks by viewModel.allEBooks.collectAsState()
     val resolvedDurations by viewModel.resolvedDurations.collectAsState()
+    val plexMovies by viewModel.plexMovies.collectAsState()
+    val plexShows by viewModel.plexShows.collectAsState()
+
+    // Filter matching Movies
+    val matchedMovies = remember(creatorName, plexMovies) {
+        plexMovies.filter { movie ->
+            movie.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            movie.directors.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            movie.writers.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            movie.producers.any { it.name.contains(creatorName, ignoreCase = true) }
+        }
+    }
+
+    // Filter matching Shows
+    val matchedShows = remember(creatorName, plexShows) {
+        plexShows.filter { show ->
+            show.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            show.directors.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            show.writers.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            show.producers.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            show.seasons.any { s ->
+                s.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
+                s.episodes.any { ep ->
+                    ep.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
+                    ep.directors.any { it.name.contains(creatorName, ignoreCase = true) }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(creatorName) {
         isLoadingBio = true
         try {
-            // First attempt direct internet bio fetcher from Wikipedia REST API & Curated Encyclopedia
+            // First check if Plex provides cast member info / thumbnail
+            val plexPerson = (plexMovies.flatMap { it.cast + it.directors + it.writers + it.producers } +
+                    plexShows.flatMap { it.cast + it.directors + it.writers + it.producers })
+                .firstOrNull { it.name.equals(creatorName, ignoreCase = true) }
+
             val bioData = InternetCreatorBioFetcher.getCreatorBio(creatorName)
-            details = bioData.toMap()
+            val updatedMap = bioData.toMap().toMutableMap()
+            if (plexPerson != null && plexPerson.thumbUrl.isNotBlank()) {
+                updatedMap["image"] = plexPerson.thumbUrl
+            }
+            if (plexPerson != null && plexPerson.role.isNotBlank()) {
+                val existingRoles = updatedMap["roles"] ?: ""
+                updatedMap["roles"] = if (existingRoles.isNotBlank()) "${plexPerson.role} • $existingRoles" else plexPerson.role
+            }
+            details = updatedMap
             
             // If bio is brief, attempt enriched background fetch
             if (bioData.bio.length < 100) {
                 val enriched = viewModel.fetchCreatorDetailsWithGemini(creatorName)
                 if (enriched.isNotEmpty() && (enriched["bio"]?.length ?: 0) > bioData.bio.length) {
-                    details = enriched
+                    val finalMap = enriched.toMutableMap()
+                    if (plexPerson != null && plexPerson.thumbUrl.isNotBlank()) {
+                        finalMap["image"] = plexPerson.thumbUrl
+                    }
+                    details = finalMap
                 }
             }
         } catch (_: Exception) {
@@ -302,100 +349,134 @@ fun CreatorDetailScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Action Buttons: Wikipedia, IMDb, Archive.org, Copy
+                // Action Buttons: IMDb, Plex, Wikipedia, Archive.org, Copy
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
                 ) {
-                    if (wikiLink.isNotBlank() && wikiLink != "N/A") {
-                        FilledTonalButton(
-                            onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(wikiLink))
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = SurfaceGlass,
-                                contentColor = Color.White
-                            ),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                            modifier = Modifier.weight(1f).height(42.dp)
-                        ) {
-                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Wikipedia", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
                     val finalImdbLink = if (imdbLink.isNotBlank() && imdbLink != "N/A") {
                         imdbLink
                     } else {
                         "https://www.imdb.com/find/?q=${Uri.encode(creatorName)}&s=nm"
                     }
 
-                    FilledTonalButton(
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalImdbLink))
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = SurfaceGlass,
-                            contentColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                        modifier = Modifier.weight(1f).height(42.dp)
+                    // IMDb Circular Button
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .clickable {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalImdbLink))
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
                     ) {
-                        Icon(Icons.Default.Movie, contentDescription = null, tint = Color(0xFFF5C518), modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("IMDb", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFFF5C518),
+                            modifier = Modifier.size(46.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("IMDb", fontWeight = FontWeight.Black, fontSize = 12.sp, color = Color.Black)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("IMDb", fontSize = 10.sp, color = Color.Gray)
                     }
 
+                    // Wikipedia Circular Button
+                    if (wikiLink.isNotBlank() && wikiLink != "N/A") {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp)
+                                .clickable {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(wikiLink))
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .border(1.dp, SurfaceGlassBorder, CircleShape)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.MenuBook, contentDescription = "Wikipedia", tint = AccentTeal, modifier = Modifier.size(22.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Wiki", fontSize = 10.sp, color = Color.Gray)
+                        }
+                    }
+
+                    // Archive.org Circular Button
                     val finalArchiveLink = if (archiveLink.isNotBlank() && archiveLink != "N/A") {
                         archiveLink
                     } else {
                         "https://archive.org/search.php?query=${Uri.encode(creatorName)}"
                     }
 
-                    FilledTonalButton(
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalArchiveLink))
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = SurfaceGlass,
-                            contentColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                        modifier = Modifier.weight(1f).height(42.dp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .clickable {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalArchiveLink))
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Archive", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.15f),
+                            modifier = Modifier
+                                .size(46.dp)
+                                .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = "Archive", tint = AccentTeal, modifier = Modifier.size(22.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Archive", fontSize = 10.sp, color = Color.Gray)
                     }
 
-                    IconButton(
-                        onClick = {
-                            try {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("Creator Bio", "$creatorName\n\n$bio")
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "Biography copied to clipboard", Toast.LENGTH_SHORT).show()
-                            } catch (_: Exception) {}
-                        },
+                    // Copy Bio Button
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SurfaceGlass)
+                            .padding(horizontal = 8.dp)
+                            .clickable {
+                                try {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("Creator Bio", "$creatorName\n\n$bio")
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Biography copied to clipboard", Toast.LENGTH_SHORT).show()
+                                } catch (_: Exception) {}
+                            }
                     ) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Bio", tint = Color.White, modifier = Modifier.size(18.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.15f),
+                            modifier = Modifier
+                                .size(46.dp)
+                                .border(1.dp, SurfaceGlassBorder, CircleShape)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy", tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Copy", fontSize = 10.sp, color = Color.Gray)
                     }
                 }
 
@@ -645,6 +726,78 @@ fun CreatorDetailScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Movies Shelf
+                if (matchedMovies.isNotEmpty()) {
+                    CreatorItemShelf(
+                        title = "Movies Featuring $creatorName (${matchedMovies.size})",
+                        items = matchedMovies,
+                        icon = Icons.Default.Movie,
+                        onItemClick = { onOpenProgram(it.id, "movie") }
+                    ) { item ->
+                        Column(modifier = Modifier.width(115.dp)) {
+                            MediaCoverArt(
+                                title = item.title,
+                                authorOrArtist = creatorName,
+                                coverUrl = item.coverUrl,
+                                isBookAspectRatio = true,
+                                cornerRadius = 8.dp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(0.68f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = item.title,
+                                maxLines = 1,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                text = if (item.year != null && item.year > 0) "${item.year}" else "Movie",
+                                fontSize = 10.sp,
+                                color = AccentTeal
+                            )
+                        }
+                    }
+                }
+
+                // TV Shows Shelf
+                if (matchedShows.isNotEmpty()) {
+                    CreatorItemShelf(
+                        title = "TV Shows Featuring $creatorName (${matchedShows.size})",
+                        items = matchedShows,
+                        icon = Icons.Default.Tv,
+                        onItemClick = { onOpenProgram(it.id, "show") }
+                    ) { item ->
+                        Column(modifier = Modifier.width(115.dp)) {
+                            MediaCoverArt(
+                                title = item.title,
+                                authorOrArtist = creatorName,
+                                coverUrl = item.coverUrl,
+                                isBookAspectRatio = true,
+                                cornerRadius = 8.dp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(0.68f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = item.title,
+                                maxLines = 1,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "${item.seasons.size} Seasons",
+                                fontSize = 10.sp,
+                                color = AccentIndigo
+                            )
                         }
                     }
                 }

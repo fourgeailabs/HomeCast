@@ -52,7 +52,9 @@ object Routes {
     
     fun MediaDetail(title: String, creator: String, type: String) = "media_detail?title=${android.net.Uri.encode(title.ifEmpty { "Unknown" })}&creator=${android.net.Uri.encode(creator.ifEmpty { "Unknown" })}&type=$type"
     fun CreatorDetail(name: String) = "creator_detail?name=${android.net.Uri.encode(name.ifEmpty { "Unknown" })}"
-
+    fun ProgramDetail(id: String, type: String) = "program_detail?id=${android.net.Uri.encode(id)}&type=${android.net.Uri.encode(type)}"
+    fun SeasonDetail(showId: String, seasonNumber: Int) = "season_detail?showId=${android.net.Uri.encode(showId)}&seasonNumber=$seasonNumber"
+    fun EpisodeDetail(showId: String, seasonNumber: Int, episodeNumber: Int) = "episode_detail?showId=${android.net.Uri.encode(showId)}&seasonNumber=$seasonNumber&episodeNumber=$episodeNumber"
 }
 
 @Composable
@@ -73,10 +75,14 @@ fun MainScreen(
     var isPlayerSlidUp by remember { mutableStateOf(false) }
     var activeEBook by remember { mutableStateOf<EBookData?>(null) }
     var activeComic by remember { mutableStateOf<ComicData?>(null) }
+    var activeVideoUrl by remember { mutableStateOf<String?>(null) }
+    var activeVideoTitle by remember { mutableStateOf("") }
+    var activeVideoSubtitle by remember { mutableStateOf("") }
 
     // Intercept back button if player or reader is expanded
-    BackHandler(enabled = isPlayerSlidUp || activeEBook != null || activeComic != null) {
+    BackHandler(enabled = isPlayerSlidUp || activeEBook != null || activeComic != null || activeVideoUrl != null) {
         when {
+            activeVideoUrl != null -> activeVideoUrl = null
             activeComic != null -> activeComic = null
             activeEBook != null -> activeEBook = null
             isPlayerSlidUp -> isPlayerSlidUp = false
@@ -340,7 +346,13 @@ fun MainScreen(
                         onTrackClick = {
                             isPlayerSlidUp = true
                         },
-                        onNavigateToSettings = { navController.navigate(Routes.Settings) }
+                        onNavigateToSettings = { navController.navigate(Routes.Settings) },
+                        onArtistClick = { artistName ->
+                            navController.navigate(Routes.CreatorDetail(artistName))
+                        },
+                        onOpenProgram = { id, type ->
+                            navController.navigate(Routes.ProgramDetail(id, type))
+                        }
                     )
                 }
                 composable(Routes.EBooks) {
@@ -567,6 +579,84 @@ fun MainScreen(
                         onPlayMusicTrack = { track ->
                             viewModel.playMusicTrackWithResolution(track)
                             isPlayerSlidUp = true
+                        },
+                        onOpenProgram = { id, type ->
+                            navController.navigate(Routes.ProgramDetail(id, type))
+                        }
+                    )
+                }
+
+                composable(
+                    route = "program_detail?id={id}&type={type}",
+                    arguments = listOf(
+                        navArgument("id") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("type") { type = NavType.StringType; defaultValue = "movie" }
+                    )
+                ) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getString("id") ?: ""
+                    val type = backStackEntry.arguments?.getString("type") ?: "movie"
+                    ProgramDetailScreen(
+                        viewModel = viewModel,
+                        programId = id,
+                        programType = type,
+                        onBack = { navController.popBackStack() },
+                        onOpenSeason = { showId, seasonNum ->
+                            navController.navigate(Routes.SeasonDetail(showId, seasonNum))
+                        },
+                        onOpenPerson = { personName ->
+                            navController.navigate(Routes.CreatorDetail(personName))
+                        },
+                        onOpenProgram = { progId, progType ->
+                            navController.navigate(Routes.ProgramDetail(progId, progType))
+                        }
+                    )
+                }
+
+                composable(
+                    route = "season_detail?showId={showId}&seasonNumber={seasonNumber}",
+                    arguments = listOf(
+                        navArgument("showId") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("seasonNumber") { type = NavType.IntType; defaultValue = 1 }
+                    )
+                ) { backStackEntry ->
+                    val showId = backStackEntry.arguments?.getString("showId") ?: ""
+                    val seasonNumber = backStackEntry.arguments?.getInt("seasonNumber") ?: 1
+                    SeasonDetailScreen(
+                        viewModel = viewModel,
+                        showId = showId,
+                        seasonNumber = seasonNumber,
+                        onBack = { navController.popBackStack() },
+                        onOpenEpisode = { sId, sNum, epNum ->
+                            navController.navigate(Routes.EpisodeDetail(sId, sNum, epNum))
+                        },
+                        onOpenPerson = { personName ->
+                            navController.navigate(Routes.CreatorDetail(personName))
+                        }
+                    )
+                }
+
+                composable(
+                    route = "episode_detail?showId={showId}&seasonNumber={seasonNumber}&episodeNumber={episodeNumber}",
+                    arguments = listOf(
+                        navArgument("showId") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("seasonNumber") { type = NavType.IntType; defaultValue = 1 },
+                        navArgument("episodeNumber") { type = NavType.IntType; defaultValue = 1 }
+                    )
+                ) { backStackEntry ->
+                    val showId = backStackEntry.arguments?.getString("showId") ?: ""
+                    val seasonNumber = backStackEntry.arguments?.getInt("seasonNumber") ?: 1
+                    val episodeNumber = backStackEntry.arguments?.getInt("episodeNumber") ?: 1
+                    EpisodeDetailScreen(
+                        viewModel = viewModel,
+                        showId = showId,
+                        seasonNumber = seasonNumber,
+                        episodeNumber = episodeNumber,
+                        onBack = { navController.popBackStack() },
+                        onOpenPerson = { personName ->
+                            navController.navigate(Routes.CreatorDetail(personName))
+                        },
+                        onNavigateEpisode = { nextEpNum ->
+                            navController.navigate(Routes.EpisodeDetail(showId, seasonNumber, nextEpNum))
                         }
                     )
                 }
@@ -620,6 +710,16 @@ fun MainScreen(
                     viewModel = viewModel
                 )
             }
+        }
+
+        // Full-screen Video Player Dialog for Movies, Shows, and Episodes
+        activeVideoUrl?.let { url ->
+            com.example.ui.components.VideoPlayerDialog(
+                videoUrl = url,
+                title = activeVideoTitle,
+                subtitle = activeVideoSubtitle,
+                onDismiss = { activeVideoUrl = null }
+            )
         }
     }
 }

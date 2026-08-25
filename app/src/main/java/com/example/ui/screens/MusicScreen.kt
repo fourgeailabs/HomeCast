@@ -85,7 +85,8 @@ fun MusicScreen(
     viewModel: MainViewModel,
     onTrackClick: (MusicTrack) -> Unit,
     onNavigateToSettings: () -> Unit,
-    onArtistClick: ((String) -> Unit)? = null
+    onArtistClick: ((String) -> Unit)? = null,
+    onOpenProgram: (id: String, type: String) -> Unit = { _, _ -> }
 ) {
     val allMusic by viewModel.allMusic.collectAsState()
     val recentMusic by viewModel.recentMusic.collectAsState()
@@ -849,8 +850,11 @@ fun MusicScreen(
 
             MusicNavTab.MOVIES_SHOWS -> {
                 PlexVideoView(
+                    viewModel = viewModel,
                     plexVideos = plexVideos,
+                    onOpenProgram = onOpenProgram,
                     onPlayVideo = { vid -> activeVideoItem = vid },
+                    onSwitchToMusic = { selectedTab = MusicNavTab.SHELVES },
                     onRefresh = { viewModel.fetchPlexVideos() }
                 )
             }
@@ -2596,11 +2600,20 @@ private fun formatMillis(millis: Long): String {
 
 @Composable
 fun PlexVideoView(
+    viewModel: MainViewModel,
     plexVideos: List<PlexVideoItem>,
+    onOpenProgram: (id: String, type: String) -> Unit,
     onPlayVideo: (PlexVideoItem) -> Unit,
+    onSwitchToMusic: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    if (plexVideos.isEmpty()) {
+    val movies by viewModel.plexMovies.collectAsState()
+    val shows by viewModel.plexShows.collectAsState()
+    val recentPrograms by viewModel.recentPrograms.collectAsState()
+
+    var selectedCategoryFilter by remember { mutableStateOf("ALL") } // ALL, MOVIES, SHOWS
+
+    if (plexVideos.isEmpty() && movies.isEmpty() && shows.isEmpty()) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2644,26 +2657,121 @@ fun PlexVideoView(
             }
         }
     } else {
-        val movies = remember(plexVideos) { plexVideos.filter { it.type == "movie" } }
-        val episodes = remember(plexVideos) { plexVideos.filter { it.type != "movie" } }
-
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            if (movies.isNotEmpty()) {
+            // Category Buttons: Movies | TV Shows | Music
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedCategoryFilter == "MOVIES",
+                        onClick = {
+                            selectedCategoryFilter = if (selectedCategoryFilter == "MOVIES") "ALL" else "MOVIES"
+                        },
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Movies (${movies.size})", fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AccentIndigo,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+
+                    FilterChip(
+                        selected = selectedCategoryFilter == "SHOWS",
+                        onClick = {
+                            selectedCategoryFilter = if (selectedCategoryFilter == "SHOWS") "ALL" else "SHOWS"
+                        },
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Tv, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("TV Shows (${shows.size})", fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AccentIndigo,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+
+                    FilterChip(
+                        selected = false,
+                        onClick = onSwitchToMusic,
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Music", fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = SurfaceGlass
+                        )
+                    )
+                }
+            }
+
+            // 1. Most Recently Played Programs Shelf
+            if (recentPrograms.isNotEmpty()) {
+                item {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.History, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Most Recently Played", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        ) {
+                            items(recentPrograms, key = { it.id }) { prog ->
+                                RecentProgramCard(
+                                    program = prog,
+                                    onClick = {
+                                        onOpenProgram(prog.id, prog.programType)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Movies Shelf / Section
+            if ((selectedCategoryFilter == "ALL" || selectedCategoryFilter == "MOVIES") && movies.isNotEmpty()) {
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "Movies (${movies.size})",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Movie, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Movies (${movies.size})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
                         IconButton(onClick = onRefresh) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = AccentIndigo)
                         }
@@ -2672,27 +2780,47 @@ fun PlexVideoView(
 
                 item {
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp)
                     ) {
-                        items(movies, key = { it.id }) { vid ->
-                            PlexVideoCard(video = vid, onClick = { onPlayVideo(vid) })
+                        items(movies, key = { it.id }) { movie ->
+                            MovieShelfCard(
+                                movie = movie,
+                                onClick = { onOpenProgram(movie.id, "movie") }
+                            )
                         }
                     }
                 }
             }
 
-            if (episodes.isNotEmpty()) {
+            // 3. TV Shows Shelf / Section
+            if ((selectedCategoryFilter == "ALL" || selectedCategoryFilter == "SHOWS") && shows.isNotEmpty()) {
                 item {
-                    Text(
-                        "TV Shows & Episodes (${episodes.size})",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = AccentIndigo, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("TV Shows (${shows.size})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
 
-                items(episodes, key = { it.id }) { vid ->
-                    PlexEpisodeRow(video = vid, onClick = { onPlayVideo(vid) })
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp)
+                    ) {
+                        items(shows, key = { it.id }) { show ->
+                            ShowShelfCard(
+                                show = show,
+                                onClick = { onOpenProgram(show.id, "show") }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2700,16 +2828,97 @@ fun PlexVideoView(
 }
 
 @Composable
-fun PlexVideoCard(
-    video: PlexVideoItem,
+fun RecentProgramCard(
+    program: RecentProgramEntity,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(180.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp)
+                    .background(Color.Black)
+            ) {
+                if (program.coverUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = program.coverUrl,
+                        contentDescription = program.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        if (program.programType.equals("movie", ignoreCase = true)) Icons.Default.Movie else Icons.Default.Tv,
+                        contentDescription = null,
+                        tint = AccentTeal,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .align(Alignment.Center)
+                    )
+                }
+
+                // Progress Bar at bottom of poster
+                if (program.duration > 0) {
+                    val frac = (program.progress.toFloat() / program.duration.toFloat()).coerceIn(0f, 1f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(Color.White.copy(alpha = 0.2f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(frac)
+                                .fillMaxHeight()
+                                .background(AccentTeal)
+                        )
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    program.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    program.subtitle.ifBlank { if (program.programType.equals("movie", ignoreCase = true)) "Movie" else "TV Show" },
+                    fontSize = 11.sp,
+                    color = AccentTeal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MovieShelfCard(
+    movie: PlexMovieItem,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .width(140.dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder)
     ) {
         Column {
             Box(
@@ -2719,10 +2928,10 @@ fun PlexVideoCard(
                     .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
                     .background(Color.Black)
             ) {
-                if (video.coverUrl.isNotBlank()) {
+                if (movie.coverUrl.isNotBlank()) {
                     AsyncImage(
-                        model = video.coverUrl,
-                        contentDescription = video.title,
+                        model = movie.coverUrl,
+                        contentDescription = movie.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -2737,22 +2946,7 @@ fun PlexVideoCard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.6f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                video.year?.let { y ->
+                movie.year?.let { y ->
                     Surface(
                         color = Color.Black.copy(alpha = 0.75f),
                         shape = RoundedCornerShape(6.dp),
@@ -2769,18 +2963,37 @@ fun PlexVideoCard(
                         )
                     }
                 }
+
+                val rating = movie.rating ?: 0f
+                if (rating > 0f) {
+                    Surface(
+                        color = Color(0xFFEAB308).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .align(Alignment.TopStart)
+                    ) {
+                        Text(
+                            "★ ${String.format(Locale.getDefault(), "%.1f", rating)}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
-                    video.title,
+                    movie.title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    video.genre,
+                    if (movie.genres.isNotEmpty()) movie.genres.joinToString(", ") else "Movie",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -2792,75 +3005,96 @@ fun PlexVideoCard(
 }
 
 @Composable
-fun PlexEpisodeRow(
-    video: PlexVideoItem,
+fun ShowShelfCard(
+    show: PlexShowItem,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(140.dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
+        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder)
     ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
             Box(
                 modifier = Modifier
-                    .size(width = 90.dp, height = 60.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
+                    .background(Color.Black)
             ) {
-                if (video.coverUrl.isNotBlank()) {
+                if (show.coverUrl.isNotBlank()) {
                     AsyncImage(
-                        model = video.coverUrl,
-                        contentDescription = video.title,
+                        model = show.coverUrl,
+                        contentDescription = show.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = AccentIndigo)
+                    Icon(
+                        Icons.Default.Tv,
+                        contentDescription = null,
+                        tint = AccentIndigo,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .align(Alignment.Center)
+                    )
                 }
-                Box(
+
+                Surface(
+                    color = AccentIndigo.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(6.dp),
                     modifier = Modifier
-                        .size(28.dp)
-                        .background(Color.Black.copy(alpha = 0.6f), CircleShape),
-                    contentAlignment = Alignment.Center
+                        .padding(6.dp)
+                        .align(Alignment.TopEnd)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text(
+                        "${show.seasons.size} Seasons",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                val rating = show.rating ?: 0f
+                if (rating > 0f) {
+                    Surface(
+                        color = Color(0xFFEAB308).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .align(Alignment.TopStart)
+                    ) {
+                        Text(
+                            "★ ${String.format(Locale.getDefault(), "%.1f", rating)}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.padding(10.dp)) {
                 Text(
-                    video.title,
+                    show.title,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    if (video.showTitle.isNotBlank()) "${video.showTitle} ${if (video.seasonEpisodeLabel.isNotBlank()) "• ${video.seasonEpisodeLabel}" else ""}"
-                    else video.seasonEpisodeLabel.ifBlank { "Episode" },
-                    fontSize = 12.sp,
-                    color = AccentIndigo,
+                    if (show.genres.isNotEmpty()) show.genres.joinToString(", ") else "TV Series",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (video.summary.isNotBlank()) {
-                    Text(
-                        video.summary,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
         }
     }

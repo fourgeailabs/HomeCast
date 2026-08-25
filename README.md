@@ -1,11 +1,29 @@
 # HomeCast
 
-**Version:** 5.16.00
+**Version:** 6.00.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.16.00)
+## 🚀 Recent Updates (v6.00.00)
+- **Major Milestone Release (v6.00.00)**:
+  - Full multimedia hub expansion: complete Movies, TV Shows, Seasons, and Episodes streaming and metadata suite.
+- **Rich Program, Season & Episode Biography Hierarchy**:
+  - Selecting any Movie or TV Show opens a dedicated high-definition overview screen instead of starting playback immediately.
+  - View full synopsis, banner artwork, release year, genre tags, and rating badges.
+  - TV Shows showcase clickable Season cards with episode counts, which expand into granular Episode lists with individual excerpt summaries.
+- **Granular Multi-Level Cast & Crew**:
+  - Cast, directors, writers, and producers are granularly partitioned at every hierarchy level (Show, Season, and Episode).
+  - Episode detail screens display the specific actors and directors for that single episode.
+- **Interactive Plex & IMDb Biography Integration**:
+  - Tapping any actor, director, or creator navigates to the `CreatorDetail` view.
+  - Profiles fetch authentic biographies (querying Plex metadata first, with intelligent fallback to Wikipedia / IMDb / Wikidata) with high-res portrait photography and related filmography shelves.
+- **Categorized Media Shelves & Recently Played Shelf**:
+  - Media landing screen organizes content into dedicated 'Most Recently Played' resume cards with live progress bars, category filter pills (All, Movies, TV Shows), and separate Movie and Show horizontal shelves.
+- **Instant In-Screen Video Player Dialog**:
+  - Playback is triggered on-demand via the 'Play Movie' or episode play buttons without interrupting navigation history.
+
+## 🚀 Previous Updates (v5.16.00)
 - **Universal Plex XML & JSON Multi-Format Parser**:
   - Fully integrated XML and JSON dual-parser for all Plex API endpoints, gracefully handling XML and JSON payloads for `MediaContainer`, `Directory`, `Metadata`, `Track`, and `Device` nodes.
   - Fixes all parsing stalls and deserialization failures when Plex returns raw XML responses.

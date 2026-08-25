@@ -14,6 +14,11 @@ class LibraryRepository(private val dao: LibraryDao, private val secureConfigMan
     val servers: Flow<List<ServerConfig>> = secureConfigManager.serversFlow
     val allPublicDomainSources: Flow<List<PublicDomainSource>> = dao.getAllPublicDomainSources()
     val allLocalFolders: Flow<List<LocalFolderConfig>> = dao.getAllLocalFolders()
+    val recentPrograms: Flow<List<RecentProgramEntity>> = dao.getAllRecentPrograms()
+
+    suspend fun insertRecentProgram(program: RecentProgramEntity) = dao.insertRecentProgram(program)
+    suspend fun updateProgramProgress(id: String, progress: Long) = dao.updateProgramProgress(id, progress, System.currentTimeMillis())
+    suspend fun deleteRecentProgram(id: String) = dao.deleteRecentProgram(id)
 
     suspend fun insertBook(book: Audiobook) = dao.insertBook(book)
     suspend fun insertBooks(books: List<Audiobook>) = dao.insertBooks(books)

@@ -93,4 +93,17 @@ interface LibraryDao {
 
     @Query("UPDATE local_folders SET fileCount = :count, lastScanned = :timestamp WHERE id = :id")
     suspend fun updateFolderScanStatus(id: String, count: Int, timestamp: Long)
+
+    // Recent Programs (Movies, TV Shows, Episodes, Music)
+    @Query("SELECT * FROM recent_programs ORDER BY lastPlayed DESC LIMIT 25")
+    fun getAllRecentPrograms(): Flow<List<RecentProgramEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecentProgram(program: RecentProgramEntity)
+
+    @Query("UPDATE recent_programs SET progress = :progress, lastPlayed = :timestamp WHERE id = :id")
+    suspend fun updateProgramProgress(id: String, progress: Long, timestamp: Long)
+
+    @Query("DELETE FROM recent_programs WHERE id = :id")
+    suspend fun deleteRecentProgram(id: String)
 }

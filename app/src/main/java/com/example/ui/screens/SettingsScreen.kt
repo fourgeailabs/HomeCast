@@ -1994,6 +1994,18 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "6.00.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Major Milestone Release (v6.00.00): Full multimedia hub transformation with complete Movies, TV Shows, Seasons, and Episodes streaming and metadata suite.",
+                    "Rich Program, Season & Episode Biography Hierarchy: Movies and TV Shows now open directly to high-definition overview screens with synopsis, rating badges, genre tags, and cast & crew credits instead of auto-playing.",
+                    "Granular Multi-Level Cast & Crew: Cast and crew members are granularly partitioned at every hierarchy level (Show, Season, and Episode). Explore actors, directors, producers, and writers specific to each episode and season.",
+                    "Interactive Plex & IMDb Biography Integration: Tapping on any actor, director, or creator opens their full profile featuring authentic biographies (sourcing Plex first, with fallback to Wikipedia/IMDb), portrait photos, and filmography shelves.",
+                    "Categorized Media Shelves & Recently Played Shelf: Media landing screen organizes content into dedicated 'Most Recently Played' resume cards with live progress bars, category filter pills (All, Movies, TV Shows), and separate Movie and Show horizontal shelves.",
+                    "Instant In-Screen Video Player Dialog: Playback is triggered on-demand via the 'Play Movie' or episode play buttons without interrupting navigation history."
+                )
+            ),
+            UpdateNotice(
                 version = "5.16.00",
                 date = "August 2026",
                 highlights = listOf(
