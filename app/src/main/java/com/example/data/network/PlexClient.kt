@@ -109,15 +109,191 @@ object PlexClient {
     }
 
     fun parseJsonArrayOrObjectList(jsonStr: String, rootKey: String = "MediaContainer", listKey: String): List<org.json.JSONObject> {
-        if (jsonStr.isBlank()) return emptyList()
+        val trimmed = jsonStr.trim()
+        if (trimmed.isBlank()) return emptyList()
+
+        // 1. If response is XML, parse XML nodes into JSONObjects
+        if (trimmed.startsWith("<")) {
+            return when {
+                listKey.equals("Directory", ignoreCase = true) -> parsePlexXmlToDirectoryList(trimmed)
+                listKey.equals("Metadata", ignoreCase = true) || listKey.equals("Video", ignoreCase = true) || listKey.equals("Track", ignoreCase = true) -> parsePlexXmlToMetadataList(trimmed)
+                listKey.equals("Device", ignoreCase = true) || listKey.equals("Server", ignoreCase = true) -> parsePlexXmlToDeviceList(trimmed)
+                else -> emptyList()
+            }
+        }
+
+        // 2. Parse JSON
         try {
-            val rootObj = org.json.JSONObject(jsonStr)
+            if (trimmed.startsWith("[")) {
+                val array = org.json.JSONArray(trimmed)
+                val list = mutableListOf<org.json.JSONObject>()
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i)
+                    if (item != null) list.add(item)
+                }
+                return list
+            }
+
+            val rootObj = org.json.JSONObject(trimmed)
             val container = if (rootObj.has(rootKey)) rootObj.optJSONObject(rootKey) else rootObj
             if (container != null) {
-                return optJsonList(container, listKey)
+                val list = optJsonList(container, listKey)
+                if (list.isNotEmpty()) return list
+                // Try lowercase or alternative key casing
+                val altKey = if (listKey.equals("Directory", ignoreCase = true)) "directory"
+                else if (listKey.equals("Metadata", ignoreCase = true)) "metadata"
+                else if (listKey.equals("Device", ignoreCase = true)) "device"
+                else listKey
+                return optJsonList(container, altKey)
             }
         } catch (_: Exception) {}
         return emptyList()
+    }
+
+    private fun parsePlexXmlToDirectoryList(xmlStr: String): List<org.json.JSONObject> {
+        val list = mutableListOf<org.json.JSONObject>()
+        try {
+            val parser = android.util.Xml.newPullParser()
+            parser.setInput(java.io.StringReader(xmlStr))
+            var eventType = parser.eventType
+            while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                    val tagName = parser.name
+                    if (tagName.equals("Directory", ignoreCase = true) || tagName.equals("Server", ignoreCase = true) || tagName.equals("Location", ignoreCase = true)) {
+                        val obj = org.json.JSONObject()
+                        for (i in 0 until parser.attributeCount) {
+                            obj.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                        }
+                        list.add(obj)
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    private fun parsePlexXmlToMetadataList(xmlStr: String): List<org.json.JSONObject> {
+        val list = mutableListOf<org.json.JSONObject>()
+        try {
+            val parser = android.util.Xml.newPullParser()
+            parser.setInput(java.io.StringReader(xmlStr))
+            var eventType = parser.eventType
+            var currentItem: org.json.JSONObject? = null
+            var mediaList = mutableListOf<org.json.JSONObject>()
+            var genreList = mutableListOf<org.json.JSONObject>()
+            var currentMedia: org.json.JSONObject? = null
+            var partList = mutableListOf<org.json.JSONObject>()
+
+            while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                    val tagName = parser.name
+                    when {
+                        tagName.equals("Metadata", ignoreCase = true) || tagName.equals("Track", ignoreCase = true) ||
+                            tagName.equals("Video", ignoreCase = true) || tagName.equals("Photo", ignoreCase = true) ||
+                            tagName.equals("Directory", ignoreCase = true) -> {
+                            currentItem = org.json.JSONObject()
+                            for (i in 0 until parser.attributeCount) {
+                                currentItem.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
+                            mediaList = mutableListOf()
+                            genreList = mutableListOf()
+                        }
+                        tagName.equals("Media", ignoreCase = true) -> {
+                            currentMedia = org.json.JSONObject()
+                            for (i in 0 until parser.attributeCount) {
+                                currentMedia.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
+                            partList = mutableListOf()
+                        }
+                        tagName.equals("Part", ignoreCase = true) -> {
+                            val partObj = org.json.JSONObject()
+                            for (i in 0 until parser.attributeCount) {
+                                partObj.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
+                            partList.add(partObj)
+                        }
+                        tagName.equals("Genre", ignoreCase = true) -> {
+                            val genreObj = org.json.JSONObject()
+                            for (i in 0 until parser.attributeCount) {
+                                genreObj.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
+                            genreList.add(genreObj)
+                        }
+                    }
+                } else if (eventType == org.xmlpull.v1.XmlPullParser.END_TAG) {
+                    val tagName = parser.name
+                    when {
+                        tagName.equals("Media", ignoreCase = true) -> {
+                            if (currentMedia != null) {
+                                currentMedia.put("Part", org.json.JSONArray(partList))
+                                mediaList.add(currentMedia)
+                                currentMedia = null
+                            }
+                        }
+                        tagName.equals("Metadata", ignoreCase = true) || tagName.equals("Track", ignoreCase = true) ||
+                            tagName.equals("Video", ignoreCase = true) || tagName.equals("Photo", ignoreCase = true) ||
+                            tagName.equals("Directory", ignoreCase = true) -> {
+                            if (currentItem != null) {
+                                if (mediaList.isNotEmpty()) currentItem.put("Media", org.json.JSONArray(mediaList))
+                                if (genreList.isNotEmpty()) currentItem.put("Genre", org.json.JSONArray(genreList))
+                                list.add(currentItem)
+                                currentItem = null
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    private fun parsePlexXmlToDeviceList(xmlStr: String): List<org.json.JSONObject> {
+        val list = mutableListOf<org.json.JSONObject>()
+        try {
+            val parser = android.util.Xml.newPullParser()
+            parser.setInput(java.io.StringReader(xmlStr))
+            var eventType = parser.eventType
+            var currentDevice: org.json.JSONObject? = null
+            var connList = mutableListOf<org.json.JSONObject>()
+
+            while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                    val tagName = parser.name
+                    when {
+                        tagName.equals("Device", ignoreCase = true) || tagName.equals("Server", ignoreCase = true) -> {
+                            currentDevice = org.json.JSONObject()
+                            for (i in 0 until parser.attributeCount) {
+                                currentDevice.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
+                            connList = mutableListOf()
+                        }
+                        tagName.equals("Connection", ignoreCase = true) -> {
+                            val connObj = org.json.JSONObject()
+                            for (i in 0 until parser.attributeCount) {
+                                connObj.put(parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
+                            connList.add(connObj)
+                        }
+                    }
+                } else if (eventType == org.xmlpull.v1.XmlPullParser.END_TAG) {
+                    val tagName = parser.name
+                    if (tagName.equals("Device", ignoreCase = true) || tagName.equals("Server", ignoreCase = true)) {
+                        if (currentDevice != null) {
+                            if (connList.isNotEmpty()) {
+                                currentDevice.put("connections", org.json.JSONArray(connList))
+                                currentDevice.put("Connection", org.json.JSONArray(connList))
+                            }
+                            list.add(currentDevice)
+                            currentDevice = null
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (_: Exception) {}
+        return list
     }
 
     /**
@@ -264,52 +440,64 @@ object PlexClient {
     }
 
     /**
-     * Fetches all Plex Media Servers linked to the user's Plex account via plex.tv/api/v2/resources.
+     * Fetches all Plex Media Servers linked to the user's Plex account via plex.tv/api/v2/resources or fallback plex.tv/pms/resources.
      * Probes and resolves the best reachable connection (local LAN IP, secure plex.direct, or remote)
      * so the user NEVER has to manually enter an IP address or port!
      */
     suspend fun fetchAccountServers(authToken: String): Result<List<DiscoveredPlexServer>> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1")
-            .get()
-            .apply { buildStandardHeaders(this, authToken) }
-            .build()
+        val cleanToken = authToken.trim()
+        if (cleanToken.isBlank()) {
+            return@withContext Result.failure(Exception("Auth token is empty."))
+        }
+
+        val resourceUrls = listOf(
+            "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1",
+            "https://plex.tv/pms/resources?includeHttps=1&includeRelay=1"
+        )
+
+        var deviceJsonList = emptyList<org.json.JSONObject>()
+        var lastErr: Exception? = null
+
+        for (resUrl in resourceUrls) {
+            try {
+                val request = Request.Builder()
+                    .url(resUrl)
+                    .get()
+                    .apply { buildStandardHeaders(this, cleanToken) }
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: ""
+                if (response.isSuccessful && body.isNotBlank()) {
+                    val parsed = parseJsonArrayOrObjectList(body, "MediaContainer", "Device")
+                        .ifEmpty { parseJsonArrayOrObjectList(body, "MediaContainer", "Server") }
+                    if (parsed.isNotEmpty()) {
+                        deviceJsonList = parsed
+                        break
+                    }
+                } else {
+                    lastErr = Exception("Plex resources returned HTTP ${response.code}")
+                }
+            } catch (e: Exception) {
+                lastErr = e
+            }
+        }
 
         try {
-            val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: ""
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("Failed to fetch Plex servers: HTTP ${response.code}"))
-            }
-
-            // Dual parsing: Moshi + JSONObject/JSONArray fallback
-            val deviceJsonList = mutableListOf<org.json.JSONObject>()
-            val rawArray = try { org.json.JSONArray(body) } catch (_: Exception) { null }
-            if (rawArray != null) {
-                for (i in 0 until rawArray.length()) {
-                    val item = rawArray.optJSONObject(i)
-                    if (item != null) deviceJsonList.add(item)
-                }
-            } else {
-                val rawObj = try { org.json.JSONObject(body) } catch (_: Exception) { null }
-                if (rawObj != null) {
-                    val innerList = optJsonList(rawObj, "Device")
-                    if (innerList.isNotEmpty()) deviceJsonList.addAll(innerList) else deviceJsonList.add(rawObj)
-                }
-            }
-
             val discoveredList = mutableListOf<DiscoveredPlexServer>()
 
             for (device in deviceJsonList) {
                 val provides = device.optString("provides", "")
-                if (!provides.contains("server", ignoreCase = true)) continue
+                if (provides.isNotBlank() && !provides.contains("server", ignoreCase = true)) continue
 
                 val serverName = device.optString("name", "Plex Server").ifBlank { "Plex Server" }
                 val clientIdentifier = device.optString("clientIdentifier", serverName)
-                val serverToken = device.optString("accessToken", authToken).ifBlank { authToken }
+                val serverToken = device.optString("accessToken", cleanToken).ifBlank { cleanToken }
                 val owned = device.optBoolean("owned", true)
 
                 val connJsonList = optJsonList(device, "connections")
+                    .ifEmpty { optJsonList(device, "Connection") }
+                    .ifEmpty { optJsonList(device, "connection") }
 
                 val candidateUris = mutableListOf<String>()
                 for (conn in connJsonList) {
@@ -325,6 +513,16 @@ object PlexClient {
                     }
                 }
 
+                // If device itself has host/address properties
+                val devAddress = device.optString("address", device.optString("publicAddress", ""))
+                val devPort = if (device.has("port")) device.optInt("port") else 32400
+                if (devAddress.isNotBlank()) {
+                    val httpUri = "http://$devAddress:$devPort"
+                    val httpsUri = "https://$devAddress:$devPort"
+                    if (!candidateUris.contains(httpUri)) candidateUris.add(httpUri)
+                    if (!candidateUris.contains(httpsUri)) candidateUris.add(httpsUri)
+                }
+
                 val sortedCandidates = candidateUris.distinct().sortedWith(
                     compareByDescending<String> { it.contains("192.168.") || it.contains("10.") || it.contains("172.") }
                         .thenByDescending { it.startsWith("http://") && !it.contains("relay.plex.services") }
@@ -332,7 +530,7 @@ object PlexClient {
                         .thenBy { it.contains("relay.plex.services") }
                 )
 
-                val activeUri = findFastestReachableUri(sortedCandidates, serverToken)
+                val activeUri = findFastestReachableUri(sortedCandidates, serverToken).ifBlank { sortedCandidates.firstOrNull() ?: "" }
                 val isLocal = activeUri.contains("192.168.") || activeUri.contains("10.") || activeUri.contains("172.") || activeUri.contains("localhost")
 
                 if (activeUri.isNotBlank()) {
@@ -359,7 +557,7 @@ object PlexClient {
     }
 
     /**
-     * Concurrently probes candidate URIs in parallel with a tight timeout, returning as soon as a working address is found.
+     * Concurrently probes candidate URIs in parallel, returning as soon as a working address is found.
      */
     private suspend fun findFastestReachableUri(candidateUris: List<String>, token: String): String = coroutineScope {
         if (candidateUris.isEmpty()) return@coroutineScope ""
@@ -380,8 +578,8 @@ object PlexClient {
         if (root.isBlank()) return false
         val cleanToken = token.trim()
         val probeClient = client.newBuilder()
-            .connectTimeout(2, TimeUnit.SECONDS)
-            .readTimeout(2, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
             .build()
 
         // 1. Try /library/sections with token
@@ -449,12 +647,15 @@ object PlexClient {
 
     private fun testSingleCandidate(root: String, token: String): Boolean {
         val candidateEndpoints = listOf(
+            "$root/library/sections?X-Plex-Token=$token",
             "$root/library/sections",
-            "$root/library/sections?X-Plex-Token=$token"
+            "$root/identity?X-Plex-Token=$token",
+            "$root/identity",
+            "$root/?X-Plex-Token=$token"
         )
         val fastClient = client.newBuilder()
-            .connectTimeout(2, TimeUnit.SECONDS)
-            .readTimeout(2, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
             .build()
 
         for (url in candidateEndpoints) {
@@ -465,7 +666,7 @@ object PlexClient {
                     .apply { buildStandardHeaders(this, token) }
                     .build()
                 val response = fastClient.newCall(request).execute()
-                val isSuccess = response.isSuccessful
+                val isSuccess = response.isSuccessful || response.code == 401
                 response.close()
                 if (isSuccess) return true
             } catch (_: Exception) {}
@@ -545,8 +746,10 @@ object PlexClient {
 
             var metadataItems: List<org.json.JSONObject> = emptyList()
             val queryUrls = listOf(
+                "$workingRoot/library/sections/$key/allLeaves?X-Plex-Token=$cleanToken",
                 "$workingRoot/library/sections/$key/all?type=10&X-Plex-Token=$cleanToken",
-                "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken"
+                "$workingRoot/library/sections/$key/all?X-Plex-Token=$cleanToken",
+                "$workingRoot/library/sections/$key/search?type=10&X-Plex-Token=$cleanToken"
             )
 
             for (tracksUrl in queryUrls) {
@@ -561,6 +764,8 @@ object PlexClient {
                     if (tracksRes.isSuccessful) {
                         val body = tracksRes.body?.string() ?: ""
                         val items = parseJsonArrayOrObjectList(body, "MediaContainer", "Metadata")
+                            .ifEmpty { parseJsonArrayOrObjectList(body, "MediaContainer", "Track") }
+                            .ifEmpty { parseJsonArrayOrObjectList(body, "MediaContainer", "Directory") }
                         if (items.isNotEmpty()) {
                             metadataItems = items
                             break
@@ -573,11 +778,67 @@ object PlexClient {
                 val ratingKey = item.optString("ratingKey", item.optString("key", "").substringAfterLast("/"))
                 if (ratingKey.isBlank()) continue
 
-                val mediaList = optJsonList(item, "Media")
-                val firstMedia = mediaList.firstOrNull()
-                val partList = if (firstMedia != null) optJsonList(firstMedia, "Part") else emptyList()
-                val partKey = partList.firstOrNull()?.optString("key", "") ?: ""
+                var mediaList = optJsonList(item, "Media")
+                var partList = if (mediaList.isNotEmpty()) optJsonList(mediaList.first(), "Part") else emptyList()
 
+                // If this is a container (Artist or Album) without direct Media, attempt to fetch its children/leaves
+                val itemType = item.optString("type", "").lowercase()
+                if (partList.isEmpty() && (itemType == "artist" || itemType == "album")) {
+                    try {
+                        val leafUrl = "$workingRoot/library/metadata/$ratingKey/allLeaves?X-Plex-Token=$cleanToken"
+                        val leafReq = Request.Builder().url(leafUrl).get().apply { buildStandardHeaders(this, cleanToken) }.build()
+                        val leafRes = client.newCall(leafReq).execute()
+                        if (leafRes.isSuccessful) {
+                            val leafBody = leafRes.body?.string() ?: ""
+                            val leaves = parseJsonArrayOrObjectList(leafBody, "MediaContainer", "Metadata")
+                                .ifEmpty { parseJsonArrayOrObjectList(leafBody, "MediaContainer", "Track") }
+                            for (leaf in leaves) {
+                                val leafKey = leaf.optString("ratingKey", leaf.optString("key", "").substringAfterLast("/"))
+                                if (leafKey.isBlank()) continue
+                                val leafMedia = optJsonList(leaf, "Media")
+                                val leafPart = if (leafMedia.isNotEmpty()) optJsonList(leafMedia.first(), "Part") else emptyList()
+                                val leafPartKey = leafPart.firstOrNull()?.optString("key", "") ?: ""
+                                val streamUrl = if (leafPartKey.isNotBlank()) {
+                                    val cleanPart = if (leafPartKey.startsWith("/")) leafPartKey else "/$leafPartKey"
+                                    "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"
+                                } else ""
+
+                                val thumbPath = leaf.optString("thumb", leaf.optString("parentThumb", leaf.optString("grandparentThumb", item.optString("thumb", ""))))
+                                val coverUrl = if (thumbPath.isNotBlank()) {
+                                    val cleanThumb = if (thumbPath.startsWith("/")) thumbPath else "/$thumbPath"
+                                    "$workingRoot$cleanThumb?X-Plex-Token=$cleanToken"
+                                } else ""
+
+                                val genreList = optJsonList(leaf, "Genre").ifEmpty { optJsonList(item, "Genre") }
+                                val genreTag = genreList.firstOrNull()?.optString("tag", "")?.takeIf { it.isNotBlank() } ?: "Music"
+                                val trackIndex = if (leaf.has("index")) leaf.optInt("index") else (tracksList.size + 1)
+                                val trackTitle = leaf.optString("title", "Track $trackIndex")
+                                val artistName = leaf.optString("grandparentTitle", leaf.optString("originalTitle", leaf.optString("parentTitle", item.optString("title", secTitle)))).ifBlank { "Plex Artist" }
+                                val albumName = leaf.optString("parentTitle", item.optString("title", secTitle)).ifBlank { "Plex Album" }
+                                val duration = leaf.optLong("duration", 0L)
+
+                                tracksList.add(
+                                    MusicTrack(
+                                        id = "plex_${serverId}_$leafKey",
+                                        title = trackTitle,
+                                        artist = artistName,
+                                        album = albumName,
+                                        coverUrl = coverUrl,
+                                        duration = duration,
+                                        serverId = serverId,
+                                        streamUrl = streamUrl,
+                                        ratingKey = leafKey,
+                                        genre = genreTag,
+                                        trackNumber = trackIndex
+                                    )
+                                )
+                            }
+                            continue
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                val partKey = partList.firstOrNull()?.optString("key", "") ?: ""
                 val streamUrl = if (partKey.isNotBlank()) {
                     val cleanPart = if (partKey.startsWith("/")) partKey else "/$partKey"
                     "$workingRoot$cleanPart?X-Plex-Token=$cleanToken"

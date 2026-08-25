@@ -1331,37 +1331,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
             try {
-                val testRes = PlexClient.testConnection(hostUrl, token, candidateUrls)
-                if (testRes.isSuccess) {
-                    val server = ServerConfig(
-                        id = "plex_${System.currentTimeMillis()}",
-                        name = name.ifBlank { "Plex Music" },
-                        type = "plex",
-                        hostUrl = hostUrl.trim(),
-                        apiKey = token.trim(),
-                        isConnected = true,
-                        lastSyncTime = System.currentTimeMillis()
-                    )
-                    repository.addOrUpdateServer(server)
+                val server = ServerConfig(
+                    id = "plex_${System.currentTimeMillis()}",
+                    name = name.ifBlank { "Plex Server" },
+                    type = "plex",
+                    hostUrl = hostUrl.trim(),
+                    apiKey = token.trim(),
+                    isConnected = true,
+                    lastSyncTime = System.currentTimeMillis()
+                )
+                repository.addOrUpdateServer(server)
 
-                    val syncRes = repository.syncPlex(server, candidateUrls)
-                    fetchPlexVideos()
-                    refreshPersonalMedia()
-                    if (syncRes.isSuccess) {
-                        val count = syncRes.getOrNull() ?: 0
+                val syncRes = repository.syncPlex(server, candidateUrls)
+                fetchPlexVideos()
+                refreshPersonalMedia()
+
+                if (syncRes.isSuccess) {
+                    val count = syncRes.getOrNull() ?: 0
+                    _serverOpState.value = ServerOperationState.Success(
+                        if (count > 0) "Connected to server '${server.name}'! Loaded $count media items from your library."
+                        else "Connected to server '${server.name}'! Library connected."
+                    )
+                } else {
+                    val testRes = PlexClient.testConnection(hostUrl, token, candidateUrls)
+                    if (testRes.isSuccess) {
                         _serverOpState.value = ServerOperationState.Success(
-                            if (count > 0) "Connected to owned server '${server.name}'! Auto-searched and synced $count tracks from your music library."
-                            else "Connected to owned server '${server.name}'! Music library auto-searched (0 tracks found in music sections)."
+                            "Connected to '${server.name}'. No tracks found in music sections."
                         )
                     } else {
-                        _serverOpState.value = ServerOperationState.Success(
-                            "Plex server connected, but music sync returned: ${syncRes.exceptionOrNull()?.message}"
+                        _serverOpState.value = ServerOperationState.Error(
+                            "Plex sync error: ${syncRes.exceptionOrNull()?.message ?: testRes.exceptionOrNull()?.message ?: "Unable to connect"}"
                         )
                     }
-                } else {
-                    _serverOpState.value = ServerOperationState.Error(
-                        "Plex connection failed: ${testRes.exceptionOrNull()?.message}"
-                    )
                 }
             } catch (e: Exception) {
                 _serverOpState.value = ServerOperationState.Error("Error: ${e.message}")

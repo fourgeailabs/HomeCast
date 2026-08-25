@@ -1,11 +1,22 @@
 # HomeCast
 
-**Version:** 5.15.00
+**Version:** 5.16.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v5.15.00)
+## 🚀 Recent Updates (v5.16.00)
+- **Universal Plex XML & JSON Multi-Format Parser**:
+  - Fully integrated XML and JSON dual-parser for all Plex API endpoints, gracefully handling XML and JSON payloads for `MediaContainer`, `Directory`, `Metadata`, `Track`, and `Device` nodes.
+  - Fixes all parsing stalls and deserialization failures when Plex returns raw XML responses.
+- **Deep Nested Track & Album Traversal**:
+  - Enhanced `fetchMusicTracks` with automatic leaf queries (`allLeaves` and `children`) for artist and album container nodes, ensuring all songs and audio tracks are loaded regardless of default library views.
+- **Safe JSON Validation**:
+  - Hardened `ArchiveOrgClient` with pre-parsing JSON format checks, eliminating `JSONException` errors on non-JSON metadata responses.
+- **Resilient Auto-Connect & Library Sync**:
+  - Saved server configurations and background sync jobs seamlessly probe candidate URLs in parallel with expanded timeouts.
+
+## 🚀 Previous Updates (v5.15.00)
 - **Universal Single & Multi-Object Plex JSON Parser**:
   - Engineered dual-mode JSON object and array parsing for `fetchAccountServers`, `fetchMusicTracks`, and `fetchVideoItems` in `PlexClient`.
   - Fixes library loading stalls where single Plex `Directory`, `Metadata`, `Media`, or `Part` JSON objects caused strict array deserializers to fail.

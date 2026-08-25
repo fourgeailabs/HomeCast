@@ -1994,6 +1994,58 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "5.16.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Universal Plex XML & JSON Multi-Format Parser: Fully integrated native XML parser and JSON parser for Plex endpoints, supporting XML and JSON MediaContainer, Directory, Metadata, Track, and Device nodes.",
+                    "Deep Nested Track & Album Traversal: Automatically extracts leaf tracks from artist and album nodes via allLeaves and child queries, ensuring complete library population regardless of default section view.",
+                    "Safe Archive.org JSON Validation: Added pre-parsing JSON validation in ArchiveOrgClient, preventing JSONExceptions on non-JSON metadata responses.",
+                    "Resilient Auto-Connect & Library Sync: Server configurations and sync pipelines now gracefully save and probe all candidate URLs in parallel with improved timeouts."
+                )
+            ),
+            UpdateNotice(
+                version = "5.15.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Universal Single & Multi-Object Plex JSON Parser: Dual-mode JSON object and array parsing for fetchAccountServers, fetchMusicTracks, and fetchVideoItems in PlexClient.",
+                    "Instant 1-Tap Auth & Direct Credentials: Sign into Plex via browser link or direct username/password credentials with automatic server discovery."
+                )
+            ),
+            UpdateNotice(
+                version = "5.14.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "1-Tap Browser Auth & Direct Link: Integrated official 1-tap browser auth link (app.plex.tv/auth) allowing instant authorization via Google, Apple, or Plex web login with auto-claimed PIN codes.",
+                    "Direct Plex Credentials Sign-In: Added dedicated tab for direct Plex Username/Email & Password sign-in, obtaining authToken directly without leaving the app."
+                )
+            ),
+            UpdateNotice(
+                version = "5.13.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Full Plex Server Video Library Support: Added full support for personal Plex Movies and TV Show episodes alongside music tracks.",
+                    "Dedicated Movies & Shows Media Tab: Featuring poster artwork, year/season metadata, and 1-tap playback in embedded HD VideoPlayerDialog.",
+                    "Remote Access Plex Pass Disclaimer: Added explicit notice in the About section of Settings stating that a Plex Pass subscription is required for remote access outside your home network."
+                )
+            ),
+            UpdateNotice(
+                version = "5.12.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Resolved Audio & Video Media Playback Stream Engine: Fixed ExoPlayer network request headers for signed URLs (Google Cloud Storage, Archive.org, LibriVox, RSS feeds, and CDN endpoints).",
+                    "Strict Single-Server Labeling: Dynamically evaluates connected servers and strictly displays EITHER 'Plex Library' or 'Jellyfin Library'."
+                )
+            ),
+            UpdateNotice(
+                version = "5.11.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "High-Performance Embedded Video Player for Podcasts & Video Media: Integrated Media3 PlayerView and ExoPlayer for high-throughput video streaming.",
+                    "Dynamic Plex & Jellyfin Server Tab Labeling: Automatically detects connected personal servers and updates section labels.",
+                    "AI Capabilities & Notice Accordion Menu in About: Full-featured dropdown menu inside About detailing all 9 intelligent AI features built by FourgeAI LABS."
+                )
+            ),
+            UpdateNotice(
                 version = "5.10.00",
                 date = "August 2026",
                 highlights = listOf(

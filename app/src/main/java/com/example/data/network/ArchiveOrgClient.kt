@@ -68,7 +68,11 @@ object ArchiveOrgClient {
             val response = client.newCall(request).execute()
             val body = response.body?.string()
             if (response.isSuccessful && body != null) {
-                val jsonObject = org.json.JSONObject(body)
+                val trimmed = body.trim()
+                if (!trimmed.startsWith("{")) {
+                    return@withContext emptyList()
+                }
+                val jsonObject = org.json.JSONObject(trimmed)
                 val filesArray = jsonObject.optJSONArray("result") ?: return@withContext emptyList()
                 val list = mutableListOf<ArchiveFile>()
                 for (i in 0 until filesArray.length()) {

@@ -96,8 +96,7 @@ object OptimizedNetworkEngine {
         builder.addInterceptor { chain ->
             val orig = chain.request()
             val req = orig.newBuilder()
-                .header("User-Agent", "HomeCast-FastEngine/5.11 (Android; High-Performance)")
-                .header("Accept-Encoding", "gzip, deflate")
+                .header("User-Agent", "HomeCast-FastEngine/5.15 (Android; High-Performance)")
                 .build()
             chain.proceed(req)
         }
