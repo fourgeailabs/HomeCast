@@ -1,11 +1,24 @@
 # HomeCast
 
-**Version:** 6.00.00
+**Version:** 6.01.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v6.00.00)
+## 🚀 Recent Updates (v6.01.00)
+- **Gemini AI Personalized Recommendations Section**:
+  - Integrated Gemini API to analyze user's recently played music tracks, audiobooks, e-books, podcasts, and movies/shows in real-time.
+  - Dynamically synthesizes personalized cross-media recommendations blending the user's private library items with curated public domain masterworks.
+  - Displays recommendation cards with cover art, type badges, vibe chips, and 1-tap direct action buttons (Play, Read, Listen, Watch).
+- **Interactive AI Rationale & Vibe Dialogs**:
+  - Tapping the AI info button on any recommendation opens a dialog with the exact reasoning ("Because you listened to...", aesthetic vibe, and contextual suggestions).
+- **Concurrently Probed Multi-Candidate Plex Connection & Login Resolution**:
+  - Fixed Plex server connection and login issues by concurrently testing all candidate local and remote URIs in parallel (`findFastWorkingUri`), locking onto the fastest reachable endpoint.
+  - Concurrently syncs Music tracks, rich Movie catalogs, and multi-season TV Shows across all available Plex candidate endpoints.
+- **Compilation & Verification Stability**:
+  - Resolved model field mappings and verified full clean builds across all Jetpack Compose UI screens and ViewModels.
+
+## 🚀 Previous Updates (v6.00.00)
 - **Major Milestone Release (v6.00.00)**:
   - Full multimedia hub expansion: complete Movies, TV Shows, Seasons, and Episodes streaming and metadata suite.
 - **Rich Program, Season & Episode Biography Hierarchy**:

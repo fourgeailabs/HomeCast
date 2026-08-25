@@ -559,19 +559,22 @@ object PlexClient {
     /**
      * Concurrently probes candidate URIs in parallel, returning as soon as a working address is found.
      */
-    private suspend fun findFastestReachableUri(candidateUris: List<String>, token: String): String = coroutineScope {
+    suspend fun findFastWorkingUri(candidateUris: List<String>, token: String): String = coroutineScope {
         if (candidateUris.isEmpty()) return@coroutineScope ""
-        if (candidateUris.size == 1) return@coroutineScope candidateUris.first()
+        val cleaned = candidateUris.map { normalizeUrl(it) }.filter { it.isNotBlank() }.distinct()
+        if (cleaned.size <= 1) return@coroutineScope cleaned.firstOrNull() ?: ""
 
-        val jobs = candidateUris.map { uri ->
+        val jobs = cleaned.map { uri ->
             async(Dispatchers.IO) {
                 if (testConnectionQuick(uri, token)) uri else null
             }
         }
 
         val results = jobs.awaitAll()
-        results.firstOrNull { !it.isNullOrBlank() } ?: candidateUris.first()
+        results.firstOrNull { !it.isNullOrBlank() } ?: cleaned.first()
     }
+
+    private suspend fun findFastestReachableUri(candidateUris: List<String>, token: String): String = findFastWorkingUri(candidateUris, token)
 
     fun testConnectionQuick(serverUrl: String, token: String): Boolean {
         val root = normalizeUrl(serverUrl)

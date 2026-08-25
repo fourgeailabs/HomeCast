@@ -84,8 +84,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isEnrichingLocalMedia = MutableStateFlow(false)
     val isEnrichingLocalMedia = _isEnrichingLocalMedia.asStateFlow()
 
-    // Discovery State
+    // Discovery & Gemini Recommendations State
     val _recommendations = MutableStateFlow<List<String>>(emptyList())
+
+    private val _personalizedRecommendations = MutableStateFlow<List<com.example.data.PersonalizedRecommendation>>(emptyList())
+    val personalizedRecommendations: StateFlow<List<com.example.data.PersonalizedRecommendation>> = _personalizedRecommendations.asStateFlow()
+
+    private val _isPersonalizedRecsLoading = MutableStateFlow(false)
+    val isPersonalizedRecsLoading: StateFlow<Boolean> = _isPersonalizedRecsLoading.asStateFlow()
 
     private val _publicDomainBooks = MutableStateFlow<List<ArchiveDoc>>(emptyList())
     val publicDomainBooks = _publicDomainBooks.asStateFlow()
@@ -465,6 +471,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Auto sync servers and scan local folders in background on app startup
             kotlinx.coroutines.delay(1000)
             refreshPersonalMedia()
+            fetchPersonalizedRecommendations()
         }
 
         viewModelScope.launch {
@@ -1326,39 +1333,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
             try {
+                var workingUrl = hostUrl.trim()
+                val cleanToken = token.trim()
+                val allCandidates = (listOf(hostUrl) + candidateUrls).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+                // Concurrently test all candidate URIs to lock onto the fastest responsive host
+                val activeFastHost = PlexClient.findFastWorkingUri(allCandidates, cleanToken)
+                if (activeFastHost.isNotBlank()) {
+                    workingUrl = activeFastHost
+                }
+
                 val server = ServerConfig(
                     id = "plex_${System.currentTimeMillis()}",
                     name = name.ifBlank { "Plex Server" },
                     type = "plex",
-                    hostUrl = hostUrl.trim(),
-                    apiKey = token.trim(),
+                    hostUrl = workingUrl,
+                    apiKey = cleanToken,
                     isConnected = true,
                     lastSyncTime = System.currentTimeMillis()
                 )
                 repository.addOrUpdateServer(server)
 
-                val syncRes = repository.syncPlex(server, candidateUrls)
-                fetchPlexVideos()
+                // Sync Music tracks across candidate URLs
+                val syncRes = repository.syncPlex(server, allCandidates)
+                
+                // Fetch Movies, TV Shows, and Episodes concurrently across candidate URLs
+                fetchPlexVideos(server, allCandidates)
                 refreshPersonalMedia()
+                fetchPersonalizedRecommendations()
 
-                if (syncRes.isSuccess) {
-                    val count = syncRes.getOrNull() ?: 0
-                    _serverOpState.value = ServerOperationState.Success(
-                        if (count > 0) "Connected to server '${server.name}'! Loaded $count media items from your library."
-                        else "Connected to server '${server.name}'! Library connected."
-                    )
-                } else {
-                    val testRes = PlexClient.testConnection(hostUrl, token, candidateUrls)
-                    if (testRes.isSuccess) {
-                        _serverOpState.value = ServerOperationState.Success(
-                            "Connected to '${server.name}'. No tracks found in music sections."
-                        )
-                    } else {
-                        _serverOpState.value = ServerOperationState.Error(
-                            "Plex sync error: ${syncRes.exceptionOrNull()?.message ?: testRes.exceptionOrNull()?.message ?: "Unable to connect"}"
-                        )
-                    }
-                }
+                val count = syncRes.getOrNull() ?: 0
+                _serverOpState.value = ServerOperationState.Success(
+                    if (count > 0) "Connected to server '${server.name}'! Loaded $count tracks & video libraries."
+                    else "Connected to server '${server.name}'! Library connected."
+                )
             } catch (e: Exception) {
                 _serverOpState.value = ServerOperationState.Error("Error: ${e.message}")
             }
@@ -1633,23 +1641,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun fetchPlexVideos() {
+    fun fetchPlexVideos(explicitServer: ServerConfig? = null, candidateUrls: List<String> = emptyList()) {
         viewModelScope.launch(Dispatchers.IO) {
             _isFetchingPlexVideos.value = true
             try {
-                val plexServers = servers.value.filter { it.type == "plex" && it.isConnected }
+                val plexServers = if (explicitServer != null) {
+                    (listOf(explicitServer) + servers.value.filter { it.type == "plex" && it.isConnected && it.id != explicitServer.id })
+                } else {
+                    servers.value.filter { it.type == "plex" && it.isConnected }
+                }
                 val allMovies = mutableListOf<PlexMovieItem>()
                 val allShows = mutableListOf<PlexShowItem>()
                 val allVideos = mutableListOf<PlexVideoItem>()
 
                 for (server in plexServers) {
-                    val moviesRes = PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id)
+                    val moviesRes = PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id, candidateUrls)
                     moviesRes.getOrNull()?.let { allMovies.addAll(it) }
 
-                    val showsRes = PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id)
+                    val showsRes = PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id, candidateUrls)
                     showsRes.getOrNull()?.let { allShows.addAll(it) }
 
-                    val videoRes = PlexClient.fetchVideoItems(server.hostUrl, server.apiKey, server.id)
+                    val videoRes = PlexClient.fetchVideoItems(server.hostUrl, server.apiKey, server.id, candidateUrls)
                     videoRes.getOrNull()?.let { allVideos.addAll(it) }
                 }
 
@@ -1660,6 +1672,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 android.util.Log.e("MainViewModel", "Error fetching rich plex videos", e)
             } finally {
                 _isFetchingPlexVideos.value = false
+            }
+        }
+    }
+
+    /**
+     * Generates personalized media recommendations with Gemini AI based on the user's recently played media.
+     */
+    fun fetchPersonalizedRecommendations() {
+        viewModelScope.launch {
+            _isPersonalizedRecsLoading.value = true
+            try {
+                val recs = com.example.data.GeminiPersonalizedEngine.generateRecommendations(
+                    recentMusic = recentMusic.value,
+                    recentBooks = recents.value,
+                    recentPrograms = recentPrograms.value,
+                    allMusic = allMusic.value,
+                    allBooks = allBooks.value,
+                    allEBooks = allEBooks.value,
+                    plexMovies = _plexMovies.value,
+                    plexShows = _plexShows.value
+                )
+                if (recs.isNotEmpty()) {
+                    _personalizedRecommendations.value = recs
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Failed to generate personalized recommendations", e)
+            } finally {
+                _isPersonalizedRecsLoading.value = false
             }
         }
     }

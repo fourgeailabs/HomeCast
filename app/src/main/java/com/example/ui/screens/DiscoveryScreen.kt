@@ -82,6 +82,12 @@ fun DiscoveryScreen(
     val allMusic by viewModel.allMusic.collectAsState()
     val recentMusic by viewModel.recentMusic.collectAsState()
     val recents by viewModel.recents.collectAsState()
+    val recentPrograms by viewModel.recentPrograms.collectAsState()
+    val plexMovies by viewModel.plexMovies.collectAsState()
+    val plexShows by viewModel.plexShows.collectAsState()
+
+    val personalizedRecs by viewModel.personalizedRecommendations.collectAsState()
+    val isPersonalizedRecsLoading by viewModel.isPersonalizedRecsLoading.collectAsState()
 
     val dynamicMixes = remember(allMusic, recentMusic) {
         MusicMixGenerator.generateDynamicMixes(allMusic, recentMusic, 0)
@@ -592,6 +598,58 @@ fun DiscoveryScreen(
                             }
                         }
                     }
+                }
+
+                // 2. Gemini AI Personalized Recommendations Section (Based on Recently Played Media)
+                item {
+                    PersonalizedGeminiRecommendationsSection(
+                        recommendations = personalizedRecs,
+                        isLoading = isPersonalizedRecsLoading,
+                        onRefresh = { viewModel.fetchPersonalizedRecommendations() },
+                        onPlayMusic = { trackId, title, artist ->
+                            val track = allMusic.find { it.id == trackId }
+                                ?: com.example.data.MusicTrack(
+                                    id = trackId,
+                                    title = title,
+                                    artist = artist,
+                                    album = "AI Recommended",
+                                    coverUrl = "",
+                                    streamUrl = "",
+                                    serverId = "personal",
+                                    duration = 240L
+                                )
+                            viewModel.playMusicTrackWithResolution(track, allMusic.ifEmpty { listOf(track) })
+                            onMusicClick()
+                        },
+                        onPlayAudiobook = { bookId, title, author ->
+                            val book = allBooks.find { it.id == bookId }
+                                ?: com.example.data.Audiobook(
+                                    id = bookId,
+                                    title = title,
+                                    author = author,
+                                    coverUrl = "",
+                                    streamUrl = "",
+                                    serverId = "personal",
+                                    duration = 3600L
+                                )
+                            viewModel.playAudiobook(book)
+                            onAudiobookClick()
+                        },
+                        onOpenEBook = { ebookId, title, author ->
+                            val ebook = allEBooks.find { it.id == ebookId }
+                            val data = EBookData(
+                                id = ebookId,
+                                title = title,
+                                author = author,
+                                downloadUrl = ebook?.coverUrl,
+                                publicDomainUrl = null
+                            )
+                            onOpenEBook(data)
+                        },
+                        onOpenVideo = { videoId, title, mediaType ->
+                            onNavigateToDetails(videoId, title, mediaType)
+                        }
+                    )
                 }
 
                 if (selectedSource == 0) {
@@ -1419,5 +1477,497 @@ private fun ShelfHeader(title: String, subtitle: String) {
             fontSize = 11.sp, 
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+fun PersonalizedGeminiRecommendationsSection(
+    recommendations: List<PersonalizedRecommendation>,
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    onPlayMusic: (String, String, String) -> Unit,
+    onPlayAudiobook: (String, String, String) -> Unit,
+    onOpenEBook: (String, String, String) -> Unit,
+    onOpenVideo: (String, String, String) -> Unit
+) {
+    var selectedRecForDetails by remember { mutableStateOf<PersonalizedRecommendation?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF1E1B4B).copy(alpha = 0.95f),
+                        Color(0xFF0F172A).copy(alpha = 0.98f)
+                    )
+                )
+            )
+            .border(1.dp, Color(0xFF6366F1).copy(alpha = 0.35f), RoundedCornerShape(24.dp))
+            .padding(18.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF818CF8), Color(0xFFC084FC))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = "Gemini AI",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "Gemini AI Recommendations",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 17.sp,
+                            color = Color.White
+                        )
+                        Surface(
+                            color = Color(0xFF6366F1).copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                "PRO",
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFA5B4FC)
+                            )
+                        }
+                    }
+                    Text(
+                        "Personalized from your recently played media & library",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onRefresh,
+                enabled = !isLoading,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.1f))
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color(0xFFA5B4FC),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Refresh Recommendations",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (isLoading && recommendations.isEmpty()) {
+            // Shimmer Loading Skeleton
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                items(3) {
+                    Box(
+                        modifier = Modifier
+                            .width(260.dp)
+                            .height(280.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .padding(14.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.7f)
+                                    .height(16.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.5f)
+                                    .height(12.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (recommendations.isEmpty()) {
+            // Empty State
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .padding(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Start playing tracks, audiobooks, or books to receive personalized Gemini recommendations!",
+                        textAlign = TextAlign.Center,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onRefresh,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Generate Recommendations", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        } else {
+            // Render Recommendation Cards
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                items(recommendations) { rec ->
+                    PersonalizedRecommendationCard(
+                        rec = rec,
+                        onCardClick = {
+                            when (rec.mediaType.uppercase()) {
+                                "MUSIC" -> onPlayMusic(rec.id, rec.title, rec.creator)
+                                "AUDIOBOOK" -> onPlayAudiobook(rec.id, rec.title, rec.creator)
+                                "EBOOK", "BOOK", "COMIC" -> onOpenEBook(rec.id, rec.title, rec.creator)
+                                "MOVIE", "SHOW", "EPISODE" -> onOpenVideo(rec.id, rec.title, rec.mediaType)
+                                else -> onPlayMusic(rec.id, rec.title, rec.creator)
+                            }
+                        },
+                        onInfoClick = { selectedRecForDetails = rec }
+                    )
+                }
+            }
+        }
+    }
+
+    // AI Analytical Details Dialog
+    if (selectedRecForDetails != null) {
+        val rec = selectedRecForDetails!!
+        AlertDialog(
+            onDismissRequest = { selectedRecForDetails = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF818CF8))
+                    Text("Gemini AI Analysis", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "${rec.title} by ${rec.creator}",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        color = Color(0xFF6366F1).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                "BECAUSE YOU RECENTLY ENJOYED:",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF6366F1)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                rec.becauseYouPlayed.ifBlank { "Your listening taste" },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    Text(
+                        "AI Rationale:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        rec.aiRationale,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (rec.vibeTag.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Vibe:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Surface(color = Color(0xFF10B981).copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+                                Text(
+                                    rec.vibeTag,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF10B981)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val currentRec = rec
+                        selectedRecForDetails = null
+                        when (currentRec.mediaType.uppercase()) {
+                            "MUSIC" -> onPlayMusic(currentRec.id, currentRec.title, currentRec.creator)
+                            "AUDIOBOOK" -> onPlayAudiobook(currentRec.id, currentRec.title, currentRec.creator)
+                            "EBOOK", "BOOK", "COMIC" -> onOpenEBook(currentRec.id, currentRec.title, currentRec.creator)
+                            "MOVIE", "SHOW", "EPISODE" -> onOpenVideo(currentRec.id, currentRec.title, currentRec.mediaType)
+                            else -> onPlayMusic(currentRec.id, currentRec.title, currentRec.creator)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                ) {
+                    Text(
+                        when (rec.suggestedAction.uppercase()) {
+                            "READ" -> "Read Now"
+                            "WATCH" -> "Watch Now"
+                            else -> "Play Now"
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedRecForDetails = null }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun PersonalizedRecommendationCard(
+    rec: PersonalizedRecommendation,
+    onCardClick: () -> Unit,
+    onInfoClick: () -> Unit
+) {
+    val mediaIcon = when (rec.mediaType.uppercase()) {
+        "AUDIOBOOK" -> Icons.Default.Headphones
+        "EBOOK", "BOOK" -> Icons.Default.MenuBook
+        "COMIC" -> Icons.Default.CollectionsBookmark
+        "MOVIE" -> Icons.Default.Movie
+        "SHOW", "EPISODE" -> Icons.Default.Tv
+        else -> Icons.Default.MusicNote
+    }
+
+    val typeColor = when (rec.mediaType.uppercase()) {
+        "AUDIOBOOK" -> Color(0xFFEC4899)
+        "EBOOK", "BOOK" -> Color(0xFF3B82F6)
+        "COMIC" -> Color(0xFFF59E0B)
+        "MOVIE" -> Color(0xFFE11D48)
+        "SHOW", "EPISODE" -> Color(0xFF8B5CF6)
+        else -> Color(0xFF10B981)
+    }
+
+    Card(
+        modifier = Modifier
+            .width(260.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onCardClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.95f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Media Poster with Overlays
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF0F172A))
+            ) {
+                if (rec.coverUrl.isNotBlank() && rec.coverUrl != "placeholder") {
+                    AsyncImage(
+                        model = rec.coverUrl,
+                        contentDescription = rec.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(typeColor.copy(alpha = 0.5f), Color(0xFF0F172A))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            mediaIcon,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                }
+
+                // Type Badge
+                Surface(
+                    color = typeColor.copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(bottomEnd = 10.dp, topStart = 14.dp),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(mediaIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
+                        Text(
+                            rec.mediaType.uppercase(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Info Button
+                IconButton(
+                    onClick = onInfoClick,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = "AI Rationale",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Action Play Floating Indicator
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (rec.suggestedAction == "READ") Icons.Default.MenuBook else Icons.Default.PlayArrow,
+                        contentDescription = rec.suggestedAction,
+                        tint = Color.Black,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Because you played / Vibe chip
+            if (rec.becauseYouPlayed.isNotBlank()) {
+                Surface(
+                    color = Color(0xFF6366F1).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFA5B4FC), modifier = Modifier.size(10.dp))
+                        Text(
+                            rec.becauseYouPlayed,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFA5B4FC),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            // Title & Creator
+            Text(
+                rec.title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                rec.creator,
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Rationale snippet
+            Text(
+                "\"${rec.aiRationale}\"",
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.6f),
+                maxLines = 2,
+                lineHeight = 14.sp,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }

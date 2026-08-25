@@ -1994,6 +1994,16 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "6.01.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Gemini AI Personalized Recommendations: New dedicated discovery section powered by Gemini AI that analyzes your recently played tracks, audiobooks, books, and movies to generate personalized cross-media recommendations.",
+                    "Interactive AI Rationale & Vibe Chips: Tap the info icon on any recommendation to explore why Gemini recommended it, the inspired media item, and the aesthetic vibe with 1-tap playback/reading.",
+                    "Concurrently Probed Multi-Candidate Plex Connection: Resolved Plex server connection and login issues by testing all local and remote candidate endpoints in parallel to lock onto the fastest responsive host with token persistence.",
+                    "Full Multi-Candidate Plex Video & Music Sync: Concurrently fetches rich movie catalogs, multi-season TV shows, and music libraries across all accessible server endpoints upon connecting."
+                )
+            ),
+            UpdateNotice(
                 version = "6.00.00",
                 date = "August 2026",
                 highlights = listOf(
