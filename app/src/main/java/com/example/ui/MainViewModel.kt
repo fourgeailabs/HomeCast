@@ -502,6 +502,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
+                
+                // Fetch Plex video libraries into memory
+                fetchPlexVideos()
 
                 // 2. Scan all enabled local folders
                 val folders = localFolders.value
