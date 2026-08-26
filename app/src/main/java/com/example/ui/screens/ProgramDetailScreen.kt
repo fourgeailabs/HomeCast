@@ -217,6 +217,14 @@ fun ProgramDetailScreen(
         }
     }
 
+    // Pre-warm cast & creative team bios in the background
+    LaunchedEffect(cast, directors, writers, producers, cinematographers) {
+        val names = (cast + directors + writers + producers + cinematographers).map { it.name }
+        if (names.isNotEmpty()) {
+            com.example.data.network.InternetCreatorBioFetcher.bulkPrefetchCreatorBios(names)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -393,7 +401,8 @@ fun ProgramDetailScreen(
                                 }
 
                                 if (isMovie && (movie?.duration ?: 0L) > 0L) {
-                                    val mins = (movie!!.duration / 60000)
+                                    val durationMs = movie?.duration ?: 0L
+                                    val mins = durationMs / 60000
                                     val hrs = mins / 60
                                     val remMins = mins % 60
                                     val durText = if (hrs > 0) "${hrs}h ${remMins}m" else "${remMins}m"
@@ -576,7 +585,7 @@ fun ProgramDetailScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            items(show.seasons, key = { it.id }) { season ->
+                            items(show.seasons.distinctBy { it.id }) { season ->
                                 SeasonCardItem(
                                     season = season,
                                     fallbackCover = show.coverUrl,
@@ -698,7 +707,7 @@ fun ProgramDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             if (isMovie) {
-                                items(similarPrograms.filterIsInstance<PlexMovieItem>(), key = { it.id }) { simMovie ->
+                                items(similarPrograms.filterIsInstance<PlexMovieItem>().distinctBy { it.id }) { simMovie ->
                                     ProgramPosterCard(
                                         title = simMovie.title,
                                         subtitle = "${simMovie.year ?: ""} • ${simMovie.genres.firstOrNull() ?: "Movie"}",
@@ -707,7 +716,7 @@ fun ProgramDetailScreen(
                                     )
                                 }
                             } else {
-                                items(similarPrograms.filterIsInstance<PlexShowItem>(), key = { it.id }) { simShow ->
+                                items(similarPrograms.filterIsInstance<PlexShowItem>().distinctBy { it.id }) { simShow ->
                                     ProgramPosterCard(
                                         title = simShow.title,
                                         subtitle = "${simShow.year ?: ""} • ${simShow.genres.firstOrNull() ?: "TV Show"}",
@@ -842,7 +851,7 @@ fun CastRowSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(members, key = { "${it.name}_${it.role}_${it.character}" }) { person ->
+            items(members.distinctBy { "${it.name}_${it.role}_${it.character}" }) { person ->
                 PersonAvatarCard(
                     person = person,
                     onClick = { onPersonClick(person) }
@@ -857,10 +866,14 @@ fun PersonAvatarCard(
     person: PlexCastMember,
     onClick: () -> Unit
 ) {
-    var resolvedThumb by remember(person.name, person.thumbUrl) { mutableStateOf(person.thumbUrl) }
+    val cachedThumb = remember(person.name, person.thumbUrl) {
+        if (person.thumbUrl.isNotBlank()) person.thumbUrl
+        else com.example.data.network.InternetCreatorBioFetcher.getCachedCreatorBio(person.name)?.imageUrl ?: ""
+    }
+    var resolvedThumb by remember(person.name, person.thumbUrl) { mutableStateOf(cachedThumb) }
 
     LaunchedEffect(person.name, person.thumbUrl) {
-        if (person.thumbUrl.isBlank() && person.name.isNotBlank()) {
+        if (resolvedThumb.isBlank() && person.name.isNotBlank()) {
             try {
                 val bioData = com.example.data.network.InternetCreatorBioFetcher.getCreatorBio(person.name)
                 if (bioData.imageUrl.isNotBlank()) {

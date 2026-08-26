@@ -1994,6 +1994,25 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "6.03.02",
+                date = "August 2026",
+                highlights = listOf(
+                    "High-Speed Parallel Plex Data Loading: Optimized Plex server probing and concurrent section queries to load entire movie and TV libraries in seconds, matching native Plex speeds.",
+                    "Complete Cast & Crew Biography Mapping: Seamlessly maps actors, directors, writers, producers, and cinematographers with full role descriptions and authentic portrait images sourced directly from Plex metadata or IMDb suggestions.",
+                    "Zero-Lag Avatar Caching & Pre-Fetching: Integrated instant local cache resolution and background bulk pre-fetching for cast and crew portraits, eliminating UI stutter and loading delays.",
+                    "Full Creative Team Support in Creator Profiles: Tapping any director, writer, producer, or cinematographer opens their rich biography with high-resolution portraits, curated filmographies, and matched media."
+                )
+            ),
+            UpdateNotice(
+                version = "6.03.01",
+                date = "August 2026",
+                highlights = listOf(
+                    "Crash Prevention & Resilient Video Loading: Hardened Plex movie and show parsing with bulletproof error boundaries, safe nullable duration handling, and complete collection deduplication to ensure zero crashes on media loading.",
+                    "Optimized Parallel Queries: Enhanced multi-candidate server queries with isolated async error handling preventing network dropouts from interrupting library display.",
+                    "Enhanced 20-Item Sub-Screen Stability: Verified seamless rendering of 'Recently Added' and 'Recent Releases' 3-column poster grid sub-screens capped at 20 items without layout conflicts."
+                )
+            ),
+            UpdateNotice(
                 version = "6.03.00",
                 date = "August 2026",
                 highlights = listOf(

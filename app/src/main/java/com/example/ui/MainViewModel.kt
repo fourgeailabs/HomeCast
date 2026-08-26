@@ -1243,7 +1243,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             candidateUrls = server.candidateUris
                         )
                     } else {
-                        _discoveredPlexServers.value = servers
+                        _discoveredPlexServers.value = servers.map {
+                            DiscoveredPlexServer(
+                                name = it.name,
+                                clientIdentifier = it.clientIdentifier,
+                                token = it.accessToken,
+                                preferredUri = it.preferredUri,
+                                isLocal = it.connections.any { c -> c.local == true },
+                                allConnections = it.connections,
+                                candidateUris = it.candidateUris,
+                                owned = it.owned
+                            )
+                        }
                         _showServerPicker.value = true
                         _serverOpState.value = ServerOperationState.Success("Plex account linked! Found ${servers.size} servers.")
                     }
@@ -1696,6 +1707,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     servers.value.filter { it.type == "plex" }
                 }
 
+                if (plexServers.isEmpty()) {
+                    return@launch
+                }
+
                 val allMovies = mutableListOf<PlexMovieItem>()
                 val allShows = mutableListOf<PlexShowItem>()
                 val allVideos = mutableListOf<PlexVideoItem>()
@@ -1703,24 +1718,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 coroutineScope {
                     val deferredList = plexServers.map { server ->
                         val moviesDeferred = async(Dispatchers.IO) {
-                            PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id, candidateUrls)
+                            try {
+                                PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id, candidateUrls).getOrNull() ?: emptyList()
+                            } catch (e: Throwable) {
+                                android.util.Log.e("MainViewModel", "Error fetching movies for ${server.name}", e)
+                                emptyList<PlexMovieItem>()
+                            }
                         }
                         val showsDeferred = async(Dispatchers.IO) {
-                            PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id, candidateUrls)
+                            try {
+                                PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id, candidateUrls).getOrNull() ?: emptyList()
+                            } catch (e: Throwable) {
+                                android.util.Log.e("MainViewModel", "Error fetching shows for ${server.name}", e)
+                                emptyList<PlexShowItem>()
+                            }
                         }
                         Pair(moviesDeferred, showsDeferred)
                     }
 
                     deferredList.forEach { (moviesDeferred, showsDeferred) ->
-                        val moviesRes = moviesDeferred.await()
-                        val showsRes = showsDeferred.await()
+                        try {
+                            val fetchedMovies = moviesDeferred.await()
+                            allMovies.addAll(fetchedMovies)
+                        } catch (t: Throwable) {
+                            android.util.Log.e("MainViewModel", "moviesDeferred await error", t)
+                        }
 
-                        moviesRes.getOrNull()?.let { allMovies.addAll(it) }
-                        showsRes.getOrNull()?.let { allShows.addAll(it) }
+                        try {
+                            val fetchedShows = showsDeferred.await()
+                            allShows.addAll(fetchedShows)
+                        } catch (t: Throwable) {
+                            android.util.Log.e("MainViewModel", "showsDeferred await error", t)
+                        }
                     }
                 }
 
-                allMovies.forEach { movie ->
+                val distinctMovies = allMovies.filter { it.id.isNotBlank() }.distinctBy { it.id }
+                val distinctShows = allShows.filter { it.id.isNotBlank() }.distinctBy { it.id }
+
+                distinctMovies.forEach { movie ->
                     allVideos.add(
                         PlexVideoItem(
                             id = movie.id,
@@ -1741,7 +1777,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                allShows.forEach { show ->
+                distinctShows.forEach { show ->
                     if (show.seasons.isEmpty()) {
                         allVideos.add(
                             PlexVideoItem(
@@ -1787,10 +1823,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                _plexMovies.value = allMovies
-                _plexShows.value = allShows
-                _plexVideoItems.value = allVideos
-            } catch (e: Exception) {
+                val distinctVideos = allVideos.filter { it.id.isNotBlank() }.distinctBy { it.id }
+
+                _plexMovies.value = distinctMovies
+                _plexShows.value = distinctShows
+                _plexVideoItems.value = distinctVideos
+            } catch (e: Throwable) {
                 android.util.Log.e("MainViewModel", "Error fetching rich plex videos", e)
             } finally {
                 _isFetchingPlexVideos.value = false

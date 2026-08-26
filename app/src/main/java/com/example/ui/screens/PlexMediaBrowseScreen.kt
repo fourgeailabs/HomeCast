@@ -1339,8 +1339,8 @@ fun SubPageContainer(
             }
             MediaDetailSubPage.CATEGORY_FILTER -> {
                 val q = categoryName.lowercase()
-                val matchedShows = shows.filter { it.genres.any { g -> g.lowercase().contains(q) } }
-                val matchedMovies = movies.filter { it.genres.any { g -> g.lowercase().contains(q) } }
+                val matchedShows = shows.filter { it.genres.any { g -> g.lowercase().contains(q) } }.distinctBy { it.id }
+                val matchedMovies = movies.filter { it.genres.any { g -> g.lowercase().contains(q) } }.distinctBy { it.id }
 
                 if (matchedShows.isNotEmpty() || matchedMovies.isNotEmpty()) {
                     LazyVerticalGrid(
@@ -1350,10 +1350,10 @@ fun SubPageContainer(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        items(matchedShows, key = { it.id }) { show ->
+                        items(matchedShows, key = { "show_${it.id}" }) { show ->
                             ShowGridPosterCard(show = show, onClick = { onOpenProgram(show.id, "show") })
                         }
-                        items(matchedMovies, key = { it.id }) { movie ->
+                        items(matchedMovies, key = { "movie_${it.id}" }) { movie ->
                             MovieGridPosterCard(movie = movie, onClick = { onOpenProgram(movie.id, "movie") })
                         }
                     }
@@ -1389,11 +1389,11 @@ fun Poster3ColumnGrid(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         if (isMovie) {
-            items(items.filterIsInstance<PlexMovieItem>(), key = { it.id }) { movie ->
+            items(items.filterIsInstance<PlexMovieItem>().distinctBy { it.id }, key = { it.id }) { movie ->
                 MovieGridPosterCard(movie = movie, onClick = { onOpenProgram(movie.id, "movie") })
             }
         } else {
-            items(items.filterIsInstance<PlexShowItem>(), key = { it.id }) { show ->
+            items(items.filterIsInstance<PlexShowItem>().distinctBy { it.id }, key = { it.id }) { show ->
                 ShowGridPosterCard(show = show, onClick = { onOpenProgram(show.id, "show") })
             }
         }

@@ -1,11 +1,34 @@
 # HomeCast
 
-**Version:** 6.03.00
+**Version:** 6.03.02
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v6.03.00)
+## 🚀 Recent Updates (v6.03.02)
+- **High-Speed Parallel Plex Data Loading**:
+  - Implemented parallel server endpoint discovery and concurrent section queries in `PlexClient` to fetch full movie and TV catalogs in seconds, matching native Plex app performance.
+  - Added fast multi-candidate connection probing to instantly resolve the active server host without sequential timeout delays.
+- **Extended Cast & Crew Media Biography Mapping**:
+  - Full mapping of Actors, Directors, Writers, Producers, and Cinematographers with specific role descriptions and authentic portrait images.
+  - Tiered portrait resolution engine queries Plex metadata first, seamlessly falling back to high-resolution IMDb suggestion portraits, Wikimedia Commons, and Wikipedia summaries.
+- **Zero-Lag Avatar Caching & Pre-Fetching**:
+  - Integrated zero-latency memory cache resolution in `PersonAvatarCard` to prevent UI thread blocking or layout stutter.
+  - Added background bulk bio pre-fetching upon opening any movie or show detail screen.
+- **Comprehensive Creative Team Navigation in Creator Profiles**:
+  - Tapping any director, writer, producer, or cinematographer opens their dedicated Creator Profile screen featuring their authentic biography, verified portrait photo, external IMDb/Wikipedia/Archive links, and filtered filmography shelves.
+
+## 🚀 Previous Updates (v6.03.01)
+- **Zero-Crash Media Loading & Bulletproof Exception Isolation**:
+  - Implemented comprehensive `Throwable` error boundaries around all JSON parsing, network fetching, and model mapping across `PlexClient` and `MainViewModel`.
+  - Replaced all unsafe nullable duration and season/episode calculations in `ProgramDetailScreen` with resilient fallback expressions (`?.` and `?: 0L`).
+  - Added robust list deduplication (`distinctBy { it.id }` and `distinctBy { "${it.name}_${it.role}_${it.character}" }`) across all LazyColumn/LazyRow/LazyVerticalGrid structures to eliminate duplicate key collisions.
+- **Isolated Multi-Server Async Query Execution**:
+  - Hardened parallel async coroutines for multi-candidate server queries so isolated network timeouts or unreachable hosts fail gracefully without interrupting the UI.
+- **Verified 20-Item Sub-Screen Layouts**:
+  - Validated 3-column poster grid navigation on 'Recently Added' and 'Recent Releases' sub-pages strictly capping to 20 media items per user requirements.
+
+## 🚀 Previous Updates (v6.03.00)
 - **High-Speed Parallel Bulk Fetching for Movies & TV Shows**:
   - Overhauled `PlexClient` video fetching by executing parallel bulk section queries for both movies and multi-season TV shows.
   - Eliminated sequential per-show and per-season round trips, achieving dramatic speed improvements and instantaneous catalog population.

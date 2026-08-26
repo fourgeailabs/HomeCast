@@ -82,7 +82,8 @@ fun CreatorDetailScreen(
             movie.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
             movie.directors.any { it.name.contains(creatorName, ignoreCase = true) } ||
             movie.writers.any { it.name.contains(creatorName, ignoreCase = true) } ||
-            movie.producers.any { it.name.contains(creatorName, ignoreCase = true) }
+            movie.producers.any { it.name.contains(creatorName, ignoreCase = true) } ||
+            movie.cinematographers.any { it.name.contains(creatorName, ignoreCase = true) }
         }
     }
 
@@ -97,7 +98,9 @@ fun CreatorDetailScreen(
                 s.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
                 s.episodes.any { ep ->
                     ep.cast.any { it.name.contains(creatorName, ignoreCase = true) } ||
-                    ep.directors.any { it.name.contains(creatorName, ignoreCase = true) }
+                    ep.directors.any { it.name.contains(creatorName, ignoreCase = true) } ||
+                    ep.writers.any { it.name.contains(creatorName, ignoreCase = true) } ||
+                    ep.producers.any { it.name.contains(creatorName, ignoreCase = true) }
                 }
             }
         }
@@ -107,8 +110,8 @@ fun CreatorDetailScreen(
         isLoadingBio = true
         try {
             // First check if Plex provides cast member info / thumbnail
-            val plexPerson = (plexMovies.flatMap { it.cast + it.directors + it.writers + it.producers } +
-                    plexShows.flatMap { it.cast + it.directors + it.writers + it.producers })
+            val plexPerson = (plexMovies.flatMap { it.cast + it.directors + it.writers + it.producers + it.cinematographers } +
+                    plexShows.flatMap { it.cast + it.directors + it.writers + it.producers + it.seasons.flatMap { s -> s.episodes.flatMap { ep -> ep.cast + ep.directors + ep.writers + ep.producers } } })
                 .firstOrNull { it.name.equals(creatorName, ignoreCase = true) }
 
             val bioData = InternetCreatorBioFetcher.getCreatorBio(creatorName)

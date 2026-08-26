@@ -267,10 +267,8 @@ fun SeasonDetailScreen(
                         color = TextSecondary
                     )
                 }
-            }
-
-            // 4. Episodes Rows
-            items(episodes, key = { it.id }) { ep ->
+            }            // 4. Episodes Rows
+            items(episodes.distinctBy { it.id }) { ep ->
                 EpisodeRowItem(
                     episode = ep,
                     fallbackCover = coverUrl,
@@ -308,7 +306,7 @@ fun SeasonDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -336,7 +334,7 @@ fun SeasonDetailScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(seasonCast, key = { "${it.name}_${it.character}" }) { person ->
+                            items(seasonCast.distinctBy { "${it.name}_${it.character}" }) { person ->
                                 PersonAvatarCard(
                                     person = person,
                                     onClick = { onOpenPerson(person.name) }
