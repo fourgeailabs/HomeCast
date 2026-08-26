@@ -493,18 +493,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // 1. Sync all connected servers
                 val currentServers = servers.value
+                val updatedServers = mutableListOf<ServerConfig>()
                 for (server in currentServers) {
                     if (server.isConnected) {
                         when (server.type) {
-                            "audiobookshelf" -> repository.syncAudiobooks(server)
-                            "booklore" -> repository.syncBooklore(server)
-                            else -> repository.syncPlex(server)
+                            "audiobookshelf" -> {
+                                repository.syncAudiobooks(server)
+                                updatedServers.add(server)
+                            }
+                            "booklore" -> {
+                                repository.syncBooklore(server)
+                                updatedServers.add(server)
+                            }
+                            else -> {
+                                var syncRes = repository.syncPlex(server)
+                                var finalServer = server
+                                if (syncRes.isFailure) {
+                                    // IP may have changed after server reboot, attempt to discover new IPs
+                                    val discoveredRes = com.example.data.network.PlexClient.fetchAccountServers(server.apiKey)
+                                    val discovered = discoveredRes.getOrNull()?.find { it.name == server.name || it.clientIdentifier == server.name }
+                                    if (discovered != null && discovered.preferredUri.isNotBlank()) {
+                                        finalServer = server.copy(hostUrl = discovered.preferredUri)
+                                        repository.addOrUpdateServer(finalServer)
+                                        repository.syncPlex(finalServer, discovered.candidateUris)
+                                    }
+                                }
+                                updatedServers.add(finalServer)
+                            }
                         }
                     }
                 }
                 
                 // Fetch Plex video libraries into memory
-                fetchPlexVideos()
+                fetchPlexVideos(overrideServers = updatedServers.filter { it.type == "plex" && it.isConnected })
 
                 // 2. Scan all enabled local folders
                 val folders = localFolders.value
@@ -1427,16 +1448,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun syncServer(server: ServerConfig) {
         viewModelScope.launch {
             _serverOpState.value = ServerOperationState.Loading
-            val res = when (server.type) {
-                "audiobookshelf" -> repository.syncAudiobooks(server)
-                "booklore" -> repository.syncBooklore(server)
-                else -> repository.syncPlex(server)
-            }
-            if (res.isSuccess) {
-                if (server.type == "plex") {
-                    fetchPlexVideos()
+            
+            var finalServer = server
+            var finalRes: Result<Int>? = null
+            
+            if (server.type == "audiobookshelf") {
+                finalRes = repository.syncAudiobooks(server)
+            } else if (server.type == "booklore") {
+                finalRes = repository.syncBooklore(server)
+            } else if (server.type == "plex") {
+                var syncRes = repository.syncPlex(server)
+                if (syncRes.isFailure) {
+                    val discoveredRes = com.example.data.network.PlexClient.fetchAccountServers(server.apiKey)
+                    val discovered = discoveredRes.getOrNull()?.find { it.name == server.name || it.clientIdentifier == server.name }
+                    if (discovered != null && discovered.preferredUri.isNotBlank()) {
+                        finalServer = server.copy(hostUrl = discovered.preferredUri)
+                        repository.addOrUpdateServer(finalServer)
+                        syncRes = repository.syncPlex(finalServer, discovered.candidateUris)
+                    }
                 }
-                _serverOpState.value = ServerOperationState.Success("Synced ${res.getOrNull()} items successfully.")
+                finalRes = syncRes
+            }
+            
+            if (finalRes?.isSuccess == true) {
+                if (finalServer.type == "plex") {
+                    fetchPlexVideos(explicitServer = finalServer)
+                }
+                _serverOpState.value = ServerOperationState.Success("Synced ${finalRes.getOrNull()} items successfully.")
                 // Run AI dynamic cleanup and category optimization on the new items!
                 launch {
                     try {
@@ -1447,7 +1485,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } else {
-                _serverOpState.value = ServerOperationState.Error("Sync failed: ${res.exceptionOrNull()?.message}")
+                _serverOpState.value = ServerOperationState.Error("Sync failed: ${finalRes?.exceptionOrNull()?.message}")
             }
         }
     }
@@ -1644,11 +1682,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun fetchPlexVideos(explicitServer: ServerConfig? = null, candidateUrls: List<String> = emptyList()) {
+    fun fetchPlexVideos(explicitServer: ServerConfig? = null, candidateUrls: List<String> = emptyList(), overrideServers: List<ServerConfig>? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             _isFetchingPlexVideos.value = true
             try {
-                val plexServers = if (explicitServer != null) {
+                val plexServers = overrideServers ?: if (explicitServer != null) {
                     (listOf(explicitServer) + servers.value.filter { it.type == "plex" && it.isConnected && it.id != explicitServer.id })
                 } else {
                     servers.value.filter { it.type == "plex" && it.isConnected }

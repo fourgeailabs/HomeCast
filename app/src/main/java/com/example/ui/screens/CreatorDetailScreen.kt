@@ -582,18 +582,12 @@ fun CreatorDetailScreen(
                     if (combinedMusic.isNotEmpty()) {
                         combinedMusic.take(10)
                     } else {
-                        // Fallback popular tracks for artist
-                        listOf(
-                            MusicTrack(id = "pop_1", title = "Symphony No. 5 in C Minor", artist = creatorName, album = "Masterpieces Vol. 1", coverUrl = imageUrl, duration = 210000L, serverId = "local", streamUrl = ""),
-                            MusicTrack(id = "pop_2", title = "Moonlight Sonata (Adagio Sostenuto)", artist = creatorName, album = "Classics Collection", coverUrl = imageUrl, duration = 300000L, serverId = "local", streamUrl = ""),
-                            MusicTrack(id = "pop_3", title = "Für Elise (Bagatelle No. 25)", artist = creatorName, album = "Piano Classics", coverUrl = imageUrl, duration = 180000L, serverId = "local", streamUrl = ""),
-                            MusicTrack(id = "pop_4", title = "Ode to Joy (Symphony No. 9)", artist = creatorName, album = "Choral Symphony", coverUrl = imageUrl, duration = 240000L, serverId = "local", streamUrl = ""),
-                            MusicTrack(id = "pop_5", title = "Violin Concerto in D Major", artist = creatorName, album = "Concertos", coverUrl = imageUrl, duration = 270000L, serverId = "local", streamUrl = "")
-                        )
+                        emptyList()
                     }
                 }
 
-                Card(
+                if (popularTracks.isNotEmpty()) {
+                    Card(
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
                     border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceGlassBorder),
@@ -668,6 +662,7 @@ fun CreatorDetailScreen(
                             }
                         }
                     }
+                }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
