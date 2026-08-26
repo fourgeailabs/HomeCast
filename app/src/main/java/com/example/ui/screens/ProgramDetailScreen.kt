@@ -33,6 +33,8 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.VideoPlayerDialog
 import com.example.ui.theme.AccentIndigo
 import com.example.ui.theme.AccentTeal
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.ui.theme.SurfaceGlass
 import com.example.ui.theme.SurfaceGlassBorder
 import com.example.ui.theme.TextPrimary
@@ -99,57 +101,101 @@ fun ProgramDetailScreen(
         if (ratingKey != null && serverId != null) {
             val server = servers.firstOrNull { it.id == serverId }
             if (server != null) {
-                // Fetch full details
-                try {
-                    val root = server.hostUrl
-                    val token = server.apiKey.trim()
-                    val url = "$root/library/metadata/$ratingKey?X-Plex-Token=$token"
-                    val req = okhttp3.Request.Builder()
-                        .url(url)
-                        .header("Accept", "application/json")
-                        .build()
-                    val res = okhttp3.OkHttpClient().newCall(req).execute()
-                    if (res.isSuccessful) {
-                        val body = res.body?.string() ?: ""
-                        val json = org.json.JSONObject(body)
-                        val mc = json.optJSONObject("MediaContainer")
-                        if (mc != null) {
-                            val metaArray = mc.optJSONArray("Metadata")
-                            if (metaArray != null && metaArray.length() > 0) {
-                                val item = metaArray.getJSONObject(0)
-                                
-                                // Helper to parse rich cast
-                                fun parseRich(tagKey: String, roleDefault: String): List<PlexCastMember> {
-                                    val list = mutableListOf<PlexCastMember>()
-                                    val arr = item.optJSONArray(tagKey)
-                                    if (arr != null) {
-                                        for (i in 0 until arr.length()) {
-                                            val obj = arr.getJSONObject(i)
-                                            val name = obj.optString("tag", obj.optString("name", "")).trim()
-                                            if (name.isBlank()) continue
-                                            val role = obj.optString("role", roleDefault).trim()
-                                            val thumb = obj.optString("thumb", "")
-                                            val thumbUrl = if (thumb.isNotBlank()) {
-                                                val cleanThumb = if (thumb.startsWith("/")) thumb else "/$thumb"
-                                                "$root$cleanThumb?X-Plex-Token=$token"
-                                            } else ""
-                                            val id = obj.optString("id", "")
-                                            list.add(PlexCastMember(id = id, name = name, role = role, thumbUrl = thumbUrl))
+                withContext(Dispatchers.IO) {
+                    try {
+                        val root = server.hostUrl.trimEnd('/')
+                        val token = server.apiKey.trim()
+                        val url = "$root/library/metadata/$ratingKey?includeConcerts=1&includeExtras=1&includeOnDeck=1&includePopularProviders=1&includePreferences=1&includeReviews=1&includeChapterImages=1&includeStations=1&includeExternalMedia=1&asyncCheckFiles=1&asyncRefreshAnalysis=1&asyncRefreshLocalMediaAgent=1&X-Plex-Token=$token"
+                        val req = okhttp3.Request.Builder()
+                            .url(url)
+                            .header("Accept", "application/json")
+                            .header("X-Plex-Token", token)
+                            .build()
+                        val res = okhttp3.OkHttpClient().newCall(req).execute()
+                        if (res.isSuccessful) {
+                            val body = res.body?.string() ?: ""
+                            val json = org.json.JSONObject(body)
+                            val mc = json.optJSONObject("MediaContainer")
+                            if (mc != null) {
+                                val metaArray = mc.optJSONArray("Metadata")
+                                val item = if (metaArray != null && metaArray.length() > 0) metaArray.getJSONObject(0) else mc.optJSONObject("Metadata")
+                                if (item != null) {
+                                    // Helper to parse rich cast
+                                    fun parseRich(tagKey: String, roleDefault: String): List<PlexCastMember> {
+                                        val list = mutableListOf<PlexCastMember>()
+                                        val arr = item.optJSONArray(tagKey)
+                                        if (arr != null) {
+                                            for (i in 0 until arr.length()) {
+                                                val obj = arr.getJSONObject(i)
+                                                val name = obj.optString("tag", obj.optString("name", "")).trim()
+                                                if (name.isBlank()) continue
+                                                val character = obj.optString("role", "").trim()
+                                                val thumb = obj.optString("thumb", obj.optString("photo", obj.optString("picture", "")))
+                                                val thumbUrl = if (thumb.isNotBlank()) {
+                                                    if (thumb.startsWith("http://") || thumb.startsWith("https://")) {
+                                                        thumb
+                                                    } else {
+                                                        val cleanThumb = if (thumb.startsWith("/")) thumb else "/$thumb"
+                                                        "$root$cleanThumb?X-Plex-Token=$token"
+                                                    }
+                                                } else ""
+                                                val id = obj.optString("id", "")
+                                                list.add(PlexCastMember(
+                                                    id = id,
+                                                    name = name,
+                                                    role = if (character.isNotBlank()) "Actor" else roleDefault,
+                                                    character = character,
+                                                    thumbUrl = thumbUrl
+                                                ))
+                                            }
+                                        } else {
+                                            val singleObj = item.optJSONObject(tagKey)
+                                            if (singleObj != null) {
+                                                val name = singleObj.optString("tag", singleObj.optString("name", "")).trim()
+                                                if (name.isNotBlank()) {
+                                                    val character = singleObj.optString("role", "").trim()
+                                                    val thumb = singleObj.optString("thumb", singleObj.optString("photo", singleObj.optString("picture", "")))
+                                                    val thumbUrl = if (thumb.isNotBlank()) {
+                                                        if (thumb.startsWith("http://") || thumb.startsWith("https://")) {
+                                                            thumb
+                                                        } else {
+                                                            val cleanThumb = if (thumb.startsWith("/")) thumb else "/$thumb"
+                                                            "$root$cleanThumb?X-Plex-Token=$token"
+                                                        }
+                                                    } else ""
+                                                    val id = singleObj.optString("id", "")
+                                                    list.add(PlexCastMember(
+                                                        id = id,
+                                                        name = name,
+                                                        role = if (character.isNotBlank()) "Actor" else roleDefault,
+                                                        character = character,
+                                                        thumbUrl = thumbUrl
+                                                    ))
+                                                }
+                                            }
                                         }
+                                        return list
                                     }
-                                    return list
+                                    
+                                    val parsedCast = parseRich("Role", "Actor").ifEmpty { parseRich("Actor", "Actor") }
+                                    val parsedDirectors = parseRich("Director", "Director")
+                                    val parsedWriters = parseRich("Writer", "Writer")
+                                    val parsedProducers = parseRich("Producer", "Producer")
+                                    val parsedCrew = parseRich("Crew", "Crew")
+
+                                    withContext(Dispatchers.Main) {
+                                        if (parsedCast.isNotEmpty()) detailedCast = parsedCast
+                                        if (parsedDirectors.isNotEmpty()) detailedDirectors = parsedDirectors
+                                        if (parsedWriters.isNotEmpty()) detailedWriters = parsedWriters
+                                        if (parsedProducers.isNotEmpty()) detailedProducers = parsedProducers
+                                        if (parsedCrew.isNotEmpty()) detailedCinematographers = parsedCrew
+                                    }
                                 }
-                                
-                                detailedCast = parseRich("Role", "Actor")
-                                detailedDirectors = parseRich("Director", "Director")
-                                detailedWriters = parseRich("Writer", "Writer")
-                                detailedProducers = parseRich("Producer", "Producer")
-                                detailedCinematographers = parseRich("Country", "Cinematographer") // Just in case, Country is what was used in PlexClient, though usually it's "Country". For real it's Country/Cinematographer? Actually, just parse what PlexClient parses.
                             }
                         }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
             }
         }
@@ -811,6 +857,19 @@ fun PersonAvatarCard(
     person: PlexCastMember,
     onClick: () -> Unit
 ) {
+    var resolvedThumb by remember(person.name, person.thumbUrl) { mutableStateOf(person.thumbUrl) }
+
+    LaunchedEffect(person.name, person.thumbUrl) {
+        if (person.thumbUrl.isBlank() && person.name.isNotBlank()) {
+            try {
+                val bioData = com.example.data.network.InternetCreatorBioFetcher.getCreatorBio(person.name)
+                if (bioData.imageUrl.isNotBlank()) {
+                    resolvedThumb = bioData.imageUrl
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     Column(
         modifier = Modifier
             .width(84.dp)
@@ -827,9 +886,9 @@ fun PersonAvatarCard(
                 .border(1.5.dp, AccentIndigo.copy(alpha = 0.4f), CircleShape)
                 .background(SurfaceGlass)
         ) {
-            if (person.thumbUrl.isNotBlank()) {
+            if (resolvedThumb.isNotBlank()) {
                 AsyncImage(
-                    model = person.thumbUrl,
+                    model = resolvedThumb,
                     contentDescription = person.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

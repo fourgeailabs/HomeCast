@@ -172,7 +172,10 @@ data class PlexShowItem(
     val writers: List<PlexCastMember> = emptyList(),
     val cinematographers: List<PlexCastMember> = emptyList(),
     val similarTitles: List<String> = emptyList(),
-    val lastPlayed: Long = 0L
+    val lastPlayed: Long = 0L,
+    val leafCount: Int = 0,
+    val childCount: Int = 0,
+    val addedAt: Long = 0L
 )
 
 data class PlexMovieItem(
@@ -199,7 +202,8 @@ data class PlexMovieItem(
     val cinematographers: List<PlexCastMember> = emptyList(),
     val similarTitles: List<String> = emptyList(),
     val lastPlayed: Long = 0L,
-    val progress: Long = 0L
+    val progress: Long = 0L,
+    val addedAt: Long = 0L
 )
 
 

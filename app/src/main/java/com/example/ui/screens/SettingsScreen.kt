@@ -1994,6 +1994,27 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     val updates = remember {
         listOf(
             UpdateNotice(
+                version = "6.03.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "High-Speed Bulk Fetching & Concurrent Loading: Overhauled Plex movie and TV show fetching to fetch all library items and episodes in high-speed parallel bulk queries, drastically reducing loading times.",
+                    "Dedicated Interactive 'Recently Added' & 'Recent Releases' Sub-Screens: Added full-screen dedicated sub-views capped at the top 20 most recent uploads and releases for both Movies and TV Shows with responsive 3-column poster grids.",
+                    "Authentic 4-Tab Plex Media Hub: Built sleek multi-tab browsing (Recommended, Browse, Playlists, Categories) with 3-column poster grids, search filter bar, dynamic sorting (Title, Year, Rating, Date Added), and colorful 2-column genre tiles matching reference design.",
+                    "Seamless Media Navigation: Interactive clickables on every poster, banner, category card, and action button leading directly to media detail views with instant HD playback."
+                )
+            ),
+            UpdateNotice(
+                version = "6.02.00",
+                date = "August 2026",
+                highlights = listOf(
+                    "Plex Video Library Fetch & Pagination Resolution: Re-architected Plex movie and TV show queries to include X-Plex-Container-Size headers (10,000 items) and exhaustive section scans to load thousands of movies and multi-season TV shows without truncation.",
+                    "Accurate Real-Time Library Item Counts: Browse Libraries cards dynamically report exact live counts for all TV shows and movies directly from your connected Plex media server.",
+                    "Comprehensive Cast & Creative Team Suite: Shows, movies, and episodes display full cast and crew lists (Actors, Directors, Writers, Producers, Cinematographers) matching native Plex client depth.",
+                    "Universal Cast & Crew Portrait Art: Enhanced portrait loader resolves high-resolution photos for all actors and creative crew members directly from Plex metadata and authentic internet archives.",
+                    "Theme-Consistent Sleek Progress Bars: Polished video resume and playback progress indicators with modern cyan/indigo gradient styling matching the app's established theme."
+                )
+            ),
+            UpdateNotice(
                 version = "6.01.00",
                 date = "August 2026",
                 highlights = listOf(

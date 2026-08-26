@@ -18,6 +18,8 @@ import com.example.data.network.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -1687,23 +1689,102 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isFetchingPlexVideos.value = true
             try {
                 val plexServers = overrideServers ?: if (explicitServer != null) {
-                    (listOf(explicitServer) + servers.value.filter { it.type == "plex" && it.isConnected && it.id != explicitServer.id })
+                    (listOf(explicitServer) + servers.value.filter { it.type == "plex" && it.id != explicitServer.id })
                 } else {
                     servers.value.filter { it.type == "plex" && it.isConnected }
+                }.ifEmpty {
+                    servers.value.filter { it.type == "plex" }
                 }
+
                 val allMovies = mutableListOf<PlexMovieItem>()
                 val allShows = mutableListOf<PlexShowItem>()
                 val allVideos = mutableListOf<PlexVideoItem>()
 
-                for (server in plexServers) {
-                    val moviesRes = PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id, candidateUrls)
-                    moviesRes.getOrNull()?.let { allMovies.addAll(it) }
+                coroutineScope {
+                    val deferredList = plexServers.map { server ->
+                        val moviesDeferred = async(Dispatchers.IO) {
+                            PlexClient.fetchRichMovies(server.hostUrl, server.apiKey, server.id, candidateUrls)
+                        }
+                        val showsDeferred = async(Dispatchers.IO) {
+                            PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id, candidateUrls)
+                        }
+                        Pair(moviesDeferred, showsDeferred)
+                    }
 
-                    val showsRes = PlexClient.fetchRichShows(server.hostUrl, server.apiKey, server.id, candidateUrls)
-                    showsRes.getOrNull()?.let { allShows.addAll(it) }
+                    deferredList.forEach { (moviesDeferred, showsDeferred) ->
+                        val moviesRes = moviesDeferred.await()
+                        val showsRes = showsDeferred.await()
 
-                    val videoRes = PlexClient.fetchVideoItems(server.hostUrl, server.apiKey, server.id, candidateUrls)
-                    videoRes.getOrNull()?.let { allVideos.addAll(it) }
+                        moviesRes.getOrNull()?.let { allMovies.addAll(it) }
+                        showsRes.getOrNull()?.let { allShows.addAll(it) }
+                    }
+                }
+
+                allMovies.forEach { movie ->
+                    allVideos.add(
+                        PlexVideoItem(
+                            id = movie.id,
+                            title = movie.title,
+                            type = "movie",
+                            showTitle = "",
+                            seasonEpisodeLabel = "",
+                            summary = movie.summary,
+                            year = movie.year,
+                            duration = movie.duration,
+                            coverUrl = movie.coverUrl,
+                            bannerUrl = movie.bannerUrl,
+                            videoUrl = movie.videoUrl,
+                            ratingKey = movie.ratingKey,
+                            genre = movie.genres.firstOrNull() ?: "Movie",
+                            serverId = movie.serverId
+                        )
+                    )
+                }
+
+                allShows.forEach { show ->
+                    if (show.seasons.isEmpty()) {
+                        allVideos.add(
+                            PlexVideoItem(
+                                id = show.id,
+                                title = show.title,
+                                type = "show",
+                                showTitle = show.title,
+                                seasonEpisodeLabel = "Series",
+                                summary = show.summary,
+                                year = show.year,
+                                duration = 0L,
+                                coverUrl = show.coverUrl,
+                                bannerUrl = show.bannerUrl,
+                                videoUrl = "",
+                                ratingKey = show.ratingKey,
+                                genre = show.genres.firstOrNull() ?: "TV Series",
+                                serverId = show.serverId
+                            )
+                        )
+                    } else {
+                        show.seasons.forEach { season ->
+                            season.episodes.forEach { ep ->
+                                allVideos.add(
+                                    PlexVideoItem(
+                                        id = ep.id,
+                                        title = ep.title,
+                                        type = "episode",
+                                        showTitle = show.title,
+                                        seasonEpisodeLabel = "S${ep.seasonNumber}E${ep.episodeNumber}",
+                                        summary = ep.summary,
+                                        year = show.year,
+                                        duration = ep.duration,
+                                        coverUrl = ep.coverUrl.ifBlank { show.coverUrl },
+                                        bannerUrl = show.bannerUrl,
+                                        videoUrl = ep.videoUrl,
+                                        ratingKey = ep.ratingKey,
+                                        genre = show.genres.firstOrNull() ?: "TV Show",
+                                        serverId = show.serverId
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
 
                 _plexMovies.value = allMovies

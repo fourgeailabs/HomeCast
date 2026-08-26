@@ -1,11 +1,35 @@
 # HomeCast
 
-**Version:** 6.01.00
+**Version:** 6.03.00
 **Description:** A premium, all-in-one local network audiobook, e-book, music, comic, podcast, and video media player built directly into a unified interface with intelligent AI discovery and adaptive glassmorphic UI.
 
 ---
 
-## 🚀 Recent Updates (v6.01.00)
+## 🚀 Recent Updates (v6.03.00)
+- **High-Speed Parallel Bulk Fetching for Movies & TV Shows**:
+  - Overhauled `PlexClient` video fetching by executing parallel bulk section queries for both movies and multi-season TV shows.
+  - Eliminated sequential per-show and per-season round trips, achieving dramatic speed improvements and instantaneous catalog population.
+- **Dedicated Interactive 'Recently Added' & 'Recent Releases' Sub-Screens**:
+  - Added dedicated full-screen sub-views capped at the top 20 most recent uploads and releases for both Movies and TV Shows.
+  - Features responsive 3-column poster cards with high-resolution artwork, badge indicators, and 1-tap navigation to program overviews.
+- **Authentic 4-Tab Plex Media Hub Layout**:
+  - Built sleek multi-tab browsing (Recommended, Browse, Playlists, Categories) with 3-column poster grids, search filter bar, dynamic sorting (Title, Year, Rating, Date Added), and colorful 2-column genre tiles matching reference design.
+- **Comprehensive Interactive Navigation**:
+  - Every poster, carousel card, category tile, and action button is interactive and immediately navigates to program details, episode selectors, and instant HD playback.
+
+## 🚀 Previous Updates (v6.02.00)
+- **Exhaustive Plex Video Library Retrieval & Container Pagination**:
+  - Re-architected `PlexClient` video queries with `X-Plex-Container-Size: 10000` headers and multi-section scans, ensuring that entire collections with thousands of Movies and multi-season TV Shows are fetched without artificial pagination cutoffs.
+- **Accurate Live Media Library Counts**:
+  - Browse Libraries section dynamically calculates and displays exact live counts (`X TV Shows • Online` and `Y Movies • Online`) from the connected Plex server.
+- **Complete Cast & Creative Team Suite**:
+  - Full display of all Cast and Creative Team members (Actors, Directors, Writers, Producers, Cinematographers/Crew) matching native Plex depth across Movie, Show, and Episode detail screens.
+- **Universal Cast & Crew Portrait Art Resolution**:
+  - Enhanced avatar loader automatically resolves portrait photos from Plex metadata and authentic internet archives (Wikipedia/Wikidata) for every single actor and crew member.
+- **Theme-Consistent Sleek Progress Bars**:
+  - Video resume cards and playback progress indicators now feature theme-matching cyan/indigo gradient styling instead of generic progress colors.
+
+## 🚀 Previous Updates (v6.01.00)
 - **Gemini AI Personalized Recommendations Section**:
   - Integrated Gemini API to analyze user's recently played music tracks, audiobooks, e-books, podcasts, and movies/shows in real-time.
   - Dynamically synthesizes personalized cross-media recommendations blending the user's private library items with curated public domain masterworks.
